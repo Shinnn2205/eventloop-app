@@ -93,7 +93,7 @@ export function AppProvider({ children }) {
       id: `APV-${Date.now().toString().slice(-4)}`,
       dateSubmitted: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
       status: 'Pending Admin Check',
-      uploader: 'currentUser' // Penanda bahwa ini milik user saat ini
+      uploader: 'currentUser'
     }
     setPendingApprovals(prev => [pendingItem, ...prev])
     return pendingItem.id
@@ -125,7 +125,7 @@ export function AppProvider({ children }) {
       description: itemToApprove.description || 'Perlengkapan organisasi kampus siap pakai.',
       lastLocation: itemToApprove.initialLocation || 'Warehouse Kampus Gedung C',
       lastStoragePhoto: itemToApprove.initialStoragePhoto || null,
-      uploader: itemToApprove.uploader, // Teruskan status uploader agar user tahu ini miliknya
+      uploader: itemToApprove.uploader,
       history: [
         { event: 'Didaftarkan & Lolos Verifikasi Admin', org: itemToApprove.ownerOrg || 'Prasmul Org', date: new Date().toISOString().split('T')[0], condition: itemToApprove.condition }
       ]
@@ -167,7 +167,14 @@ export function AppProvider({ children }) {
     }
 
     setTransactions(prev => [newTxn, ...prev])
-    setActiveReservation({ ...reservationDetails, items: cartItems, txnId })
+    
+    // Sinkronisasi item keranjang agar muncul di halaman Return & Dashboard
+    setActiveReservation({ 
+      ...reservationDetails, 
+      items: cartItems, 
+      txnId 
+    })
+    
     setCartItems([])
     setUserPaymentStatus('pending_admin_approval')
   }
@@ -202,7 +209,7 @@ export function AppProvider({ children }) {
 
   // --- ACTIONS ADMIN MANAGE STOK ---
   const updateEquipmentPriceAndStock = (id, newPrice, newAvailable) => {
-    if (currentUserRole !== 'admin') return // Keamanan ekstra
+    if (currentUserRole !== 'admin') return
     setEquipments(prev => prev.map(item => {
       if (item.id === id) {
         return {
@@ -217,7 +224,7 @@ export function AppProvider({ children }) {
   }
 
   const deleteEquipment = (id) => {
-    if (currentUserRole !== 'admin') return // Keamanan ekstra
+    if (currentUserRole !== 'admin') return
     setEquipments(prev => prev.filter(item => item.id !== id))
     setCartItems(prev => prev.filter(item => item.id !== id))
   }
@@ -265,7 +272,7 @@ export function AppProvider({ children }) {
 
   return (
     <AppContext.Provider value={{
-      currentUserRole, setCurrentUserRole, // <- FUNGSI ROLE
+      currentUserRole, setCurrentUserRole,
       equipments, pendingApprovals, transactions, userPaymentStatus, activeReservation, returnStatus, pendingReturns,
       cartItems, addToCart, removeFromCart, updateCartQty,
       uploadEquipmentByUser, approveEquipmentByAdmin, rejectEquipmentByAdmin, submitUserQrisPayment, approvePaymentByAdmin,
