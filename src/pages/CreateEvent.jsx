@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useApp } from '../context/AppContext'
 import { 
   Calendar, 
   MapPin, 
@@ -15,6 +16,8 @@ import {
 
 export default function CreateEvent() {
   const navigate = useNavigate()
+  const { addToCart, equipments } = useApp()
+  
   const [eventName, setEventName] = useState('INNOFAIR 2026')
   const [eventDate, setEventDate] = useState('2026-09-18')
   const [location, setLocation] = useState('Hall Auditorium Kampus Utama')
@@ -59,7 +62,6 @@ export default function CreateEvent() {
         { name: 'Reusable Cup Set (50pcs)', qty: cupSets, price: 30000, score: 85, note: 'Minum rapat ramah lingkungan' },
       ]
     } else {
-      // Default: Expo / Bazaar
       return [
         { name: 'Modular Exhibition Booth', qty: 3, price: 50000, score: 92, note: 'Booth tenant pameran & bazaar' },
         { name: 'Standing Banner Frame', qty: 3, price: 15000, score: 95, note: 'Signage denah booth & rundown' },
@@ -82,6 +84,12 @@ export default function CreateEvent() {
   }
 
   const handleSaveAndProceed = () => {
+    recommendedList.forEach(rec => {
+      const actualItem = equipments.find(eq => eq.name.includes(rec.name.split(' ')[0]))
+      if (actualItem) {
+        addToCart(actualItem, rec.qty)
+      }
+    })
     navigate('/reservation')
   }
 
@@ -206,7 +214,6 @@ export default function CreateEvent() {
           </div>
         </form>
 
-        {/* Generated Equipment List Section */}
         {generated && (
           <div className="mt-8 pt-8 border-t border-gray-200 space-y-6 animate-fade-in-up">
             <div className="flex items-center justify-between">
