@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Recycle, Mail, Lock, ArrowRight, ShieldCheck, Sparkles, Building2, User, Hash } from 'lucide-react' // <-- Tambah icon Hash untuk NIM
+import { Recycle, Mail, Lock, ArrowRight, ShieldCheck, Sparkles, Building2, User, Hash } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useApp } from '../context/AppContext'
 
@@ -10,7 +10,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   
-  // State baru untuk Nama dan NIM
+  // State untuk Nama dan NIM
   const [fullName, setFullName] = useState('') 
   const [nim, setNim] = useState('') 
   
@@ -23,7 +23,7 @@ export default function LoginPage() {
     setLoading(true)
 
     if (isSignUp) {
-      // Proses Pendaftaran: Simpan Nama & NIM di metadata Supabase
+      // Proses Pendaftaran: Simpan user baru ke Supabase Auth + Trigger profiles
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -38,6 +38,17 @@ export default function LoginPage() {
       if (error) {
         alert('Gagal mendaftar: ' + error.message)
       } else {
+        // Jika sukses mendaftar, juga masukkan secara manual ke tabel profiles sebagai cadangan aman
+        if (data?.user) {
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            full_name: fullName || 'Prasmulyan',
+            nim: nim || '00000000',
+            email: email,
+            updated_at: new Date()
+          })
+        }
+
         alert('Pendaftaran berhasil! Akun dengan NIM ' + nim + ' telah dibuat. Silakan masuk.')
         setIsSignUp(false)
       }
