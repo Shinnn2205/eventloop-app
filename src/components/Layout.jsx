@@ -14,8 +14,9 @@ import {
   ShieldCheck,
   Package
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
+import { supabase } from '../lib/supabaseClient' // <-- Import supabase client
 
 const userNavItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -37,7 +38,27 @@ const adminNavItems = [
 export default function Layout() {
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { currentUserRole, currentUserName } = useApp() 
+  const { currentUserRole } = useApp() 
+
+  // State untuk menyimpan nama dan NIM dari Supabase Auth
+  const [displayName, setDisplayName] = useState('Prasmulyan')
+  const [displayNim, setDisplayNim] = useState('Mahasiswa / Org')
+
+  useEffect(() => {
+    async function fetchUserData() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const metadata = session.user.user_metadata
+        if (metadata?.full_name) {
+          setDisplayName(metadata.full_name)
+        }
+        if (metadata?.nim) {
+          setDisplayNim(`NIM: ${metadata.nim}`)
+        }
+      }
+    }
+    fetchUserData()
+  }, [])
 
   const currentNavItems = currentUserRole === 'admin' ? adminNavItems : userNavItems
 
@@ -120,17 +141,18 @@ export default function Layout() {
           </p>
         </div>
 
+        {/* Bagian Profil User di Kiri Bawah */}
         <div className="p-4 border-t border-gray-100">
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100">
             <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm ${currentUserRole === 'admin' ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : 'bg-gradient-to-br from-green-500 to-emerald-600'}`}>
-              {currentUserRole === 'admin' ? 'AD' : currentUserName.substring(0,2).toUpperCase()}
+              {currentUserRole === 'admin' ? 'AD' : displayName.substring(0, 2).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900 truncate">
-                {currentUserName}
+                {currentUserRole === 'admin' ? 'Admin Sarpras' : displayName}
               </p>
               <p className="text-xs text-gray-500 truncate">
-                {currentUserRole === 'admin' ? 'Pengelola Terpusat' : 'Mahasiswa / Org'}
+                {currentUserRole === 'admin' ? 'Pengelola Terpusat' : displayNim}
               </p>
             </div>
             <Link to="/login" title="Logout" className="text-gray-400 hover:text-red-500 transition-colors p-1">
