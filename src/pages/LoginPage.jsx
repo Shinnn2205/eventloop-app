@@ -1,24 +1,71 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Recycle, Mail, Lock, ArrowRight, ShieldCheck, Sparkles, Building2 } from 'lucide-react'
+import { Recycle, Mail, Lock, ArrowRight, ShieldCheck, Sparkles, Building2, User, Hash } from 'lucide-react' // <-- Tambah icon Hash untuk NIM
+import { supabase } from '../lib/supabaseClient'
 import { useApp } from '../context/AppContext'
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const { setCurrentUserRole } = useApp()
-  const [email, setEmail] = useState('bem@univ.ac.id')
-  const [password, setPassword] = useState('password123')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  
+  // State baru untuk Nama dan NIM
+  const [fullName, setFullName] = useState('') 
+  const [nim, setNim] = useState('') 
+  
   const [role, setRole] = useState('student_org')
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = (e) => {
+  const handleAuth = async (e) => {
     e.preventDefault()
-    if (role === 'sarpras') {
-      setCurrentUserRole('admin')
-      navigate('/admin')
+    setLoading(true)
+
+    if (isSignUp) {
+      // Proses Pendaftaran: Simpan Nama & NIM di metadata Supabase
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName || 'Prasmulyan',
+            nim: nim || '00000000',
+          }
+        }
+      })
+
+      if (error) {
+        alert('Gagal mendaftar: ' + error.message)
+      } else {
+        alert('Pendaftaran berhasil! Akun dengan NIM ' + nim + ' telah dibuat. Silakan masuk.')
+        setIsSignUp(false)
+      }
     } else {
-      setCurrentUserRole('user')
-      navigate('/dashboard')
+      // Validasi Login
+      if (role === 'sarpras') {
+        if (!email.includes('admin') && !email.includes('sarpras')) {
+          alert('Akses ditolak: Email ini bukan akun Administrator Sarpras!')
+          setLoading(false)
+          return
+        }
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      
+      if (error) {
+        alert('Gagal masuk: ' + error.message)
+      } else if (data?.session) {
+        if (role === 'sarpras') {
+          setCurrentUserRole('admin')
+          navigate('/admin', { replace: true })
+        } else {
+          setCurrentUserRole('user')
+          navigate('/dashboard', { replace: true })
+        }
+      }
     }
+    setLoading(false)
   }
 
   return (
@@ -52,7 +99,7 @@ export default function LoginPage() {
           <div className="pt-8 border-t border-white/20 space-y-3 text-xs text-green-100">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-green-300" />
-              <span>Single Sign-On (SSO) Akun Organisasi Kampus</span>
+              <span>Autentikasi Aman Berbasis Supabase Auth</span>
             </div>
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-green-300" />
@@ -64,11 +111,15 @@ export default function LoginPage() {
         {/* Right Form */}
         <div className="p-8 md:p-12 flex flex-col justify-center">
           <div className="mb-6">
-            <h3 className="text-2xl font-bold text-gray-900">Masuk ke EventLoop</h3>
-            <p className="text-sm text-gray-500 mt-1">Gunakan akun SSO kampus atau akun panitia</p>
+            <h3 className="text-2xl font-bold text-gray-900">
+              {isSignUp ? 'Daftar Akun EventLoop' : 'Masuk ke EventLoop'}
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              {isSignUp ? 'Lengkapi identitas mahasiswa Anda untuk mendaftar' : 'Gunakan email kampus atau organisasi Anda'}
+            </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleAuth} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                 Role Pengguna
@@ -83,7 +134,7 @@ export default function LoginPage() {
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  🎓 Organisasi (Prasmulyan)
+                  🎓 Mahasiswa / Org
                 </button>
                 <button
                   type="button"
@@ -94,10 +145,48 @@ export default function LoginPage() {
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  🏫 Admin Kampus / Sarpras
+                  🏫 Admin Kampus
                 </button>
               </div>
             </div>
+
+            {/* Kolom Nama & NIM Hanya Muncul Saat Daftar Akun Mahasiswa */}
+            {isSignUp && role === 'student_org' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Nama Lengkap
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                      placeholder="Choirul Arifin"
+                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                    NIM
+                  </label>
+                  <div className="relative">
+                    <Hash className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={nim}
+                      onChange={(e) => setNim(e.target.value)}
+                      required
+                      placeholder="23302410001"
+                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
@@ -110,7 +199,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  placeholder="organisasi@kampus.ac.id"
+                  placeholder={role === 'sarpras' ? 'sarpras@prasetiyamulya.ac.id' : 'student@prasetiyamulya.ac.id'}
                   className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
                 />
               </div>
@@ -133,28 +222,28 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs pt-1">
-              <label className="flex items-center gap-2 cursor-pointer text-gray-600">
-                <input type="checkbox" defaultChecked className="rounded text-green-600 focus:ring-green-500" />
-                Ingat akun ini
-              </label>
-              <a href="#" className="text-green-700 hover:underline font-semibold">Lupa sandi?</a>
-            </div>
-
             <button
               type="submit"
-              className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 mt-4"
+              disabled={loading}
+              className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 mt-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold shadow-md shadow-green-600/20"
             >
-              <span>Masuk ke Dashboard</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>{loading ? 'Memproses...' : (isSignUp ? 'Daftar Akun Baru' : 'Masuk ke Dashboard')}</span>
+              {!loading && <ArrowRight className="w-4 h-4" />}
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-gray-100 text-center">
+          <div className="mt-6 pt-6 border-t border-gray-100 text-center space-y-2">
             <p className="text-xs text-gray-500">
-              Butuh demo instan? Klik <strong className="text-green-700 cursor-pointer" onClick={() => { setCurrentUserRole('user'); navigate('/dashboard'); }}>"Masuk ke Dashboard"</strong> untuk langsung mencoba prototype.
+              {isSignUp ? 'Sudah punya akun?' : 'Belum punya akun?'}{' '}
+              <button
+                type="button"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="font-semibold text-green-700 hover:underline"
+              >
+                {isSignUp ? 'Masuk di sini' : 'Daftar sekarang'}
+              </button>
             </p>
-            <div className="mt-3">
+            <div>
               <Link to="/" className="text-xs text-gray-400 hover:text-gray-600">
                 ← Kembali ke Beranda
               </Link>
