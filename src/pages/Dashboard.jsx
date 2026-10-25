@@ -18,8 +18,7 @@ import {
 } from 'lucide-react'
 
 export default function Dashboard() {
-  // Mengambil activeReservation, transactions, DAN currentOrgName dari AppContext
-  const { activeReservation, transactions, currentOrgName } = useApp()
+  const { activeReservation, transactions, currentUserName } = useApp()
   
   const hasActiveRentals = activeReservation?.items?.length > 0
   const latestTxn = transactions[0]
@@ -35,7 +34,7 @@ export default function Dashboard() {
               <Sparkles className="w-3.5 h-3.5" /> Dashboard Organisasi
             </div>
             <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
-              Good afternoon, {currentOrgName || 'Prasmulyan'} 👋
+              Good afternoon, {currentUserName} 👋
             </h2>
             <p className="text-green-100/90 text-sm sm:text-base mt-2 max-w-xl">
               Organisasi Anda aktif berkontribusi dalam circular economy kampus. Kelola perlengkapan event berikutnya dengan mudah dan hemat!
@@ -65,7 +64,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-bold text-gray-900">Your Circular Impact</h3>
-            <p className="text-xs text-gray-500">Akumulasi penghematan & pengurangan sampah organisasi {currentOrgName || 'Prasmulyan'}</p>
+            <p className="text-xs text-gray-500">Akumulasi penghematan & pengurangan sampah organisasi {currentUserName}</p>
           </div>
           <Link to="/impact" className="text-xs font-bold text-green-700 hover:text-green-800 flex items-center gap-1">
             Lihat Analitik Lengkap <ArrowRight className="w-3.5 h-3.5" />

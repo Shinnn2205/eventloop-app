@@ -1,24 +1,32 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { equipmentData as initialEquipment, adminTransactions as initialTransactions, pendingApprovalEquipments as initialPending } from '../data/mockData'
 
 const AppContext = createContext()
 
 export function AppProvider({ children }) {
-  // STATE ROLE & AUTH USER
   const [currentUserRole, setCurrentUserRole] = useState(() => {
     return localStorage.getItem('eventloop_role') || 'user'
   })
-  const [sessionUser, setSessionUser] = useState(null)
-  
-  // State untuk menyimpan nama organisasi/user yang sedang login
-  const [currentOrgName, setCurrentOrgName] = useState(() => {
-    return localStorage.getItem('eventloop_org_name') || 'Organisasi Kampus'
+
+  // Tambahan state untuk menyimpan nama pengguna
+  const [currentUserName, setCurrentUserName] = useState(() => {
+    return localStorage.getItem('eventloop_user_name') || 'Prasmulyan'
   })
 
-  const [equipments, setEquipments] = useState([])
-  const [pendingApprovals, setPendingApprovals] = useState([])
-  const [transactions, setTransactions] = useState([])
-  const [pendingReturns, setPendingReturns] = useState([])
+  const [equipments, setEquipments] = useState(() => {
+    const saved = localStorage.getItem('eventloop_equipments')
+    return saved ? JSON.parse(saved) : initialEquipment
+  })
+
+  const [pendingApprovals, setPendingApprovals] = useState(() => {
+    const saved = localStorage.getItem('eventloop_pending_approvals')
+    return saved ? JSON.parse(saved) : initialPending
+  })
+
+  const [transactions, setTransactions] = useState(() => {
+    const saved = localStorage.getItem('eventloop_transactions')
+    return saved ? JSON.parse(saved) : initialTransactions
+  })
 
   const [userPaymentStatus, setUserPaymentStatus] = useState(() => {
     const saved = localStorage.getItem('eventloop_user_payment_status')
@@ -35,101 +43,28 @@ export function AppProvider({ children }) {
     return saved || 'idle'
   })
 
+  const [pendingReturns, setPendingReturns] = useState(() => {
+    const saved = localStorage.getItem('eventloop_pending_returns')
+    return saved ? JSON.parse(saved) : []
+  })
+
   const [cartItems, setCartItems] = useState(() => {
     const saved = localStorage.getItem('eventloop_cart')
     return saved ? JSON.parse(saved) : []
   })
 
-  // Sinkronisasi otomatis state ke Local Storage
+  // Sinkronisasi otomatis ke Local Storage
   useEffect(() => { localStorage.setItem('eventloop_role', currentUserRole) }, [currentUserRole])
-  useEffect(() => { localStorage.setItem('eventloop_org_name', currentOrgName) }, [currentOrgName])
+  useEffect(() => { localStorage.setItem('eventloop_user_name', currentUserName) }, [currentUserName])
+  useEffect(() => { localStorage.setItem('eventloop_equipments', JSON.stringify(equipments)) }, [equipments])
+  useEffect(() => { localStorage.setItem('eventloop_pending_approvals', JSON.stringify(pendingApprovals)) }, [pendingApprovals])
+  useEffect(() => { localStorage.setItem('eventloop_transactions', JSON.stringify(transactions)) }, [transactions])
   useEffect(() => { localStorage.setItem('eventloop_user_payment_status', userPaymentStatus) }, [userPaymentStatus])
   useEffect(() => { localStorage.setItem('eventloop_active_reservation', JSON.stringify(activeReservation)) }, [activeReservation])
   useEffect(() => { localStorage.setItem('eventloop_return_status', returnStatus) }, [returnStatus])
+  useEffect(() => { localStorage.setItem('eventloop_pending_returns', JSON.stringify(pendingReturns)) }, [pendingReturns])
   useEffect(() => { localStorage.setItem('eventloop_cart', JSON.stringify(cartItems)) }, [cartItems])
 
-  // AUTH & AMBIL DATA DARI SUPABASE SAAT PERTAMA KALI DIMUAT
-  useEffect(() => {
-    // 1. Cek sesi login Supabase saat aplikasi dimuat
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSessionUser(session?.user ?? null)
-      if (session?.user) {
-        const metadataName = session.user.user_metadata?.full_name
-        if (metadataName) {
-          setCurrentOrgName(metadataName)
-        }
-      }
-    })
-
-    // 2. Pantau perubahan status login auth secara real-time
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSessionUser(session?.user ?? null)
-      if (session?.user) {
-        const metadataName = session.user.user_metadata?.full_name
-        if (metadataName) {
-          setCurrentOrgName(metadataName)
-        }
-      }
-    })
-
-    // 3. Ambil data dari tabel Supabase
-    fetchDataFromSupabase()
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const fetchDataFromSupabase = async () => {
-    // Ambil data marketplace yang sudah disetujui
-    const { data: eqData, error: eqError } = await supabase.from('equipments').select('*').eq('status', 'approved')
-    if (!eqError && eqData) {
-      setEquipments(eqData.map(item => ({
-        ...item,
-        salePrice: item.sale_price,
-        listingType: item.listing_type,
-        imageUrl: item.image_url,
-        circularScore: item.circular_score,
-        owner: item.owner_org,
-        lastLocation: item.last_location
-      })))
-    }
-
-    // Ambil data barang pending approval admin
-    const { data: pendingData, error: pError } = await supabase.from('equipments').select('*').eq('status', 'pending_approval')
-    if (!pError && pendingData) {
-      setPendingApprovals(pendingData.map(item => ({
-        ...item,
-        salePrice: item.sale_price,
-        listingType: item.listing_type,
-        imagePreview: item.image_url,
-        circularScore: item.circular_score,
-        ownerOrg: item.owner_org
-      })))
-    }
-
-    // Ambil data transaksi
-    const { data: txnData, error: tError } = await supabase.from('transactions').select('*')
-    if (!tError && txnData) {
-      setTransactions(txnData.map(t => ({
-        ...t,
-        buyerOrg: t.buyer_org,
-        itemName: t.item_names,
-        qrisStatus: t.qris_status,
-        payoutStatus: t.payout_status
-      })))
-    }
-
-    // Ambil data pengembalian (returns)
-    const { data: retData, error: rError } = await supabase.from('returns').select('*')
-    if (!rError && retData) {
-      setPendingReturns(retData.map(r => ({
-        ...r,
-        equipmentId: r.equipment_id,
-        returnedQty: r.returned_qty
-      })))
-    }
-  }
-
-  // --- CART ACTIONS ---
   const addToCart = (equipment, qty = 1) => {
     if (userPaymentStatus !== 'idle') {
       setUserPaymentStatus('idle')
@@ -155,91 +90,86 @@ export function AppProvider({ children }) {
     }))
   }
 
-  // --- ACTIONS UPLOAD & VERIFIKASI ---
-  const uploadEquipmentByUser = async (newEquipment) => {
-    const { data, error } = await supabase
-      .from('equipments')
-      .insert([
-        {
-          name: newEquipment.name,
-          category: newEquipment.category,
-          price: newEquipment.price,
-          sale_price: newEquipment.salePrice,
-          listing_type: newEquipment.pricingType || 'rental',
-          available: parseInt(newEquipment.qty) || 1,
-          total: parseInt(newEquipment.qty) || 1,
-          image_url: newEquipment.imagePreview || null,
-          circular_score: newEquipment.circularScore || 88,
-          condition: newEquipment.condition || 'Good',
-          owner_org: currentOrgName, // Menggunakan nama organisasi aktif yang sedang login
-          last_location: newEquipment.initialLocation || 'Warehouse Kampus Gedung C',
-          status: 'pending_approval'
-        }
-      ])
-      .select()
-
-    if (error) {
-      console.error('Gagal mengupload barang:', error)
-      return null
+  const uploadEquipmentByUser = (newEquipment) => {
+    const pendingItem = {
+      ...newEquipment,
+      id: `APV-${Date.now().toString().slice(-4)}`,
+      dateSubmitted: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+      status: 'Pending Admin Check',
+      uploader: 'currentUser'
     }
-
-    fetchDataFromSupabase()
-    return data?.[0]?.id
+    setPendingApprovals(prev => [pendingItem, ...prev])
+    return pendingItem.id
   }
 
-  const approveEquipmentByAdmin = async (approvalId) => {
-    const { error } = await supabase
-      .from('equipments')
-      .update({ status: 'approved' })
-      .eq('id', approvalId)
+  const approveEquipmentByAdmin = (approvalId) => {
+    const itemToApprove = pendingApprovals.find(p => p.id === approvalId)
+    if (!itemToApprove) return
 
-    if (error) {
-      console.error('Gagal menyetujui barang:', error)
-      return
+    const newMarketplaceItem = {
+      id: Date.now(),
+      name: itemToApprove.name,
+      category: itemToApprove.category,
+      price: itemToApprove.pricingType === 'sale' ? (itemToApprove.price || 50000) : (itemToApprove.price || 20000),
+      salePrice: itemToApprove.pricingType === 'sale' ? (itemToApprove.salePrice || itemToApprove.price) : null,
+      listingType: itemToApprove.pricingType || 'rental',
+      available: parseInt(itemToApprove.qty) || 1,
+      total: parseInt(itemToApprove.qty) || 1,
+      image: itemToApprove.imagePreview ? '📷' : '📦',
+      imageUrl: itemToApprove.imagePreview || null,
+      circularScore: itemToApprove.circularScore || 88,
+      reusedCount: 0,
+      maxReuse: parseInt(itemToApprove.maxReuse) || 30,
+      size: itemToApprove.size || 'Standar',
+      material: itemToApprove.material || 'Aluminium',
+      condition: itemToApprove.condition || 'Good',
+      owner: `${itemToApprove.ownerOrg || 'Prasmulyan Organization'} (Verified by Admin)`,
+      ownerBank: itemToApprove.bankAccount || 'BCA 8012345678 a.n Owner',
+      description: itemToApprove.description || 'Perlengkapan organisasi kampus siap pakai.',
+      lastLocation: itemToApprove.initialLocation || 'Warehouse Kampus Gedung C',
+      lastStoragePhoto: itemToApprove.initialStoragePhoto || null,
+      uploader: itemToApprove.uploader,
+      history: [
+        { event: 'Didaftarkan & Lolos Verifikasi Admin', org: itemToApprove.ownerOrg || 'Prasmul Org', date: new Date().toISOString().split('T')[0], condition: itemToApprove.condition }
+      ]
     }
 
-    fetchDataFromSupabase()
+    setEquipments(prev => [newMarketplaceItem, ...prev])
+    setPendingApprovals(prev => prev.filter(p => p.id !== approvalId))
   }
 
-  const rejectEquipmentByAdmin = async (approvalId) => {
-    const { error } = await supabase
-      .from('equipments')
-      .delete()
-      .eq('id', approvalId)
-
-    if (!error) {
-      fetchDataFromSupabase()
-    }
+  const rejectEquipmentByAdmin = (approvalId) => {
+    setPendingApprovals(prev => prev.filter(p => p.id !== approvalId))
   }
 
-  // --- ACTIONS TRANSAKSI & QRIS ---
-  const submitUserQrisPayment = async (reservationDetails) => {
+  const submitUserQrisPayment = (reservationDetails) => {
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
-    for (const cartItem of cartItems) {
-      const targetEq = equipments.find(e => e.id === cartItem.id)
-      if (targetEq) {
-        await supabase
-          .from('equipments')
-          .update({ available: Math.max(0, targetEq.available - cartItem.qty) })
-          .eq('id', cartItem.id)
+    setEquipments(prev => prev.map(eq => {
+      const reservedItem = cartItems.find(cart => cart.id === eq.id)
+      if (reservedItem) {
+        return { ...eq, available: eq.available - reservedItem.qty }
       }
+      return eq
+    }))
+
+    const newTxn = {
+      id: txnId,
+      buyerOrg: reservationDetails.buyerOrg || 'SISO Prasmulyan',
+      itemName: reservationDetails.itemNames || 'Reservasi Perlengkapan Event',
+      amount: reservationDetails.totalAmount,
+      qrisStatus: 'Pending Admin Verification',
+      paidAt: `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`,
+      bankAdminRef: `BCA-QRIS-${Math.floor(1000000 + Math.random() * 9000000)}`,
+      ownerOrg: 'Organisasi Pemilik & Sarpras',
+      ownerBank: 'BCA 8012345678 a.n Owner',
+      payoutStatus: 'Waiting Admin Approval',
+      payoutAmount: Math.round(reservationDetails.totalAmount * 0.95),
+      adminFee: Math.round(reservationDetails.totalAmount * 0.05),
     }
 
-    const { error } = await supabase.from('transactions').insert([
-      {
-        buyer_org: currentOrgName, // Menggunakan nama organisasi aktif
-        item_names: reservationDetails.itemNames || 'Reservasi Perlengkapan Event',
-        amount: reservationDetails.totalAmount,
-        qris_status: 'Pending Admin Verification',
-        payout_status: 'Waiting Admin Approval'
-      }
-    ])
-
-    if (!error) {
-      fetchDataFromSupabase()
-    }
-
+    setTransactions(prev => [newTxn, ...prev])
+    
     setActiveReservation({ 
       ...reservationDetails, 
       items: cartItems, 
@@ -250,94 +180,85 @@ export function AppProvider({ children }) {
     setUserPaymentStatus('pending_admin_approval')
   }
 
-  const approvePaymentByAdmin = async (txnId) => {
-    const targetTxn = transactions.find(t => t.id === txnId)
-    if (targetTxn) {
-      await supabase
-        .from('transactions')
-        .update({
-          qris_status: 'Payment Approved by Admin (Lunas)',
-          payout_status: 'Pending Transfer'
-        })
-        .eq('buyer_org', targetTxn.buyerOrg)
-
-      fetchDataFromSupabase()
-    }
+  const approvePaymentByAdmin = (txnId) => {
+    setTransactions(prev => prev.map(t => {
+      if (t.id === txnId) {
+        return {
+          ...t,
+          qrisStatus: 'Payment Approved by Admin (Lunas)',
+          payoutStatus: 'Pending Transfer'
+        }
+      }
+      return t
+    }))
     setUserPaymentStatus('approved_success')
   }
 
-  const transferPayoutToOwner = async (txnId) => {
-    const targetTxn = transactions.find(t => t.id === txnId)
-    if (targetTxn) {
-      await supabase
-        .from('transactions')
-        .update({
-          payout_status: 'Transferred'
-        })
-        .eq('buyer_org', targetTxn.buyerOrg)
-
-      fetchDataFromSupabase()
-    }
-  }
-
-  // --- ACTIONS ADMIN MANAGE STOK ---
-  const updateEquipmentPriceAndStock = async (id, newPrice, newAvailable) => {
-    if (currentUserRole !== 'admin') return
-    await supabase
-      .from('equipments')
-      .update({
-        price: parseInt(newPrice) || 0,
-        available: parseInt(newAvailable) || 0
-      })
-      .eq('id', id)
-
-    fetchDataFromSupabase()
-  }
-
-  const deleteEquipment = async (id) => {
-    if (currentUserRole !== 'admin') return
-    await supabase
-      .from('equipments')
-      .delete()
-      .eq('id', id)
-
-    setCartItems(prev => prev.filter(item => item.id !== id))
-    fetchDataFromSupabase()
-  }
-
-  // --- ACTIONS PENGEMBALIAN BARANG ---
-  const submitUserReturnProof = async (returnData) => {
-    const { error } = await supabase.from('returns').insert([
-      {
-        equipment_id: returnData.equipmentId,
-        borrower: currentOrgName,
-        returned_qty: returnData.returnedQty,
-        condition_photo: returnData.conditionPhoto,
-        storage_photo: returnData.storagePhoto,
-        status: 'pending_admin_approval'
+  const transferPayoutToOwner = (txnId) => {
+    setTransactions(prev => prev.map(t => {
+      if (t.id === txnId) {
+        return {
+          ...t,
+          payoutStatus: 'Transferred',
+          payoutRef: `TRF-BCA-${Math.floor(100000 + Math.random() * 900000)}`,
+          transferredAt: 'Baru saja'
+        }
       }
-    ])
+      return t
+    }))
+  }
 
-    if (!error) {
-      fetchDataFromSupabase()
+  const updateEquipmentPriceAndStock = (id, newPrice, newAvailable) => {
+    if (currentUserRole !== 'admin') return
+    setEquipments(prev => prev.map(item => {
+      if (item.id === id) {
+        return {
+          ...item,
+          price: parseInt(newPrice) || item.price,
+          salePrice: item.listingType === 'sale' ? parseInt(newPrice) : item.salePrice,
+          available: parseInt(newAvailable) || item.available
+        }
+      }
+      return item
+    }))
+  }
+
+  const deleteEquipment = (id) => {
+    if (currentUserRole !== 'admin') return
+    setEquipments(prev => prev.filter(item => item.id !== id))
+    setCartItems(prev => prev.filter(item => item.id !== id))
+  }
+
+  const submitUserReturnProof = (returnData) => {
+    const newReturn = {
+      id: `RET-${Math.floor(Math.random() * 9000) + 1000}`,
+      ...returnData,
+      borrower: 'SISO Prasmulyan',
+      timestamp: new Date().toLocaleString('id-ID')
     }
+    setPendingReturns(prev => [newReturn, ...prev])
     setReturnStatus('pending_admin_approval')
   }
 
-  const approveReturnByAdmin = async (returnId, equipmentId, returnedQty) => {
-    await supabase.from('returns').delete().eq('id', returnId)
-
-    const targetEq = equipments.find(e => e.id === equipmentId)
-    if (targetEq) {
-      await supabase
-        .from('equipments')
-        .update({ available: targetEq.available + returnedQty })
-        .eq('id', equipmentId)
-    }
-
-    fetchDataFromSupabase()
+  const approveReturnByAdmin = (returnId, equipmentId, returnedQty) => {
+    const returnData = pendingReturns.find(r => r.id === returnId)
+    
+    setPendingReturns(prev => prev.filter(r => r.id !== returnId))
     setReturnStatus('approved_success')
     
+    setEquipments(prev => prev.map(item => {
+      if (item.id === equipmentId) {
+        return { 
+          ...item, 
+          available: item.available + returnedQty,
+          lastLocation: 'Warehouse Kampus Gedung C (Rak B-04)',
+          lastStoragePhoto: returnData?.storagePhoto || item.lastStoragePhoto,
+          lastConditionPhoto: returnData?.conditionPhoto || null
+        }
+      }
+      return item
+    }))
+
     setActiveReservation(prev => {
       if (!prev || !prev.items) return prev;
       const remainingItems = prev.items.filter(item => item.id !== equipmentId);
@@ -350,7 +271,8 @@ export function AppProvider({ children }) {
 
   return (
     <AppContext.Provider value={{
-      currentUserRole, setCurrentUserRole, sessionUser, currentOrgName, setCurrentOrgName,
+      currentUserRole, setCurrentUserRole,
+      currentUserName, setCurrentUserName,
       equipments, pendingApprovals, transactions, userPaymentStatus, activeReservation, returnStatus, pendingReturns,
       cartItems, addToCart, removeFromCart, updateCartQty,
       uploadEquipmentByUser, approveEquipmentByAdmin, rejectEquipmentByAdmin, submitUserQrisPayment, approvePaymentByAdmin,
