@@ -5,8 +5,14 @@ import { supabase } from '../lib/supabaseClient'
 const AppContext = createContext()
 
 export function AppProvider({ children }) {
-  const [currentUserRole, setCurrentUserRole] = useState('user')
-  const [currentUserName, setCurrentUserName] = useState('Prasmulyan')
+  // Menggunakan localStorage agar status admin/user tidak hilang saat page refresh
+  const [currentUserRole, setCurrentUserRole] = useState(() => {
+    return localStorage.getItem('eventloop_user_role') || 'user'
+  })
+  const [currentUserName, setCurrentUserName] = useState(() => {
+    return localStorage.getItem('eventloop_user_name') || 'Prasmulyan'
+  })
+
   const [userSession, setUserSession] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -21,7 +27,12 @@ export function AppProvider({ children }) {
   const [cartItems, setCartItems] = useState([])
   const [reservations, setReservations] = useState([])
 
-  // Fungsi ambil katalog barang dari Supabase
+  // Sinkronisasi ke localStorage setiap kali berubah
+  useEffect(() => {
+    localStorage.setItem('eventloop_user_role', currentUserRole)
+    localStorage.setItem('eventloop_user_name', currentUserName)
+  }, [currentUserRole, currentUserName])
+
   async function fetchEquipments() {
     const { data, error } = await supabase
       .from('equipments')
@@ -37,7 +48,6 @@ export function AppProvider({ children }) {
     }
   }
 
-  // Fungsi ambil draf pending approval dari Supabase
   async function fetchPendingApprovals() {
     const { data, error } = await supabase
       .from('pending_equipments')
@@ -55,7 +65,7 @@ export function AppProvider({ children }) {
 
       if (session?.user) {
         const metadata = session.user.user_metadata
-        if (metadata?.full_name) {
+        if (metadata?.full_name && currentUserRole !== 'admin') {
           setCurrentUserName(metadata.full_name)
         }
 
@@ -78,7 +88,7 @@ export function AppProvider({ children }) {
       setUserSession(session)
       if (session?.user) {
         const metadata = session.user.user_metadata
-        if (metadata?.full_name) {
+        if (metadata?.full_name && currentUserRole !== 'admin') {
           setCurrentUserName(metadata.full_name)
         }
 
@@ -89,12 +99,14 @@ export function AppProvider({ children }) {
         setReservations(resData || [])
       } else {
         setReservations([])
-        setCurrentUserName('Prasmulyan')
+        if (currentUserRole !== 'admin') {
+          setCurrentUserName('Prasmulyan')
+        }
       }
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [currentUserRole])
 
   const addToCart = (equipment, qty = 1) => {
     if (userPaymentStatus !== 'idle') {
@@ -121,7 +133,6 @@ export function AppProvider({ children }) {
     }))
   }
 
-  // Upload barang oleh user (Disimpan ke database Supabase)
   const uploadEquipmentByUser = async (newEquipment) => {
     const pendingId = `APV-${Date.now().toString().slice(-4)}`
     const pendingItem = {
@@ -141,7 +152,6 @@ export function AppProvider({ children }) {
     return pendingId
   }
 
-  // Admin menyetujui barang (Pindah dari pending_equipments ke equipments)
   const approveEquipmentByAdmin = async (approvalId) => {
     const itemToApprove = pendingApprovals.find(p => p.id === approvalId)
     if (!itemToApprove) return
@@ -169,21 +179,18 @@ export function AppProvider({ children }) {
       uploader: itemToApprove.uploader,
     }
 
-    // Masukkan ke katalog utama
     const { error: insertError } = await supabase.from('equipments').insert([newItemPayload])
     if (insertError) {
       alert('Gagal memproses persetujuan: ' + insertError.message)
       return
     }
 
-    // Hapus dari draf pending
     await supabase.from('pending_equipments').delete().eq('id', approvalId)
 
     await fetchEquipments()
     await fetchPendingApprovals()
   }
 
-  // Admin menolak barang
   const rejectEquipmentByAdmin = async (approvalId) => {
     await supabase.from('pending_equipments').delete().eq('id', approvalId)
     await fetchPendingApprovals()
