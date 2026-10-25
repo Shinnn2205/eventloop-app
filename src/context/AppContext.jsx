@@ -1,69 +1,77 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { equipmentData as initialEquipment, adminTransactions as initialTransactions, pendingApprovalEquipments as initialPending } from '../data/mockData'
+import { supabase } from '../lib/supabaseClient'
 
 const AppContext = createContext()
 
 export function AppProvider({ children }) {
-  const [currentUserRole, setCurrentUserRole] = useState(() => {
-    return localStorage.getItem('eventloop_role') || 'user'
-  })
+  const [currentUserRole, setCurrentUserRole] = useState('user')
+  const [currentUserName, setCurrentUserName] = useState('Prasmulyan')
+  const [userSession, setUserSession] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  // Tambahan state untuk menyimpan nama pengguna
-  const [currentUserName, setCurrentUserName] = useState(() => {
-    return localStorage.getItem('eventloop_user_name') || 'Prasmulyan'
-  })
+  const [equipments, setEquipments] = useState(initialEquipment)
+  const [pendingApprovals, setPendingApprovals] = useState(initialPending)
+  const [transactions, setTransactions] = useState(initialTransactions)
+  
+  const [userPaymentStatus, setUserPaymentStatus] = useState('idle')
+  const [activeReservation, setActiveReservation] = useState(null)
+  const [returnStatus, setReturnStatus] = useState('idle')
+  const [pendingReturns, setPendingReturns] = useState([])
+  const [cartItems, setCartItems] = useState([])
+  const [reservations, setReservations] = useState([])
 
-  const [equipments, setEquipments] = useState(() => {
-    const saved = localStorage.getItem('eventloop_equipments')
-    return saved ? JSON.parse(saved) : initialEquipment
-  })
+  // Ambil sesi login aktif dari Supabase dan sinkronkan data berdasarkan user_id
+  useEffect(() => {
+    async function initSessionAndData() {
+      const { data: { session } } = await supabase.auth.getSession()
+      setUserSession(session)
 
-  const [pendingApprovals, setPendingApprovals] = useState(() => {
-    const saved = localStorage.getItem('eventloop_pending_approvals')
-    return saved ? JSON.parse(saved) : initialPending
-  })
+      if (session?.user) {
+        const metadata = session.user.user_metadata
+        if (metadata?.full_name) {
+          setCurrentUserName(metadata.full_name)
+        }
 
-  const [transactions, setTransactions] = useState(() => {
-    const saved = localStorage.getItem('eventloop_transactions')
-    return saved ? JSON.parse(saved) : initialTransactions
-  })
+        // Ambil reservasi khusus user ini dari database Supabase
+        const { data, error } = await supabase
+          .from('reservations')
+          .select('*')
+          .eq('user_id', session.user.id)
 
-  const [userPaymentStatus, setUserPaymentStatus] = useState(() => {
-    const saved = localStorage.getItem('eventloop_user_payment_status')
-    return saved || 'idle'
-  })
+        if (!error && data) {
+          setReservations(data)
+        }
+      } else {
+        setReservations([])
+      }
+      setLoading(false)
+    }
 
-  const [activeReservation, setActiveReservation] = useState(() => {
-    const saved = localStorage.getItem('eventloop_active_reservation')
-    return saved ? JSON.parse(saved) : null
-  })
+    initSessionAndData()
 
-  const [returnStatus, setReturnStatus] = useState(() => {
-    const saved = localStorage.getItem('eventloop_return_status')
-    return saved || 'idle'
-  })
+    // Listener perubahan status auth (Login / Logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setUserSession(session)
+      if (session?.user) {
+        const metadata = session.user.user_metadata
+        if (metadata?.full_name) {
+          setCurrentUserName(metadata.full_name)
+        }
 
-  const [pendingReturns, setPendingReturns] = useState(() => {
-    const saved = localStorage.getItem('eventloop_pending_returns')
-    return saved ? JSON.parse(saved) : []
-  })
+        const { data } = await supabase
+          .from('reservations')
+          .select('*')
+          .eq('user_id', session.user.id)
+        setReservations(data || [])
+      } else {
+        setReservations([])
+        setCurrentUserName('Prasmulyan')
+      }
+    })
 
-  const [cartItems, setCartItems] = useState(() => {
-    const saved = localStorage.getItem('eventloop_cart')
-    return saved ? JSON.parse(saved) : []
-  })
-
-  // Sinkronisasi otomatis ke Local Storage
-  useEffect(() => { localStorage.setItem('eventloop_role', currentUserRole) }, [currentUserRole])
-  useEffect(() => { localStorage.setItem('eventloop_user_name', currentUserName) }, [currentUserName])
-  useEffect(() => { localStorage.setItem('eventloop_equipments', JSON.stringify(equipments)) }, [equipments])
-  useEffect(() => { localStorage.setItem('eventloop_pending_approvals', JSON.stringify(pendingApprovals)) }, [pendingApprovals])
-  useEffect(() => { localStorage.setItem('eventloop_transactions', JSON.stringify(transactions)) }, [transactions])
-  useEffect(() => { localStorage.setItem('eventloop_user_payment_status', userPaymentStatus) }, [userPaymentStatus])
-  useEffect(() => { localStorage.setItem('eventloop_active_reservation', JSON.stringify(activeReservation)) }, [activeReservation])
-  useEffect(() => { localStorage.setItem('eventloop_return_status', returnStatus) }, [returnStatus])
-  useEffect(() => { localStorage.setItem('eventloop_pending_returns', JSON.stringify(pendingReturns)) }, [pendingReturns])
-  useEffect(() => { localStorage.setItem('eventloop_cart', JSON.stringify(cartItems)) }, [cartItems])
+    return () => subscription.unsubscribe()
+  }, [])
 
   const addToCart = (equipment, qty = 1) => {
     if (userPaymentStatus !== 'idle') {
@@ -96,7 +104,7 @@ export function AppProvider({ children }) {
       id: `APV-${Date.now().toString().slice(-4)}`,
       dateSubmitted: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
       status: 'Pending Admin Check',
-      uploader: 'currentUser'
+      uploader: userSession?.user?.id || 'currentUser'
     }
     setPendingApprovals(prev => [pendingItem, ...prev])
     return pendingItem.id
@@ -123,14 +131,14 @@ export function AppProvider({ children }) {
       size: itemToApprove.size || 'Standar',
       material: itemToApprove.material || 'Aluminium',
       condition: itemToApprove.condition || 'Good',
-      owner: `${itemToApprove.ownerOrg || 'Prasmulyan Organization'} (Verified by Admin)`,
+      owner: `${itemToApprove.ownerOrg || currentUserName} (Verified by Admin)`,
       ownerBank: itemToApprove.bankAccount || 'BCA 8012345678 a.n Owner',
       description: itemToApprove.description || 'Perlengkapan organisasi kampus siap pakai.',
       lastLocation: itemToApprove.initialLocation || 'Warehouse Kampus Gedung C',
       lastStoragePhoto: itemToApprove.initialStoragePhoto || null,
       uploader: itemToApprove.uploader,
       history: [
-        { event: 'Didaftarkan & Lolos Verifikasi Admin', org: itemToApprove.ownerOrg || 'Prasmul Org', date: new Date().toISOString().split('T')[0], condition: itemToApprove.condition }
+        { event: 'Didaftarkan & Lolos Verifikasi Admin', org: itemToApprove.ownerOrg || currentUserName, date: new Date().toISOString().split('T')[0], condition: itemToApprove.condition }
       ]
     }
 
@@ -142,7 +150,7 @@ export function AppProvider({ children }) {
     setPendingApprovals(prev => prev.filter(p => p.id !== approvalId))
   }
 
-  const submitUserQrisPayment = (reservationDetails) => {
+  const submitUserQrisPayment = async (reservationDetails) => {
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
     setEquipments(prev => prev.map(eq => {
@@ -155,7 +163,7 @@ export function AppProvider({ children }) {
 
     const newTxn = {
       id: txnId,
-      buyerOrg: reservationDetails.buyerOrg || 'SISO Prasmulyan',
+      buyerOrg: reservationDetails.buyerOrg || currentUserName,
       itemName: reservationDetails.itemNames || 'Reservasi Perlengkapan Event',
       amount: reservationDetails.totalAmount,
       qrisStatus: 'Pending Admin Verification',
@@ -170,6 +178,28 @@ export function AppProvider({ children }) {
 
     setTransactions(prev => [newTxn, ...prev])
     
+    // Simpan reservasi ke database Supabase jika user sudah login
+    if (userSession?.user) {
+      for (const cartItem of cartItems) {
+        await supabase.from('reservations').insert([
+          {
+            user_id: userSession.user.id,
+            item_name: cartItem.name,
+            quantity: cartItem.qty,
+            start_date: reservationDetails.startDate || new Date().toISOString().split('T')[0],
+            status: 'Sedang Berjalan'
+          }
+        ])
+      }
+
+      // Ambil ulang data reservasi terbaru dari database
+      const { data } = await supabase
+        .from('reservations')
+        .select('*')
+        .eq('user_id', userSession.user.id)
+      if (data) setReservations(data)
+    }
+
     setActiveReservation({ 
       ...reservationDetails, 
       items: cartItems, 
@@ -233,14 +263,14 @@ export function AppProvider({ children }) {
     const newReturn = {
       id: `RET-${Math.floor(Math.random() * 9000) + 1000}`,
       ...returnData,
-      borrower: 'SISO Prasmulyan',
+      borrower: currentUserName,
       timestamp: new Date().toLocaleString('id-ID')
     }
     setPendingReturns(prev => [newReturn, ...prev])
     setReturnStatus('pending_admin_approval')
   }
 
-  const approveReturnByAdmin = (returnId, equipmentId, returnedQty) => {
+  const approveReturnByAdmin = async (returnId, equipmentId, returnedQty) => {
     const returnData = pendingReturns.find(r => r.id === returnId)
     
     setPendingReturns(prev => prev.filter(r => r.id !== returnId))
@@ -259,6 +289,20 @@ export function AppProvider({ children }) {
       return item
     }))
 
+    // Hapus data dari tabel database Supabase jika user login
+    if (userSession?.user) {
+      await supabase
+        .from('reservations')
+        .delete()
+        .eq('user_id', userSession.user.id)
+
+      const { data } = await supabase
+        .from('reservations')
+        .select('*')
+        .eq('user_id', userSession.user.id)
+      if (data) setReservations(data)
+    }
+
     setActiveReservation(prev => {
       if (!prev || !prev.items) return prev;
       const remainingItems = prev.items.filter(item => item.id !== equipmentId);
@@ -273,6 +317,7 @@ export function AppProvider({ children }) {
     <AppContext.Provider value={{
       currentUserRole, setCurrentUserRole,
       currentUserName, setCurrentUserName,
+      userSession, reservations, loading,
       equipments, pendingApprovals, transactions, userPaymentStatus, activeReservation, returnStatus, pendingReturns,
       cartItems, addToCart, removeFromCart, updateCartQty,
       uploadEquipmentByUser, approveEquipmentByAdmin, rejectEquipmentByAdmin, submitUserQrisPayment, approvePaymentByAdmin,
