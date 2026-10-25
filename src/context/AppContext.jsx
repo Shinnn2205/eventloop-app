@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { adminTransactions as initialTransactions, pendingApprovalEquipments as initialPending } from '../data/mockData'
+import { adminTransactions as initialTransactions } from '../data/mockData'
 import { supabase } from '../lib/supabaseClient'
 
 const AppContext = createContext()
@@ -10,9 +10,8 @@ export function AppProvider({ children }) {
   const [userSession, setUserSession] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // State utama ditarik dari database Supabase
   const [equipments, setEquipments] = useState([])
-  const [pendingApprovals, setPendingApprovals] = useState(initialPending)
+  const [pendingApprovals, setPendingApprovals] = useState([])
   const [transactions, setTransactions] = useState(initialTransactions)
   
   const [userPaymentStatus, setUserPaymentStatus] = useState('idle')
@@ -22,7 +21,7 @@ export function AppProvider({ children }) {
   const [cartItems, setCartItems] = useState([])
   const [reservations, setReservations] = useState([])
 
-  // Fungsi untuk mengambil data katalog barang dari tabel Supabase
+  // Fungsi ambil katalog barang dari Supabase
   async function fetchEquipments() {
     const { data, error } = await supabase
       .from('equipments')
@@ -30,7 +29,6 @@ export function AppProvider({ children }) {
       .order('id', { ascending: false })
 
     if (!error && data) {
-      // Format ulang data agar sesuai dengan struktur UI komponen frontend
       const formattedData = data.map(item => ({
         ...item,
         image: item.imageUrl ? '📷' : '📦',
@@ -39,7 +37,17 @@ export function AppProvider({ children }) {
     }
   }
 
-  // Ambil sesi login aktif dan data dari Supabase saat aplikasi dimuat
+  // Fungsi ambil draf pending approval dari Supabase
+  async function fetchPendingApprovals() {
+    const { data, error } = await supabase
+      .from('pending_equipments')
+      .select('*')
+
+    if (!error && data) {
+      setPendingApprovals(data)
+    }
+  }
+
   useEffect(() => {
     async function initSessionAndData() {
       const { data: { session } } = await supabase.auth.getSession()
@@ -51,7 +59,6 @@ export function AppProvider({ children }) {
           setCurrentUserName(metadata.full_name)
         }
 
-        // Ambil reservasi user ini
         const { data: resData } = await supabase
           .from('reservations')
           .select('*')
@@ -60,14 +67,13 @@ export function AppProvider({ children }) {
         if (resData) setReservations(resData)
       }
 
-      // Ambil katalog barang
       await fetchEquipments()
+      await fetchPendingApprovals()
       setLoading(false)
     }
 
     initSessionAndData()
 
-    // Listener perubahan status auth (Login / Logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUserSession(session)
       if (session?.user) {
@@ -115,19 +121,27 @@ export function AppProvider({ children }) {
     }))
   }
 
-  const uploadEquipmentByUser = (newEquipment) => {
+  // Upload barang oleh user (Disimpan ke database Supabase)
+  const uploadEquipmentByUser = async (newEquipment) => {
+    const pendingId = `APV-${Date.now().toString().slice(-4)}`
     const pendingItem = {
       ...newEquipment,
-      id: `APV-${Date.now().toString().slice(-4)}`,
+      id: pendingId,
       dateSubmitted: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
       status: 'Pending Admin Check',
       uploader: userSession?.user?.id || 'currentUser'
     }
-    setPendingApprovals(prev => [pendingItem, ...prev])
-    return pendingItem.id
+
+    const { error } = await supabase.from('pending_equipments').insert([pendingItem])
+    if (!error) {
+      await fetchPendingApprovals()
+    } else {
+      alert('Gagal mengunggah barang: ' + error.message)
+    }
+    return pendingId
   }
 
-  // Fungsi saat Admin menyetujui barang masuk (langsung simpan ke tabel Supabase `equipments`)
+  // Admin menyetujui barang (Pindah dari pending_equipments ke equipments)
   const approveEquipmentByAdmin = async (approvalId) => {
     const itemToApprove = pendingApprovals.find(p => p.id === approvalId)
     if (!itemToApprove) return
@@ -155,24 +169,29 @@ export function AppProvider({ children }) {
       uploader: itemToApprove.uploader,
     }
 
-    const { error } = await supabase.from('equipments').insert([newItemPayload])
-
-    if (error) {
-      alert('Gagal menambahkan barang ke database: ' + error.message)
-    } else {
-      await fetchEquipments() // Ambil data terbaru dari server
-      setPendingApprovals(prev => prev.filter(p => p.id !== approvalId))
+    // Masukkan ke katalog utama
+    const { error: insertError } = await supabase.from('equipments').insert([newItemPayload])
+    if (insertError) {
+      alert('Gagal memproses persetujuan: ' + insertError.message)
+      return
     }
+
+    // Hapus dari draf pending
+    await supabase.from('pending_equipments').delete().eq('id', approvalId)
+
+    await fetchEquipments()
+    await fetchPendingApprovals()
   }
 
-  const rejectEquipmentByAdmin = (approvalId) => {
-    setPendingApprovals(prev => prev.filter(p => p.id !== approvalId))
+  // Admin menolak barang
+  const rejectEquipmentByAdmin = async (approvalId) => {
+    await supabase.from('pending_equipments').delete().eq('id', approvalId)
+    await fetchPendingApprovals()
   }
 
   const submitUserQrisPayment = async (reservationDetails) => {
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
-    // Update stok di database Supabase
     for (const reservedItem of cartItems) {
       const targetItem = equipments.find(e => e.id === reservedItem.id)
       if (targetItem) {
@@ -202,7 +221,6 @@ export function AppProvider({ children }) {
 
     setTransactions(prev => [newTxn, ...prev])
     
-    // Simpan reservasi ke database Supabase
     if (userSession?.user) {
       for (const cartItem of cartItems) {
         await supabase.from('reservations').insert([
@@ -308,7 +326,6 @@ export function AppProvider({ children }) {
     setPendingReturns(prev => prev.filter(r => r.id !== returnId))
     setReturnStatus('approved_success')
     
-    // Kembalikan stok di database Supabase
     const targetItem = equipments.find(e => e.id === equipmentId)
     if (targetItem) {
       const restoredAvailable = targetItem.available + returnedQty
@@ -319,7 +336,6 @@ export function AppProvider({ children }) {
       await fetchEquipments()
     }
 
-    // Hapus data dari tabel reservations Supabase
     if (userSession?.user) {
       await supabase
         .from('reservations')
