@@ -28,7 +28,7 @@ export default function Marketplace() {
   const filteredEquipment = equipments.filter(item => {
     const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          item.material.toLowerCase().includes(searchQuery.toLowerCase())
+                          (item.material && item.material.toLowerCase().includes(searchQuery.toLowerCase()))
     const matchesScore = item.circularScore >= minScore
     const matchesType = listingFilter === 'all' || 
                         (listingFilter === 'sale' && item.listingType === 'sale') ||
@@ -193,7 +193,7 @@ export default function Marketplace() {
                   <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 ) : (
                   <span className="text-6xl group-hover:scale-110 transition-transform duration-300">
-                    {item.image}
+                    {item.image || '📦'}
                   </span>
                 )}
                 <div 
@@ -210,7 +210,7 @@ export default function Marketplace() {
                   <span className="text-[10px] font-normal opacity-70">/100</span>
                 </div>
                 <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-2 py-0.5 rounded-md text-[10px] font-bold text-gray-600 border border-gray-200">
-                  {item.owner}
+                  {item.owner || 'Prasmulyan'}
                 </div>
               </div>
 
