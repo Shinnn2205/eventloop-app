@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Recycle, Mail, Lock, ArrowRight, ShieldCheck, Sparkles, Building2, User } from 'lucide-react'
+import { Recycle, Mail, Lock, ArrowRight, ShieldCheck, Sparkles, Building2, User, Hash } from 'lucide-react' // <-- Tambah icon Hash untuk NIM
 import { supabase } from '../lib/supabaseClient'
 import { useApp } from '../context/AppContext'
 
@@ -9,7 +9,11 @@ export default function LoginPage() {
   const { setCurrentUserRole } = useApp()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('') // State untuk Nama Organisasi/User
+  
+  // State baru untuk Nama dan NIM
+  const [fullName, setFullName] = useState('') 
+  const [nim, setNim] = useState('') 
+  
   const [role, setRole] = useState('student_org')
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -19,13 +23,14 @@ export default function LoginPage() {
     setLoading(true)
 
     if (isSignUp) {
-      // 1. Proses Pendaftaran dengan menyimpan nama di metadata Supabase
+      // Proses Pendaftaran: Simpan Nama & NIM di metadata Supabase
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            full_name: fullName || 'Organisasi Prasmulyan',
+            full_name: fullName || 'Prasmulyan',
+            nim: nim || '00000000',
           }
         }
       })
@@ -33,13 +38,12 @@ export default function LoginPage() {
       if (error) {
         alert('Gagal mendaftar: ' + error.message)
       } else {
-        alert('Pendaftaran berhasil! Silakan masuk.')
+        alert('Pendaftaran berhasil! Akun dengan NIM ' + nim + ' telah dibuat. Silakan masuk.')
         setIsSignUp(false)
       }
     } else {
-      // 2. Validasi Login Admin Khusus
+      // Validasi Login
       if (role === 'sarpras') {
-        // Kamu bisa tentukan email khusus admin sarpras di sini
         if (!email.includes('admin') && !email.includes('sarpras')) {
           alert('Akses ditolak: Email ini bukan akun Administrator Sarpras!')
           setLoading(false)
@@ -111,7 +115,7 @@ export default function LoginPage() {
               {isSignUp ? 'Daftar Akun EventLoop' : 'Masuk ke EventLoop'}
             </h3>
             <p className="text-sm text-gray-500 mt-1">
-              {isSignUp ? 'Buat akun baru untuk mulai menyewa alat' : 'Gunakan email kampus atau organisasi Anda'}
+              {isSignUp ? 'Lengkapi identitas mahasiswa Anda untuk mendaftar' : 'Gunakan email kampus atau organisasi Anda'}
             </p>
           </div>
 
@@ -130,7 +134,7 @@ export default function LoginPage() {
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  🎓 Organisasi / User
+                  🎓 Mahasiswa / Org
                 </button>
                 <button
                   type="button"
@@ -141,27 +145,45 @@ export default function LoginPage() {
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  🏫 Admin Kampus / Sarpras
+                  🏫 Admin Kampus
                 </button>
               </div>
             </div>
 
-            {/* Input Nama Organisasi khusus saat Sign Up */}
-            {isSignUp && (
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Nama Organisasi / Tim
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                    placeholder="Contoh: HIMA RE / BEM Prasmul"
-                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
-                  />
+            {/* Kolom Nama & NIM Hanya Muncul Saat Daftar Akun Mahasiswa */}
+            {isSignUp && role === 'student_org' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Nama Lengkap
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                      placeholder="Choirul Arifin"
+                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                    NIM
+                  </label>
+                  <div className="relative">
+                    <Hash className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={nim}
+                      onChange={(e) => setNim(e.target.value)}
+                      required
+                      placeholder="23302410001"
+                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -177,7 +199,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  placeholder={role === 'sarpras' ? 'sarpras@prasetiyamulya.ac.id' : 'organisasi@student.prasetiyamulya.ac.id'}
+                  placeholder={role === 'sarpras' ? 'sarpras@prasetiyamulya.ac.id' : 'student@prasetiyamulya.ac.id'}
                   className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
                 />
               </div>
