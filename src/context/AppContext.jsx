@@ -5,12 +5,12 @@ import { supabase } from '../lib/supabaseClient'
 const AppContext = createContext()
 
 export function AppProvider({ children }) {
-  // Menggunakan localStorage agar status admin/user tidak hilang saat page refresh
+  // Menggunakan sessionStorage agar tab satu dan tab lainnya independen (tidak saling menimpa)
   const [currentUserRole, setCurrentUserRole] = useState(() => {
-    return localStorage.getItem('eventloop_user_role') || 'user'
+    return sessionStorage.getItem('eventloop_user_role') || 'user'
   })
   const [currentUserName, setCurrentUserName] = useState(() => {
-    return localStorage.getItem('eventloop_user_name') || 'Prasmulyan'
+    return sessionStorage.getItem('eventloop_user_name') || 'Prasmulyan'
   })
 
   const [userSession, setUserSession] = useState(null)
@@ -27,10 +27,10 @@ export function AppProvider({ children }) {
   const [cartItems, setCartItems] = useState([])
   const [reservations, setReservations] = useState([])
 
-  // Sinkronisasi ke localStorage setiap kali berubah
+  // Sinkronisasi otomatis ke sessionStorage per tab browser
   useEffect(() => {
-    localStorage.setItem('eventloop_user_role', currentUserRole)
-    localStorage.setItem('eventloop_user_name', currentUserName)
+    sessionStorage.setItem('eventloop_user_role', currentUserRole)
+    sessionStorage.setItem('eventloop_user_name', currentUserName)
   }, [currentUserRole, currentUserName])
 
   async function fetchEquipments() {
