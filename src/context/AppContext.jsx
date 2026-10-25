@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { equipmentData as initialEquipment, adminTransactions as initialTransactions, pendingApprovalEquipments as initialPending } from '../data/mockData'
+import { adminTransactions as initialTransactions, pendingApprovalEquipments as initialPending } from '../data/mockData'
 import { supabase } from '../lib/supabaseClient'
 
 const AppContext = createContext()
@@ -10,7 +10,8 @@ export function AppProvider({ children }) {
   const [userSession, setUserSession] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const [equipments, setEquipments] = useState(initialEquipment)
+  // State utama ditarik dari database Supabase
+  const [equipments, setEquipments] = useState([])
   const [pendingApprovals, setPendingApprovals] = useState(initialPending)
   const [transactions, setTransactions] = useState(initialTransactions)
   
@@ -21,7 +22,24 @@ export function AppProvider({ children }) {
   const [cartItems, setCartItems] = useState([])
   const [reservations, setReservations] = useState([])
 
-  // Ambil sesi login aktif dari Supabase dan sinkronkan data berdasarkan user_id
+  // Fungsi untuk mengambil data katalog barang dari tabel Supabase
+  async function fetchEquipments() {
+    const { data, error } = await supabase
+      .from('equipments')
+      .select('*')
+      .order('id', { ascending: false })
+
+    if (!error && data) {
+      // Format ulang data agar sesuai dengan struktur UI komponen frontend
+      const formattedData = data.map(item => ({
+        ...item,
+        image: item.imageUrl ? '📷' : '📦',
+      }))
+      setEquipments(formattedData)
+    }
+  }
+
+  // Ambil sesi login aktif dan data dari Supabase saat aplikasi dimuat
   useEffect(() => {
     async function initSessionAndData() {
       const { data: { session } } = await supabase.auth.getSession()
@@ -33,18 +51,17 @@ export function AppProvider({ children }) {
           setCurrentUserName(metadata.full_name)
         }
 
-        // Ambil reservasi khusus user ini dari database Supabase
-        const { data, error } = await supabase
+        // Ambil reservasi user ini
+        const { data: resData } = await supabase
           .from('reservations')
           .select('*')
           .eq('user_id', session.user.id)
 
-        if (!error && data) {
-          setReservations(data)
-        }
-      } else {
-        setReservations([])
+        if (resData) setReservations(resData)
       }
+
+      // Ambil katalog barang
+      await fetchEquipments()
       setLoading(false)
     }
 
@@ -59,11 +76,11 @@ export function AppProvider({ children }) {
           setCurrentUserName(metadata.full_name)
         }
 
-        const { data } = await supabase
+        const { data: resData } = await supabase
           .from('reservations')
           .select('*')
           .eq('user_id', session.user.id)
-        setReservations(data || [])
+        setReservations(resData || [])
       } else {
         setReservations([])
         setCurrentUserName('Prasmulyan')
@@ -110,12 +127,12 @@ export function AppProvider({ children }) {
     return pendingItem.id
   }
 
-  const approveEquipmentByAdmin = (approvalId) => {
+  // Fungsi saat Admin menyetujui barang masuk (langsung simpan ke tabel Supabase `equipments`)
+  const approveEquipmentByAdmin = async (approvalId) => {
     const itemToApprove = pendingApprovals.find(p => p.id === approvalId)
     if (!itemToApprove) return
 
-    const newMarketplaceItem = {
-      id: Date.now(),
+    const newItemPayload = {
       name: itemToApprove.name,
       category: itemToApprove.category,
       price: itemToApprove.pricingType === 'sale' ? (itemToApprove.price || 50000) : (itemToApprove.price || 20000),
@@ -123,7 +140,6 @@ export function AppProvider({ children }) {
       listingType: itemToApprove.pricingType || 'rental',
       available: parseInt(itemToApprove.qty) || 1,
       total: parseInt(itemToApprove.qty) || 1,
-      image: itemToApprove.imagePreview ? '📷' : '📦',
       imageUrl: itemToApprove.imagePreview || null,
       circularScore: itemToApprove.circularScore || 88,
       reusedCount: 0,
@@ -137,13 +153,16 @@ export function AppProvider({ children }) {
       lastLocation: itemToApprove.initialLocation || 'Warehouse Kampus Gedung C',
       lastStoragePhoto: itemToApprove.initialStoragePhoto || null,
       uploader: itemToApprove.uploader,
-      history: [
-        { event: 'Didaftarkan & Lolos Verifikasi Admin', org: itemToApprove.ownerOrg || currentUserName, date: new Date().toISOString().split('T')[0], condition: itemToApprove.condition }
-      ]
     }
 
-    setEquipments(prev => [newMarketplaceItem, ...prev])
-    setPendingApprovals(prev => prev.filter(p => p.id !== approvalId))
+    const { error } = await supabase.from('equipments').insert([newItemPayload])
+
+    if (error) {
+      alert('Gagal menambahkan barang ke database: ' + error.message)
+    } else {
+      await fetchEquipments() // Ambil data terbaru dari server
+      setPendingApprovals(prev => prev.filter(p => p.id !== approvalId))
+    }
   }
 
   const rejectEquipmentByAdmin = (approvalId) => {
@@ -153,13 +172,18 @@ export function AppProvider({ children }) {
   const submitUserQrisPayment = async (reservationDetails) => {
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
-    setEquipments(prev => prev.map(eq => {
-      const reservedItem = cartItems.find(cart => cart.id === eq.id)
-      if (reservedItem) {
-        return { ...eq, available: eq.available - reservedItem.qty }
+    // Update stok di database Supabase
+    for (const reservedItem of cartItems) {
+      const targetItem = equipments.find(e => e.id === reservedItem.id)
+      if (targetItem) {
+        const newAvailable = Math.max(0, targetItem.available - reservedItem.qty)
+        await supabase
+          .from('equipments')
+          .update({ available: newAvailable })
+          .eq('id', reservedItem.id)
       }
-      return eq
-    }))
+    }
+    await fetchEquipments()
 
     const newTxn = {
       id: txnId,
@@ -178,7 +202,7 @@ export function AppProvider({ children }) {
 
     setTransactions(prev => [newTxn, ...prev])
     
-    // Simpan reservasi ke database Supabase jika user sudah login
+    // Simpan reservasi ke database Supabase
     if (userSession?.user) {
       for (const cartItem of cartItems) {
         await supabase.from('reservations').insert([
@@ -192,7 +216,6 @@ export function AppProvider({ children }) {
         ])
       }
 
-      // Ambil ulang data reservasi terbaru dari database
       const { data } = await supabase
         .from('reservations')
         .select('*')
@@ -238,25 +261,34 @@ export function AppProvider({ children }) {
     }))
   }
 
-  const updateEquipmentPriceAndStock = (id, newPrice, newAvailable) => {
+  const updateEquipmentPriceAndStock = async (id, newPrice, newAvailable) => {
     if (currentUserRole !== 'admin') return
-    setEquipments(prev => prev.map(item => {
-      if (item.id === id) {
-        return {
-          ...item,
-          price: parseInt(newPrice) || item.price,
-          salePrice: item.listingType === 'sale' ? parseInt(newPrice) : item.salePrice,
-          available: parseInt(newAvailable) || item.available
-        }
-      }
-      return item
-    }))
+
+    const { error } = await supabase
+      .from('equipments')
+      .update({
+        price: parseInt(newPrice),
+        available: parseInt(newAvailable)
+      })
+      .eq('id', id)
+
+    if (!error) {
+      await fetchEquipments()
+    }
   }
 
-  const deleteEquipment = (id) => {
+  const deleteEquipment = async (id) => {
     if (currentUserRole !== 'admin') return
-    setEquipments(prev => prev.filter(item => item.id !== id))
-    setCartItems(prev => prev.filter(item => item.id !== id))
+
+    const { error } = await supabase
+      .from('equipments')
+      .delete()
+      .eq('id', id)
+
+    if (!error) {
+      setEquipments(prev => prev.filter(item => item.id !== id))
+      setCartItems(prev => prev.filter(item => item.id !== id))
+    }
   }
 
   const submitUserReturnProof = (returnData) => {
@@ -276,20 +308,18 @@ export function AppProvider({ children }) {
     setPendingReturns(prev => prev.filter(r => r.id !== returnId))
     setReturnStatus('approved_success')
     
-    setEquipments(prev => prev.map(item => {
-      if (item.id === equipmentId) {
-        return { 
-          ...item, 
-          available: item.available + returnedQty,
-          lastLocation: 'Warehouse Kampus Gedung C (Rak B-04)',
-          lastStoragePhoto: returnData?.storagePhoto || item.lastStoragePhoto,
-          lastConditionPhoto: returnData?.conditionPhoto || null
-        }
-      }
-      return item
-    }))
+    // Kembalikan stok di database Supabase
+    const targetItem = equipments.find(e => e.id === equipmentId)
+    if (targetItem) {
+      const restoredAvailable = targetItem.available + returnedQty
+      await supabase
+        .from('equipments')
+        .update({ available: restoredAvailable })
+        .eq('id', equipmentId)
+      await fetchEquipments()
+    }
 
-    // Hapus data dari tabel database Supabase jika user login
+    // Hapus data dari tabel reservations Supabase
     if (userSession?.user) {
       await supabase
         .from('reservations')
