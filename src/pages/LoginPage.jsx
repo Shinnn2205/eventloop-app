@@ -6,14 +6,13 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [isSignUp, setIsSignUp] = useState(false) // Untuk toggle antara Login atau Daftar akun baru
+  const [isSignUp, setIsSignUp] = useState(false)
 
   const handleAuth = async (e) => {
     e.preventDefault()
     setLoading(true)
 
     if (isSignUp) {
-      // Proses Daftar Akun Baru
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -21,20 +20,21 @@ export default function LoginPage() {
       if (error) {
         alert('Gagal mendaftar: ' + error.message)
       } else {
-        alert('Pendaftaran berhasil! Silakan masuk dengan akun yang baru dibuat.')
+        alert('Pendaftaran berhasil! Silakan masuk.')
         setIsSignUp(false)
       }
     } else {
-      // Proses Login
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       if (error) {
         alert('Gagal masuk: ' + error.message)
-      } else {
-        // Berhasil masuk, aplikasi akan otomatis mendeteksi sesi
-        window.location.href = '/'
+      } else if (data?.session) {
+        // Simpan peran login ke local storage agar state langsung dikenali
+        localStorage.setItem('eventloop_role', 'user')
+        // Paksa arahkan ke halaman utama aplikasi dan refresh state
+        window.location.replace('/')
       }
     }
     setLoading(false)
