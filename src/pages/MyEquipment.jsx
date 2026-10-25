@@ -10,11 +10,13 @@ import {
 } from 'lucide-react'
 
 export default function MyEquipment() {
-  const { equipments, pendingApprovals } = useApp()
+  const { equipments, pendingApprovals, userSession } = useApp()
 
-  // Saring barang yang HANYA diupload oleh currentUser
-  const myApprovedEquipments = equipments.filter(item => item.uploader === 'currentUser')
-  const myPendingEquipments = pendingApprovals.filter(item => item.uploader === 'currentUser')
+  const currentUserId = userSession?.user?.id
+
+  // Saring barang yang HANYA diupload oleh user yang sedang login saat ini berdasarkan uploader (user_id)
+  const myApprovedEquipments = equipments.filter(item => item.uploader === currentUserId)
+  const myPendingEquipments = pendingApprovals.filter(item => item.uploader === currentUserId)
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
@@ -60,7 +62,7 @@ export default function MyEquipment() {
                   )}
                 </div>
                 <div>
-                  <div className="text-[10px] font-bold text-amber-600 uppercase mb-0.5">#{item.id} • PENDING</div>
+                  <div className="text-[10px] font-bold text-amber-600 uppercase mb-0.5">#{item.id}PENDING</div>
                   <h4 className="font-extrabold text-gray-900 text-sm leading-tight">{item.name}</h4>
                   <div className="text-[11px] text-gray-500 mt-1">Stok diajukan: {item.qty} Unit</div>
                 </div>
