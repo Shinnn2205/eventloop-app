@@ -1,14 +1,15 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Recycle, Mail, Lock, ArrowRight, ShieldCheck, Sparkles, Building2 } from 'lucide-react'
+import { Recycle, Mail, Lock, ArrowRight, ShieldCheck, Sparkles, Building2, User } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useApp } from '../context/AppContext'
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const { setCurrentUserRole } = useApp()
-  const [email, setEmail] = useState('23302410001@student.prasetiyamulya.ac.id')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('') // State untuk Nama Organisasi/User
   const [role, setRole] = useState('student_org')
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -18,7 +19,17 @@ export default function LoginPage() {
     setLoading(true)
 
     if (isSignUp) {
-      const { error } = await supabase.auth.signUp({ email, password })
+      // 1. Proses Pendaftaran dengan menyimpan nama di metadata Supabase
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName || 'Organisasi Prasmulyan',
+          }
+        }
+      })
+
       if (error) {
         alert('Gagal mendaftar: ' + error.message)
       } else {
@@ -26,7 +37,18 @@ export default function LoginPage() {
         setIsSignUp(false)
       }
     } else {
+      // 2. Validasi Login Admin Khusus
+      if (role === 'sarpras') {
+        // Kamu bisa tentukan email khusus admin sarpras di sini
+        if (!email.includes('admin') && !email.includes('sarpras')) {
+          alert('Akses ditolak: Email ini bukan akun Administrator Sarpras!')
+          setLoading(false)
+          return
+        }
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      
       if (error) {
         alert('Gagal masuk: ' + error.message)
       } else if (data?.session) {
@@ -89,7 +111,7 @@ export default function LoginPage() {
               {isSignUp ? 'Daftar Akun EventLoop' : 'Masuk ke EventLoop'}
             </h3>
             <p className="text-sm text-gray-500 mt-1">
-              {isSignUp ? 'Buat akun Supabase baru' : 'Gunakan email kampus atau organisasi Anda'}
+              {isSignUp ? 'Buat akun baru untuk mulai menyewa alat' : 'Gunakan email kampus atau organisasi Anda'}
             </p>
           </div>
 
@@ -124,6 +146,26 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Input Nama Organisasi khusus saat Sign Up */}
+            {isSignUp && (
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Nama Organisasi / Tim
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    placeholder="Contoh: HIMA RE / BEM Prasmul"
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                 Email Kampus
@@ -135,7 +177,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  placeholder="organisasi@kampus.ac.id"
+                  placeholder={role === 'sarpras' ? 'sarpras@prasetiyamulya.ac.id' : 'organisasi@student.prasetiyamulya.ac.id'}
                   className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
                 />
               </div>
@@ -170,7 +212,7 @@ export default function LoginPage() {
 
           <div className="mt-6 pt-6 border-t border-gray-100 text-center space-y-2">
             <p className="text-xs text-gray-500">
-              {isSignUp ? 'Sudah punya akun?' : 'Belum punya akun di Supabase?'}{' '}
+              {isSignUp ? 'Sudah punya akun?' : 'Belum punya akun?'}{' '}
               <button
                 type="button"
                 onClick={() => setIsSignUp(!isSignUp)}
