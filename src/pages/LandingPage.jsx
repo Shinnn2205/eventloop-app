@@ -172,10 +172,10 @@ export default function LandingPage() {
               </div>
               <h4 className="text-xl font-bold text-gray-900 mb-3">2. Campus Inventory</h4>
               <p className="text-sm text-gray-600 leading-relaxed mb-4">
-                Sistem tracking real-time 3 sumber barang: Campus Inventory, BEM/UKM Organization Inventory, dan Partner Vendor dengan QR Code tracking.
+                Sistem tracking real-time 3 sumber barang: Campus Inventory, BEM/UKM Organization Inventory, dan Partner Vendor dengan verifikasi foto fisik.
               </p>
               <div className="text-xs font-semibold text-blue-700 bg-blue-50 py-1.5 px-3 rounded-lg inline-block">
-                QR Inspection & Status Check
+                Photo Inspection & Timestamp Check
               </div>
             </div>
 
@@ -294,9 +294,9 @@ export default function LandingPage() {
               { step: '02', title: 'Create Event', desc: 'Tentukan nama acara, tanggal, kuota, & kebutuhan.', icon: '📅' },
               { step: '03', title: 'Pilih Equipment', desc: 'Filter barang berdasarkan Circular Score & kuota.', icon: '🛒' },
               { step: '04', title: 'Reserve & Checkout', desc: 'Konfirmasi sewa dengan estimasi penghematan biaya.', icon: '📝' },
-              { step: '05', title: 'Pick Up & Scan', desc: 'Ambil di storage kampus dengan verifikasi QR code.', icon: '📦' },
+              { step: '05', title: 'Pick Up & Verifikasi', desc: 'Ambil di storage kampus dan pastikan kelengkapan fisik.', icon: '📦' },
               { step: '06', title: 'Use at Event', desc: 'Perlengkapan aktif digunakan selama kegiatan.', icon: '🎪' },
-              { step: '07', title: 'Return & Inspect', desc: 'Kembalikan barang, check kondisi & kebersihan.', icon: '🔄' },
+              { step: '07', title: 'Return & Inspect', desc: 'Kembalikan barang, upload foto kondisi & rak penempatan.', icon: '🔄' },
               { step: '08', title: 'Impact Recorded', desc: 'Metrik limbah & circular score otomatis bertambah!', icon: '🌱' },
             ].map((f, idx) => (
               <div key={idx} className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow">
