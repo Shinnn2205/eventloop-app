@@ -56,7 +56,7 @@ export function AppProvider({ children }) {
     }
   }
 
-  // Tarik data transaksi riil dari Supabase
+  // Tarik data transaksi dari Supabase untuk Admin & User
   async function fetchTransactions() {
     const { data, error } = await supabase
       .from('transactions')
@@ -79,7 +79,6 @@ export function AppProvider({ children }) {
           setCurrentUserName(metadata.full_name)
         }
 
-        // Murni tarik dari tabel reservations Supabase
         const { data: resData } = await supabase
           .from('reservations')
           .select('*')
@@ -217,11 +216,11 @@ export function AppProvider({ children }) {
     await fetchPendingApprovals()
   }
 
-  // Simpan transaksi & reservasi ke Supabase
+  // Kirim data transaksi langsung ke Supabase agar masuk ke database admin
   const submitUserQrisPayment = async (reservationDetails) => {
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
-    // Potong stok barang
+    // 1. Kurangi stok barang di database equipments
     for (const reservedItem of cartItems) {
       const targetItem = equipments.find(e => e.id === reservedItem.id)
       if (targetItem) {
@@ -234,10 +233,11 @@ export function AppProvider({ children }) {
     }
     await fetchEquipments()
 
+    // 2. Format data transaksi untuk tabel 'transactions' (Panel Admin)
     const newTxn = {
       id: txnId,
       buyerOrg: reservationDetails.buyerOrg || currentUserName,
-      itemName: reservationDetails.itemNames || 'Reservasi Perlengkapan Event',
+      itemName: reservationDetails.itemNames || cartItems.map(i => i.name).join(', ') || 'Reservasi Perlengkapan Event',
       amount: reservationDetails.totalAmount,
       qrisStatus: 'Pending Admin Verification',
       paidAt: `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`,
@@ -249,9 +249,15 @@ export function AppProvider({ children }) {
       adminFee: Math.round(reservationDetails.totalAmount * 0.05),
     }
 
-    await supabase.from('transactions').insert([newTxn])
+    // Insert ke tabel transactions Supabase
+    const { error: txnError } = await supabase.from('transactions').insert([newTxn])
+    if (txnError) {
+      console.error("Gagal insert ke transactions:", txnError.message)
+    }
+    
     await fetchTransactions()
     
+    // 3. Simpan ke tabel reservations Supabase jika user login
     if (userSession?.user) {
       for (const cartItem of cartItems) {
         await supabase.from('reservations').insert([
