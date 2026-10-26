@@ -11,7 +11,8 @@ import {
 
 export default function CreateEvent() {
   const navigate = useNavigate()
-  const { setActiveReservation } = useApp()
+  const app = useApp() || {}
+  const setActiveReservation = app.setActiveReservation || (() => {})
   
   const [eventName, setEventName] = useState('INNOFAIR 2026')
   const [eventDate, setEventDate] = useState('2026-09-18')
@@ -19,23 +20,32 @@ export default function CreateEvent() {
   const [participants, setParticipants] = useState('450')
   const [eventType, setEventType] = useState('Expo / Bazaar')
 
-  const handleSaveAndProceedToMarketplace = () => {
-    // 1. Simpan detail event ke state global
-    setActiveReservation({
-      eventName,
-      eventDate,
-      location,
-      participants,
-      eventType,
-      items: [] 
-    })
+  const handleSaveAndProceedToMarketplace = (e) => {
+    // Mencegah konflik event bawaan
+    if (e) e.stopPropagation()
+    
+    console.log("Tombol Simpan Event diklik, mengarahkan ke marketplace...")
 
-    // 2. Langsung arahkan user ke marketplace
+    try {
+      // Simpan data event jika fungsinya ada
+      setActiveReservation({
+        eventName,
+        eventDate,
+        location,
+        participants,
+        eventType,
+        items: [] 
+      })
+    } catch (err) {
+      console.error("Gagal menyimpan state reservation:", err)
+    }
+
+    // Paksa navigasi ke marketplace
     navigate('/marketplace')
   }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto animate-fade-in-up">
+    <div className="space-y-8 max-w-4xl mx-auto animate-fade-in-up relative z-10">
       <div>
         <div className="inline-flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full mb-1">
           <Calendar className="w-3.5 h-3.5" /> Wizard Event Kampus
@@ -48,7 +58,7 @@ export default function CreateEvent() {
         </p>
       </div>
 
-      <div className="card p-6 md:p-8 space-y-6">
+      <div className="card p-6 md:p-8 space-y-6 bg-white shadow-sm rounded-2xl relative z-20">
         <div className="space-y-5">
           <div className="grid md:grid-cols-2 gap-5">
             <div>
@@ -139,11 +149,11 @@ export default function CreateEvent() {
             />
           </div>
 
-          <div className="pt-4 flex items-center justify-end">
+          <div className="pt-4 flex items-center justify-end relative z-30">
             <button
               type="button"
               onClick={handleSaveAndProceedToMarketplace}
-              className="btn-primary text-sm !py-3 !px-6 flex items-center gap-2 shadow-green-600/20 cursor-pointer"
+              className="btn-primary text-sm !py-3 !px-6 flex items-center gap-2 shadow-lg shadow-green-600/20 cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all pointer-events-auto"
             >
               <Package className="w-4 h-4" />
               <span>Simpan Event & Pilih Barang di Marketplace</span>
