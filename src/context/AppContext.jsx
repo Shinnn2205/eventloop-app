@@ -16,9 +16,7 @@ export function AppProvider({ children }) {
 
   const [equipments, setEquipments] = useState([])
   const [pendingApprovals, setPendingApprovals] = useState([])
-  const [transactions, setTransactions] = useState([
-    { id: 'TXN-QRIS-789', buyerOrg: 'HMPR', itemName: 'Tenda Kerucut 3x3 Meter', amount: 195000, qrisStatus: 'Pending Admin Verification' }
-  ])
+  const [transactions, setTransactions] = useState([])
   
   const [userPaymentStatus, setUserPaymentStatus] = useState(() => {
     return sessionStorage.getItem('eventloop_payment_status') || 'idle'
@@ -97,8 +95,9 @@ export function AppProvider({ children }) {
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
+      .order('created_at', { ascending: false })
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       setTransactions(data)
     }
   }
@@ -281,8 +280,13 @@ export function AppProvider({ children }) {
   }
 
   const submitUserQrisPayment = async (reservationDetails) => {
-    const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
+    const txnId = `TXN-QRIS-${Math.floor(1000 + Math.random() * 9000)}`
+    const totalAmount = reservationDetails.totalAmount || 0
     
+    // Hitung Net Payout setelah dipotong fee admin 5%
+    const adminFee = totalAmount * 0.05
+    const netPayout = totalAmount - adminFee
+
     for (const reservedItem of cartItems) {
       const targetItem = equipments.find(e => e.id === reservedItem.id)
       if (targetItem) {
@@ -295,26 +299,26 @@ export function AppProvider({ children }) {
     }
     await fetchEquipments()
 
+    const itemNames = cartItems.map(i => `${i.qty || 1}x ${i.name}`).join(', ') || 'Reservasi Perlengkapan Event'
+    const ownerAccount = cartItems[0]?.ownerBank || 'BCA 8012345678 a.n Owner Organisasi'
+
     const newTxn = {
       id: txnId,
       buyerOrg: reservationDetails.buyerOrg || currentUserName,
-      itemName: cartItems.map(i => i.name).join(', ') || 'Reservasi Perlengkapan Event',
-      amount: reservationDetails.totalAmount,
+      itemName: itemNames,
+      amount: totalAmount,
+      net_payout: netPayout,
+      owner_bank: ownerAccount,
       qrisStatus: 'Pending Admin Verification'
     }
     
-    // Simpan juga ke tabel transactions Supabase agar terbaca di Admin Panel
-    await supabase.from('transactions').insert([
-      {
-        id: txnId,
-        buyerOrg: reservationDetails.buyerOrg || currentUserName,
-        itemName: newTxn.itemName,
-        amount: reservationDetails.totalAmount,
-        qrisStatus: 'Pending Admin Verification'
-      }
-    ])
+    // Simpan permanen ke Supabase transactions
+    const { error: txnError } = await supabase.from('transactions').insert([newTxn])
+    if (txnError) {
+      console.error('Gagal menyimpan transaksi ke database:', txnError.message)
+    }
 
-    setTransactions(prev => [newTxn, ...prev])
+    await fetchTransactions()
     
     if (userSession?.user) {
       for (const cartItem of cartItems) {
@@ -322,7 +326,7 @@ export function AppProvider({ children }) {
           {
             user_id: userSession.user.id,
             item_name: cartItem.name,
-            quantity: cartItem.qty,
+            quantity: cartItem.qty || 1,
             start_date: activeEvent.date,
             status: 'Sedang Berjalan'
           }
@@ -354,13 +358,12 @@ export function AppProvider({ children }) {
   }
 
   const approvePaymentByAdmin = async (txnId) => {
-    // Update status di Supabase transactions
     await supabase
       .from('transactions')
       .update({ qrisStatus: 'Payment Approved by Admin (Lunas)' })
       .eq('id', txnId)
 
-    setTransactions(prev => prev.map(t => t.id === txnId ? { ...t, qrisStatus: 'Payment Approved by Admin (Lunas)' } : t))
+    await fetchTransactions()
     setUserPaymentStatus('approved_success')
   }
 
@@ -370,7 +373,7 @@ export function AppProvider({ children }) {
       .update({ payoutStatus: 'Transferred' })
       .eq('id', txnId)
 
-    setTransactions(prev => prev.map(t => t.id === txnId ? { ...t, payoutStatus: 'Transferred' } : t))
+    await fetchTransactions()
   }
 
   const updateEquipmentPriceAndStock = async (id, newPrice, newAvailable) => {
