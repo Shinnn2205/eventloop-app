@@ -216,7 +216,7 @@ export function AppProvider({ children }) {
     await fetchPendingApprovals()
   }
 
-  // Kirim data transaksi langsung ke Supabase agar masuk ke database admin
+  // Kirim data transaksi lengkap ke Supabase agar langsung tampil di panel Admin
   const submitUserQrisPayment = async (reservationDetails) => {
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
@@ -233,7 +233,7 @@ export function AppProvider({ children }) {
     }
     await fetchEquipments()
 
-    // 2. Format data transaksi untuk tabel 'transactions' (Panel Admin)
+    // 2. Format data transaksi untuk tabel 'transactions' di Supabase
     const newTxn = {
       id: txnId,
       buyerOrg: reservationDetails.buyerOrg || currentUserName,
@@ -255,9 +255,11 @@ export function AppProvider({ children }) {
       console.error("Gagal insert ke transactions:", txnError.message)
     }
     
+    // Gabungkan transaksi mock lokal dengan data baru agar langsung muncul di UI Admin tanpa delay
+    setTransactions(prev => [newTxn, ...prev])
     await fetchTransactions()
     
-    // 3. Simpan ke tabel reservations Supabase jika user login
+    // 3. Simpan ke tabel reservations Supabase
     if (userSession?.user) {
       for (const cartItem of cartItems) {
         await supabase.from('reservations').insert([
