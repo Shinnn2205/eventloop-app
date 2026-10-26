@@ -55,7 +55,10 @@ export function AppProvider({ children }) {
             circularScore: 90
           }))
         })
+        setUserPaymentStatus('pending_admin_approval')
       }
+    } else if (error) {
+      console.error('Gagal mengambil reservasi:', error.message)
     }
   }
 
@@ -92,6 +95,7 @@ export function AppProvider({ children }) {
         setCartItems([])
         setReservations([])
         setActiveReservation(null)
+        setUserPaymentStatus('idle')
       }
       await fetchTransactions()
     })
@@ -264,13 +268,16 @@ export function AppProvider({ children }) {
     }
 
     // 2. Simpan transaksi ke tabel Supabase transactions
-    await supabase.from('transactions').insert([newTxn])
+    const { error: txnError } = await supabase.from('transactions').insert([newTxn])
+    if (txnError) {
+      console.error('Gagal simpan transaksi:', txnError.message)
+    }
     setTransactions(prev => [newTxn, ...prev])
 
     // 3. Simpan permanen ke tabel reservations Supabase
     if (userSession?.user?.id) {
       for (const cartItem of cartItems) {
-        await supabase.from('reservations').insert([
+        const { error: resError } = await supabase.from('reservations').insert([
           {
             user_id: userSession.user.id,
             item_name: cartItem.name,
@@ -281,6 +288,9 @@ export function AppProvider({ children }) {
             status: 'Sedang Berjalan'
           }
         ])
+        if (resError) {
+          console.error('Gagal simpan reservasi:', resError.message)
+        }
       }
       await fetchUserReservations(userSession.user.id)
     }
@@ -368,6 +378,7 @@ export function AppProvider({ children }) {
       await fetchUserReservations(userSession.user.id)
     }
     setActiveReservation(null)
+    setUserPaymentStatus('idle')
   }
 
   return (
