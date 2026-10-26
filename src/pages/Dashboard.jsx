@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
-import { supabase } from '../lib/supabaseClient' // Pastikan import supabase client
+import { impactData } from '../data/mockData' // <-- Mengambil data langsung dari mockData lokal
 import { 
   Recycle, 
   Calendar, 
@@ -12,77 +11,17 @@ import {
   Sparkles, 
   RotateCcw,
   PlusCircle,
+  CheckCircle2,
   Clock,
-  PackagePlus
+  PackagePlus,
+  Tent
 } from 'lucide-react'
 
 export default function Dashboard() {
-  const { activeReservation, currentUserName } = useApp()
-  const hasActiveRentals = activeReservation?.items?.length > 0
+  const { activeReservation, transactions, currentUserName } = useApp()
   
-  // State untuk menyimpan data asli dari Supabase
-  const [impactStats, setImpactStats] = useState({
-    itemsReused: 0,
-    costAvoided: 0,
-    wasteAvoided: 0,
-    orgScore: 0
-  })
-  const [latestTxn, setLatestTxn] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    // Fungsi untuk mengambil data asli dari Supabase
-    const fetchSupabaseData = async () => {
-      try {
-        setLoading(true)
-        // 1. Ambil session user yang sedang login
-        const { data: { user } } = await supabase.auth.getUser()
-        
-        if (user) {
-          // 2. Fetch riwayat transaksi/reservasi dari Supabase 
-          // (Ubah 'transactions' menjadi nama tabel asli Anda di Supabase, misal: 'reservations')
-          const { data: txData, error: txError } = await supabase
-            .from('transactions')
-            .select('*')
-            // .eq('user_id', user.id) // Uncomment jika ingin filter berdasarkan user spesifik
-            .order('created_at', { ascending: false })
-            
-          if (!txError && txData) {
-            // Set transaksi terbaru untuk ditampilkan di UI
-            setLatestTxn(txData[0] || null)
-
-            // 3. Kalkulasi data secara dinamis berdasarkan data Supabase
-            // Asumsi: txData memiliki properti 'qty', 'amount', dll
-            let totalItems = 0
-            let totalSpent = 0
-            
-            txData.forEach(tx => {
-              totalItems += (tx.qty || 1) // Sesuaikan dengan kolom qty di Supabase
-              totalSpent += (tx.amount || 0) // Sesuaikan dengan kolom nominal di Supabase
-            })
-
-            // Rumus Kalkulasi Impact (Bisa disesuaikan dengan logika bisnis EventLoop)
-            const calculatedCostAvoided = totalSpent * 4.8 // Asumsi hemat hampir 5x lipat dibanding beli baru
-            const calculatedWaste = (totalItems * 1.2) // Asumsi 1 barang = 1.2 kg limbah
-            
-            // Set data dinamis ke state UI
-            setImpactStats({
-              itemsReused: totalItems,
-              costAvoided: calculatedCostAvoided,
-              wasteAvoided: calculatedWaste.toFixed(1),
-              orgScore: totalItems > 10 ? 92 : (totalItems > 5 ? 75 : 50) // Logic skor dinamis
-            })
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchSupabaseData()
-  }, [])
+  const hasActiveRentals = activeReservation?.items?.length > 0
+  const latestTxn = transactions && transactions.length > 0 ? transactions[0] : null
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto animate-fade-in-up">
@@ -122,12 +61,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Statistik Impact dari Supabase */}
+      {/* Statistik Impact - Menarik data dinamis dari mockData.js */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-bold text-gray-900">Your Circular Impact</h3>
-            <p className="text-xs text-gray-500">Akumulasi penghematan berdasarkan data real-time</p>
+            <h3 className="text-lg font-bold text-gray-900">Global Circular Impact</h3>
+            <p className="text-xs text-gray-500">Akumulasi penghematan & pengurangan sampah seluruh kampus</p>
           </div>
           <Link to="/impact" className="text-xs font-bold text-green-700 hover:text-green-800 flex items-center gap-1">
             Lihat Analitik Lengkap <ArrowRight className="w-3.5 h-3.5" />
@@ -140,53 +79,42 @@ export default function Dashboard() {
               <span>Items Reused</span>
               <Recycle className="w-4 h-4 text-green-600" />
             </div>
-            <div className="text-3xl font-black text-gray-900">
-              {loading ? '...' : impactStats.itemsReused}
-            </div>
-            <div className="text-[11px] text-gray-400 font-medium mt-1 flex items-center gap-1">
-              Data ditarik dari database
+            <div className="text-3xl font-black text-gray-900">{impactData.totalItemsReused.toLocaleString('id-ID')}</div>
+            <div className="text-xs text-green-700 font-medium mt-1 flex items-center gap-1">
+              Peralatan digunakan berulang
             </div>
           </div>
 
-          <div className="card p-5 border-l-4 border-l-emerald-500">
+          <div className="card p-5 border-l-4 border-l-blue-500">
             <div className="flex items-center justify-between text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">
-              <span>Cost Avoided</span>
-              <DollarSign className="w-4 h-4 text-emerald-600" />
+              <span>Events Supported</span>
+              <Tent className="w-4 h-4 text-blue-600" />
             </div>
-            <div className="text-3xl font-black text-gray-900">
-              {loading ? '...' : `Rp${(impactStats.costAvoided / 1000000).toFixed(1)}M`}
-            </div>
-            <div className="text-xs text-emerald-700 font-medium mt-1 flex items-center gap-1">
-              <span>💰 Hemat biaya beli baru</span>
+            <div className="text-3xl font-black text-gray-900">{impactData.totalEventsSupported}</div>
+            <div className="text-xs text-blue-700 font-medium mt-1 flex items-center gap-1">
+              Seminar, Expo, Lomba & UKM
             </div>
           </div>
 
           <div className="card p-5 border-l-4 border-l-teal-500">
             <div className="flex items-center justify-between text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">
-              <span>Waste Avoided</span>
+              <span>Material Waste Avoided</span>
               <Leaf className="w-4 h-4 text-teal-600" />
             </div>
-            <div className="text-3xl font-black text-gray-900">
-              {loading ? '...' : `${impactStats.wasteAvoided} kg`}
-            </div>
+            <div className="text-3xl font-black text-gray-900">{impactData.wasteAvoided} kg</div>
             <div className="text-xs text-teal-700 font-medium mt-1">
               Limbah material dicegah
             </div>
           </div>
 
-          <div className="card p-5 border-l-4 border-l-green-600 bg-gradient-to-br from-green-50/50 to-white">
+          <div className="card p-5 border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50/50 to-white">
             <div className="flex items-center justify-between text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">
-              <span>Organization Score</span>
-              <span className="text-xs bg-green-200 text-green-800 font-bold px-1.5 py-0.5 rounded">Real-time</span>
+              <span>Cost Avoided</span>
+              <DollarSign className="w-4 h-4 text-emerald-600" />
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-black text-green-700">
-                {loading ? '...' : impactStats.orgScore}
-              </span>
-              <span className="text-sm font-bold text-gray-400">/ 100</span>
-            </div>
-            <div className="text-xs text-green-800 font-semibold mt-1">
-              {impactStats.orgScore >= 80 ? '🌿 Green Campus Champion' : '🌱 Circular Starter'}
+            <div className="text-3xl font-black text-gray-900">Rp{(impactData.costAvoided / 1000000).toFixed(1)}M</div>
+            <div className="text-xs text-emerald-700 font-medium mt-1">
+              💰 Hemat anggaran BEM & Kampus
             </div>
           </div>
         </div>
@@ -222,7 +150,7 @@ export default function Dashboard() {
                     <h4 className="text-xl font-black text-gray-900 mt-2">Daftar Pinjaman Saat Ini</h4>
                     <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600 mt-2">
                       <span className="flex items-center gap-1 font-semibold text-gray-800">
-                        📅 Mulai: {latestTxn?.created_at ? new Date(latestTxn.created_at).toLocaleDateString('id-ID') : 'Baru saja'}
+                        📅 Mulai: {latestTxn?.paidAt || 'Baru saja'}
                       </span>
                       <span>📍 Diambil di Warehouse</span>
                     </div>
