@@ -16,9 +16,16 @@ export function AppProvider({ children }) {
 
   const [equipments, setEquipments] = useState([])
   const [pendingApprovals, setPendingApprovals] = useState([])
-  const [transactions, setTransactions] = useState([])
   
-  const [userPaymentStatus, setUserPaymentStatus] = useState('idle')
+  // Transaksi disinkronkan dengan sessionStorage agar admin langsung melihat data masuk
+  const [transactions, setTransactions] = useState(() => {
+    const saved = sessionStorage.getItem('eventloop_transactions')
+    return saved ? JSON.parse(saved) : []
+  })
+  
+  const [userPaymentStatus, setUserPaymentStatus] = useState(() => {
+    return sessionStorage.getItem('eventloop_payment_status') || 'idle'
+  })
   
   const [activeEvent, setActiveEvent] = useState({
     name: 'Event Organisasi Kampus',
@@ -26,14 +33,33 @@ export function AppProvider({ children }) {
     location: 'Hadi Budiman Hall'
   })
 
-  const [activeReservation, setActiveReservation] = useState(null)
+  const [activeReservation, setActiveReservation] = useState(() => {
+    const savedRes = sessionStorage.getItem('eventloop_active_reservation')
+    return savedRes ? JSON.parse(savedRes) : null
+  })
+
   const [returnStatus, setReturnStatus] = useState('idle')
   const [pendingReturns, setPendingReturns] = useState([])
   
   const [cartItems, setCartItems] = useState([])
   const [reservations, setReservations] = useState([])
 
-  // Load data dari Supabase berdasarkan user login
+  useEffect(() => {
+    sessionStorage.setItem('eventloop_transactions', JSON.stringify(transactions))
+  }, [transactions])
+
+  useEffect(() => {
+    sessionStorage.setItem('eventloop_payment_status', userPaymentStatus)
+  }, [userPaymentStatus])
+
+  useEffect(() => {
+    if (activeReservation) {
+      sessionStorage.setItem('eventloop_active_reservation', JSON.stringify(activeReservation))
+    } else {
+      sessionStorage.removeItem('eventloop_active_reservation')
+    }
+  }, [activeReservation])
+
   async function fetchUserReservations(userId) {
     const { data, error } = await supabase
       .from('reservations')
@@ -42,23 +68,6 @@ export function AppProvider({ children }) {
 
     if (!error && data) {
       setReservations(data)
-      if (data.length > 0) {
-        setActiveReservation({
-          eventName: activeEvent.name,
-          eventDate: activeEvent.date,
-          items: data.map(r => ({
-            id: r.id,
-            name: r.item_name,
-            qty: r.quantity,
-            price: r.price || 50000,
-            listingType: r.listing_type || 'rental',
-            circularScore: 90
-          }))
-        })
-        setUserPaymentStatus('pending_admin_approval')
-      }
-    } else if (error) {
-      console.error('Gagal mengambil reservasi:', error.message)
     }
   }
 
@@ -134,10 +143,8 @@ export function AppProvider({ children }) {
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (!error && data) {
+    if (!error && data && data.length > 0) {
       setTransactions(data)
-    } else {
-      setTransactions([])
     }
   }
 
@@ -236,7 +243,6 @@ export function AppProvider({ children }) {
     const adminFee = totalAmount * 0.05
     const netPayout = totalAmount - adminFee
 
-    // 1. Update stok equipment di Supabase
     for (const reservedItem of cartItems) {
       const targetItem = equipments.find(e => e.id === reservedItem.id)
       if (targetItem) {
@@ -267,17 +273,23 @@ export function AppProvider({ children }) {
       paidAt: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     }
 
-    // 2. Simpan transaksi ke tabel Supabase transactions
-    const { error: txnError } = await supabase.from('transactions').insert([newTxn])
-    if (txnError) {
-      console.error('Gagal simpan transaksi:', txnError.message)
-    }
+    // Simpan ke Supabase & state lokal agar langsung tampil
+    await supabase.from('transactions').insert([newTxn])
     setTransactions(prev => [newTxn, ...prev])
 
-    // 3. Simpan permanen ke tabel reservations Supabase
+    // Simpan data reservasi aktif agar tidak hilang saat di-refresh
+    const reservationPayload = {
+      eventName: reservationDetails.buyerOrg || activeEvent.name,
+      eventDate: activeEvent.date,
+      items: [...cartItems],
+      txnId,
+      totalAmount
+    }
+    setActiveReservation(reservationPayload)
+
     if (userSession?.user?.id) {
       for (const cartItem of cartItems) {
-        const { error: resError } = await supabase.from('reservations').insert([
+        await supabase.from('reservations').insert([
           {
             user_id: userSession.user.id,
             item_name: cartItem.name,
@@ -288,9 +300,6 @@ export function AppProvider({ children }) {
             status: 'Sedang Berjalan'
           }
         ])
-        if (resError) {
-          console.error('Gagal simpan reservasi:', resError.message)
-        }
       }
       await fetchUserReservations(userSession.user.id)
     }
@@ -305,7 +314,7 @@ export function AppProvider({ children }) {
       .update({ qrisStatus: 'Payment Approved by Admin (Lunas)' })
       .eq('id', txnId)
 
-    await fetchTransactions()
+    setTransactions(prev => prev.map(t => t.id === txnId ? { ...t, qrisStatus: 'Payment Approved by Admin (Lunas)' } : t))
     setUserPaymentStatus('approved_success')
   }
 
@@ -315,7 +324,7 @@ export function AppProvider({ children }) {
       .update({ payoutStatus: 'Transferred' })
       .eq('id', txnId)
 
-    await fetchTransactions()
+    setTransactions(prev => prev.map(t => t.id === txnId ? { ...t, payoutStatus: 'Transferred' } : t))
   }
 
   const updateEquipmentPriceAndStock = async (id, newPrice, newAvailable) => {

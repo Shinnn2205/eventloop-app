@@ -20,25 +20,17 @@ export default function Reservation() {
     updateCartQty, 
     removeFromCart,
     activeReservation,
-    activeEvent,
-    reservations 
+    activeEvent 
   } = useApp()
   
   const [showQrisModal, setShowQrisModal] = useState(false)
 
-  // Prioritaskan cartItems, jika kosong ambil dari activeReservation atau reservations Supabase
+  // Ambil item dari cart atau dari activeReservation yang sedang menunggu ACC
   const displayItems = (cartItems && cartItems.length > 0) 
     ? cartItems 
-    : (activeReservation?.items || reservations.map(r => ({
-        id: r.id,
-        name: r.item_name,
-        qty: r.quantity,
-        price: r.price || 50000,
-        listingType: r.listing_type || 'rental',
-        circularScore: 90
-      })))
+    : (activeReservation?.items || [])
 
-  const totalCost = displayItems.reduce((sum, item) => sum + ((item.listingType === 'sale' ? (item.salePrice || item.price) : item.price) * (item.qty || 1)), 0)
+  const totalCost = displayItems.reduce((sum, item) => sum + ((item.listingType === 'sale' ? (item.salePrice || item.price) : (item.price || 50000)) * (item.qty || 1)), 0)
   const estimatedAvoidedCost = totalCost * 4.8 
   const estimatedWasteAvoided = (displayItems.reduce((sum, item) => sum + (item.qty || 1), 0) * 1.8).toFixed(1)
 
@@ -234,7 +226,7 @@ export default function Reservation() {
                   <QrCode className="w-4 h-4" />
                   <span>Bayar via QRIS (Rp{totalCost.toLocaleString('id-ID')})</span>
                 </button>
-              ) : userPaymentStatus === 'pending_admin_approval' || reservations.length > 0 ? (
+              ) : userPaymentStatus === 'pending_admin_approval' ? (
                 <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 text-center space-y-3 animate-fade-in-up">
                   <div className="w-12 h-12 bg-amber-500 text-white rounded-full flex items-center justify-center mx-auto shadow-md animate-pulse">
                     <Clock className="w-6 h-6" />
@@ -245,6 +237,15 @@ export default function Reservation() {
                   <p className="text-[11px] text-amber-800 leading-relaxed">
                     Bukti bayar Anda sebesar <strong>Rp{totalCost.toLocaleString('id-ID')}</strong> telah masuk ke antrean verifikasi Sarpras. Status akan otomatis berubah menjadi <strong>BERHASIL</strong> begitu Admin mengklik ACC di panel admin.
                   </p>
+                </div>
+              ) : userPaymentStatus === 'approved_success' ? (
+                <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-5 text-center space-y-3 animate-fade-in-up">
+                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center mx-auto shadow-md">
+                    <CheckCircle2 className="w-7 h-7" />
+                  </div>
+                  <div className="font-extrabold text-emerald-950 text-sm">
+                    PEMBAYARAN TELAH DI-ACC & LUNAS! ✓ 💳
+                  </div>
                 </div>
               ) : (
                 <button
@@ -288,29 +289,20 @@ export default function Reservation() {
               <h4 className="font-extrabold text-gray-900 text-sm mt-0.5">
                 EVENTLOOP PRASMUL - BANK BCA REKBER
               </h4>
-              <div className="text-[10px] text-gray-400 font-mono mt-0.5">
-                NMID: ID1029384756910 • A01
-              </div>
             </div>
 
             <div className="bg-gradient-to-b from-gray-50 to-white p-5 rounded-2xl border-2 border-gray-200 inline-block shadow-inner">
               <div className="w-48 h-48 bg-white p-2 rounded-xl border border-gray-300 flex flex-col items-center justify-center relative">
                 <div className="w-full h-full border-4 border-gray-900 p-2 flex flex-col justify-between">
                   <div className="flex justify-between">
-                    <div className="w-10 h-10 border-4 border-gray-900 rounded-md p-1">
-                      <div className="w-full h-full bg-gray-900" />
-                    </div>
-                    <div className="w-10 h-10 border-4 border-gray-900 rounded-md p-1">
-                      <div className="w-full h-full bg-gray-900" />
-                    </div>
+                    <div className="w-10 h-10 border-4 border-gray-900 rounded-md p-1 bg-gray-900" />
+                    <div className="w-10 h-10 border-4 border-gray-900 rounded-md p-1 bg-gray-900" />
                   </div>
                   <div className="text-center font-bold text-[10px] tracking-widest text-gray-900 uppercase">
-                    [ SCAN VIA E-WALLET / BANK ]
+                    [ SCAN QRIS ]
                   </div>
                   <div className="flex justify-between">
-                    <div className="w-10 h-10 border-4 border-gray-900 rounded-md p-1">
-                      <div className="w-full h-full bg-gray-900" />
-                    </div>
+                    <div className="w-10 h-10 border-4 border-gray-900 rounded-md p-1 bg-gray-900" />
                     <div className="w-10 h-10 bg-gray-900 rounded-md" />
                   </div>
                 </div>
