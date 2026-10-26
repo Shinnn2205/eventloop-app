@@ -16,21 +16,20 @@ export function AppProvider({ children }) {
 
   const [equipments, setEquipments] = useState([])
   const [pendingApprovals, setPendingApprovals] = useState([])
-  
-  // Ambil transaksi dari Supabase dan simpan cadangan di sessionStorage agar admin selalu bisa melihatnya
-  const [transactions, setTransactions] = useState(() => {
-    const saved = sessionStorage.getItem('eventloop_transactions')
-    return saved ? JSON.parse(saved) : []
-  })
+  const [transactions, setTransactions] = useState([])
   
   const [userPaymentStatus, setUserPaymentStatus] = useState(() => {
     return sessionStorage.getItem('eventloop_payment_status') || 'idle'
   })
   
-  const [activeEvent, setActiveEvent] = useState({
-    name: 'Event Organisasi Kampus',
-    date: '2026-09-18',
-    location: 'Hadi Budiman Hall'
+  // Event aktif yang disinkronkan dengan sessionStorage agar tidak hilang
+  const [activeEvent, setActiveEvent] = useState(() => {
+    const saved = sessionStorage.getItem('eventloop_active_event')
+    return saved ? JSON.parse(saved) : {
+      name: 'Event Organisasi Kampus',
+      date: '2026-09-18',
+      location: 'Hadi Budiman Hall'
+    }
   })
 
   const [activeReservation, setActiveReservation] = useState(() => {
@@ -45,8 +44,8 @@ export function AppProvider({ children }) {
   const [reservations, setReservations] = useState([])
 
   useEffect(() => {
-    sessionStorage.setItem('eventloop_transactions', JSON.stringify(transactions))
-  }, [transactions])
+    sessionStorage.setItem('eventloop_active_event', JSON.stringify(activeEvent))
+  }, [activeEvent])
 
   useEffect(() => {
     sessionStorage.setItem('eventloop_payment_status', userPaymentStatus)
@@ -55,8 +54,6 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (activeReservation) {
       sessionStorage.setItem('eventloop_active_reservation', JSON.stringify(activeReservation))
-    } else {
-      sessionStorage.removeItem('eventloop_active_reservation')
     }
   }, [activeReservation])
 
@@ -77,9 +74,8 @@ export function AppProvider({ children }) {
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       setTransactions(data)
-      sessionStorage.setItem('eventloop_transactions', JSON.stringify(data))
     }
   }
 
@@ -178,6 +174,7 @@ export function AppProvider({ children }) {
       location: eventData.location || 'Kampus Utama'
     }
     setActiveEvent(newEvt)
+    sessionStorage.setItem('eventloop_active_event', JSON.stringify(newEvt))
   }
 
   const uploadEquipmentByUser = async (newEquipment) => {
@@ -250,7 +247,7 @@ export function AppProvider({ children }) {
 
     const newTxn = {
       id: txnId,
-      buyerOrg: reservationDetails.buyerOrg || activeEvent.name,
+      buyerOrg: activeEvent.name,
       itemName: itemNames,
       amount: totalAmount,
       payoutAmount: netPayout,
@@ -262,12 +259,16 @@ export function AppProvider({ children }) {
       paidAt: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     }
 
-    // Simpan transaksi ke database Supabase dan state
-    await supabase.from('transactions').insert([newTxn])
-    setTransactions(prev => [newTxn, ...prev])
+    // Masukkan transaksi langsung ke database Supabase agar langsung masuk ke Admin Hub
+    const { error: txnError } = await supabase.from('transactions').insert([newTxn])
+    if (txnError) {
+      console.error('Error insert transaction:', txnError.message)
+    }
+    
+    await fetchTransactions()
 
     const reservationPayload = {
-      eventName: reservationDetails.buyerOrg || activeEvent.name,
+      eventName: activeEvent.name,
       eventDate: activeEvent.date,
       items: [...cartItems],
       txnId,
@@ -302,7 +303,7 @@ export function AppProvider({ children }) {
       .update({ qrisStatus: 'Payment Approved by Admin (Lunas)' })
       .eq('id', txnId)
 
-    setTransactions(prev => prev.map(t => t.id === txnId ? { ...t, qrisStatus: 'Payment Approved by Admin (Lunas)' } : t))
+    await fetchTransactions()
     setUserPaymentStatus('approved_success')
   }
 
@@ -312,7 +313,7 @@ export function AppProvider({ children }) {
       .update({ payoutStatus: 'Transferred' })
       .eq('id', txnId)
 
-    setTransactions(prev => prev.map(t => t.id === txnId ? { ...t, payoutStatus: 'Transferred' } : t))
+    await fetchTransactions()
   }
 
   const updateEquipmentPriceAndStock = async (id, newPrice, newAvailable) => {
