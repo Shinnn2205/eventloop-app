@@ -13,7 +13,7 @@ import {
 
 export default function CreateEvent() {
   const navigate = useNavigate()
-  const { addToCart, setActiveReservation } = useApp()
+  const { setActiveReservation } = useApp()
   
   const [eventName, setEventName] = useState('INNOFAIR 2026')
   const [eventDate, setEventDate] = useState('2026-09-18')
@@ -81,33 +81,25 @@ export default function CreateEvent() {
   }
 
   const handleSaveAndProceed = () => {
-    // 1. Siapkan data items yang bersih
-    const itemsToSave = recommendedList.map((rec) => ({
-      id: rec.id,
-      name: rec.name,
-      price: rec.price,
-      qty: rec.qty,
-      circularScore: rec.score,
-      listingType: 'rental',
-      available: 50
-    }))
-
-    // 2. Set active reservation dengan tanggal & detail event pilihan user
+    // Simpan data event & items langsung ke state global activeReservation
+    // Halaman Reservation otomatis membaca data ini tanpa harus lewat addToCart yang error
     setActiveReservation({
       eventName,
       eventDate,
       location,
       participants,
       eventType,
-      items: itemsToSave
+      items: recommendedList.map((rec) => ({
+        id: rec.id,
+        name: rec.name,
+        price: rec.price,
+        qty: rec.qty,
+        circularScore: rec.score,
+        listingType: 'rental'
+      }))
     })
 
-    // 3. Masukkan ke cart global satu per satu
-    itemsToSave.forEach(item => {
-      addToCart(item, item.qty)
-    })
-
-    // 4. Langsung navigasi ke halaman reservasi tanpa error
+    // Langsung pindah ke halaman reservasi
     navigate('/reservation')
   }
 
