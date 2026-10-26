@@ -5,7 +5,6 @@ import {
   Calendar, 
   MapPin, 
   Users, 
-  Sparkles, 
   ArrowRight, 
   Package
 } from 'lucide-react'
@@ -23,17 +22,17 @@ export default function CreateEvent() {
   const handleSaveAndProceedToMarketplace = (e) => {
     e.preventDefault()
 
-    // 1. Simpan detail event ke state global agar tanggal & lokasi event tersimpan dengan benar
+    // 1. Simpan detail event ke state global
     setActiveReservation({
       eventName,
       eventDate,
       location,
       participants,
       eventType,
-      items: [] // Barang akan dipilih sendiri oleh user dari marketplace
+      items: [] 
     })
 
-    // 2. Arahkan user ke marketplace untuk memilih peralatan secara manual
+    // 2. Arahkan user ke marketplace
     navigate('/marketplace')
   }
 
@@ -64,20 +63,21 @@ export default function CreateEvent() {
                 value={eventName}
                 onChange={(e) => setEventName(e.target.value)}
                 placeholder="cth. Seminar Nasional CTI 2026"
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-gray-900 font-medium"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Tanggal Pelaksanaan
+                Tanggal Pelaksanaan (YYYY-MM-DD)
               </label>
               <input
-                type="date"
+                type="text"
                 required
                 value={eventDate}
                 onChange={(e) => setEventDate(e.target.value)}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                placeholder="2026-09-18"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-gray-900 font-medium"
               />
             </div>
           </div>
@@ -90,7 +90,7 @@ export default function CreateEvent() {
               <select
                 value={eventType}
                 onChange={(e) => setEventType(e.target.value)}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all font-medium text-gray-800"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all font-medium text-gray-900"
               >
                 <option>Expo / Bazaar</option>
                 <option>Seminar / Workshop</option>
@@ -112,7 +112,7 @@ export default function CreateEvent() {
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   placeholder="Auditorium / Lapangan / Kelas"
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-gray-900 font-medium"
                 />
               </div>
             </div>
@@ -129,7 +129,7 @@ export default function CreateEvent() {
                   value={participants}
                   onChange={(e) => setParticipants(e.target.value)}
                   placeholder="200"
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-gray-900 font-medium"
                 />
               </div>
             </div>
@@ -142,7 +142,7 @@ export default function CreateEvent() {
             <textarea
               rows={2}
               placeholder="cth. Butuh perlengkapan panggung dan booth pameran..."
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-gray-900"
             />
           </div>
 
