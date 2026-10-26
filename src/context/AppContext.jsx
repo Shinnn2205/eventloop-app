@@ -20,9 +20,10 @@ export function AppProvider({ children }) {
     { id: 'TXN-QRIS-789', buyerOrg: 'HMPR', itemName: 'Tenda Kerucut 3x3 Meter', amount: 195000, qrisStatus: 'Pending Admin Verification' }
   ])
   
-  const [userPaymentStatus, setUserPaymentStatus] = useState('idle')
+  const [userPaymentStatus, setUserPaymentStatus] = useState(() => {
+    return sessionStorage.getItem('eventloop_payment_status') || 'idle'
+  })
   
-  // State Event Aktif
   const [activeEvent, setActiveEvent] = useState(() => {
     const savedEvent = sessionStorage.getItem('eventloop_current_event')
     return savedEvent ? JSON.parse(savedEvent) : {
@@ -50,6 +51,10 @@ export function AppProvider({ children }) {
   useEffect(() => {
     sessionStorage.setItem('eventloop_cart_items', JSON.stringify(cartItems))
   }, [cartItems])
+
+  useEffect(() => {
+    sessionStorage.setItem('eventloop_payment_status', userPaymentStatus)
+  }, [userPaymentStatus])
 
   useEffect(() => {
     if (activeEvent) {
@@ -120,7 +125,6 @@ export function AppProvider({ children }) {
           const savedRes = sessionStorage.getItem(`eventloop_active_res_${session.user.id}`)
           if (savedRes) {
             setActiveReservation(JSON.parse(savedRes))
-            setUserPaymentStatus('pending_admin_approval')
           } else {
             setActiveReservation({
               eventName: activeEvent.name,
@@ -135,7 +139,6 @@ export function AppProvider({ children }) {
               })),
               txnId: 'TXN-QRIS-789'
             })
-            setUserPaymentStatus('pending_admin_approval')
           }
         }
       }
@@ -181,7 +184,6 @@ export function AppProvider({ children }) {
               txnId: 'TXN-QRIS-789'
             })
           }
-          setUserPaymentStatus('pending_admin_approval')
         }
       }
     })
@@ -190,9 +192,6 @@ export function AppProvider({ children }) {
   }, [currentUserRole])
 
   const addToCart = (equipment, qty = 1) => {
-    if (userPaymentStatus !== 'idle') {
-      setUserPaymentStatus('idle')
-    }
     setCartItems(prev => {
       const existing = prev.find(item => item.id === equipment.id)
       if (existing) {
@@ -303,6 +302,18 @@ export function AppProvider({ children }) {
       amount: reservationDetails.totalAmount,
       qrisStatus: 'Pending Admin Verification'
     }
+    
+    // Simpan juga ke tabel transactions Supabase agar terbaca di Admin Panel
+    await supabase.from('transactions').insert([
+      {
+        id: txnId,
+        buyerOrg: reservationDetails.buyerOrg || currentUserName,
+        itemName: newTxn.itemName,
+        amount: reservationDetails.totalAmount,
+        qrisStatus: 'Pending Admin Verification'
+      }
+    ])
+
     setTransactions(prev => [newTxn, ...prev])
     
     if (userSession?.user) {
@@ -343,11 +354,22 @@ export function AppProvider({ children }) {
   }
 
   const approvePaymentByAdmin = async (txnId) => {
+    // Update status di Supabase transactions
+    await supabase
+      .from('transactions')
+      .update({ qrisStatus: 'Payment Approved by Admin (Lunas)' })
+      .eq('id', txnId)
+
     setTransactions(prev => prev.map(t => t.id === txnId ? { ...t, qrisStatus: 'Payment Approved by Admin (Lunas)' } : t))
     setUserPaymentStatus('approved_success')
   }
 
   const transferPayoutToOwner = async (txnId) => {
+    await supabase
+      .from('transactions')
+      .update({ payoutStatus: 'Transferred' })
+      .eq('id', txnId)
+
     setTransactions(prev => prev.map(t => t.id === txnId ? { ...t, payoutStatus: 'Transferred' } : t))
   }
 
