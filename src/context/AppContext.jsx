@@ -22,11 +22,7 @@ export function AppProvider({ children }) {
   
   const [userPaymentStatus, setUserPaymentStatus] = useState('idle')
   
-  // Ambil activeReservation dari sessionStorage agar tidak hilang saat refresh
-  const [activeReservation, setActiveReservation] = useState(() => {
-    const savedRes = sessionStorage.getItem('eventloop_active_reservation')
-    return savedRes ? JSON.parse(savedRes) : null
-  })
+  const [activeReservation, setActiveReservation] = useState(null)
 
   const [returnStatus, setReturnStatus] = useState('idle')
   const [pendingReturns, setPendingReturns] = useState([])
@@ -46,13 +42,12 @@ export function AppProvider({ children }) {
     sessionStorage.setItem('eventloop_cart_items', JSON.stringify(cartItems))
   }, [cartItems])
 
+  // Sinkronisasi activeReservation dengan userSession agar tidak tertukar antar akun
   useEffect(() => {
-    if (activeReservation) {
-      sessionStorage.setItem('eventloop_active_reservation', JSON.stringify(activeReservation))
-    } else {
-      sessionStorage.removeItem('eventloop_active_reservation')
+    if (userSession?.user && activeReservation) {
+      sessionStorage.setItem(`eventloop_active_res_${userSession.user.id}`, JSON.stringify(activeReservation))
     }
-  }, [activeReservation])
+  }, [activeReservation, userSession])
 
   async function fetchEquipments() {
     const { data, error } = await supabase
@@ -100,6 +95,7 @@ export function AppProvider({ children }) {
           setCurrentUserName(metadata.full_name)
         }
 
+        // Ambil reservasi spesifik berdasarkan user_id yang sedang login
         const { data: resData } = await supabase
           .from('reservations')
           .select('*')
@@ -107,8 +103,14 @@ export function AppProvider({ children }) {
 
         if (resData && resData.length > 0) {
           setReservations(resData)
-          // Jika activeReservation kosong tapi ada data di database, restore
-          if (!activeReservation) {
+          
+          // Cek apakah ada penyimpanan lokal khusus user ini
+          const savedRes = sessionStorage.getItem(`eventloop_active_res_${session.user.id}`)
+          if (savedRes) {
+            setActiveReservation(JSON.parse(savedRes))
+            setUserPaymentStatus('pending_admin_approval')
+          } else {
+            // Restore dari database jika ada
             setActiveReservation({
               eventName: 'Event Organisasi Kampus',
               eventDate: resData[0].start_date || '18 September 2026',
@@ -124,6 +126,18 @@ export function AppProvider({ children }) {
             })
             setUserPaymentStatus('pending_admin_approval')
           }
+        } else {
+          // Jika akun ini tidak punya reservasi, kosongkan activeReservation
+          setReservations([])
+          setActiveReservation(null)
+          setUserPaymentStatus('idle')
+        }
+      } else {
+        setReservations([])
+        setActiveReservation(null)
+        setUserPaymentStatus('idle')
+        if (currentUserRole !== 'admin') {
+          setCurrentUserName('Prasmulyan')
         }
       }
 
@@ -147,9 +161,38 @@ export function AppProvider({ children }) {
           .from('reservations')
           .select('*')
           .eq('user_id', session.user.id)
-        setReservations(resData || [])
+        
+        if (resData && resData.length > 0) {
+          setReservations(resData)
+          const savedRes = sessionStorage.getItem(`eventloop_active_res_${session.user.id}`)
+          if (savedRes) {
+            setActiveReservation(JSON.parse(savedRes))
+          } else {
+            setActiveReservation({
+              eventName: 'Event Organisasi Kampus',
+              eventDate: resData[0].start_date || '18 September 2026',
+              items: resData.map(r => ({
+                id: r.id,
+                name: r.item_name,
+                qty: r.quantity,
+                price: 25000,
+                circularScore: 88,
+                status: r.status
+              })),
+              txnId: 'TXN-QRIS-789'
+            })
+          }
+          setUserPaymentStatus('pending_admin_approval')
+        } else {
+          setReservations([])
+          setActiveReservation(null)
+          setUserPaymentStatus('idle')
+        }
       } else {
+        setUserSession(null)
         setReservations([])
+        setActiveReservation(null)
+        setUserPaymentStatus('idle')
         if (currentUserRole !== 'admin') {
           setCurrentUserName('Prasmulyan')
         }
@@ -247,11 +290,9 @@ export function AppProvider({ children }) {
     await fetchPendingApprovals()
   }
 
-  // Submit QRIS dan pastikan cartItems disalin ke activeReservation.items sebelum cart dikosongkan
   const submitUserQrisPayment = async (reservationDetails) => {
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
-    // 1. Kurangi stok barang di database equipments
     for (const reservedItem of cartItems) {
       const targetItem = equipments.find(e => e.id === reservedItem.id)
       if (targetItem) {
@@ -264,7 +305,6 @@ export function AppProvider({ children }) {
     }
     await fetchEquipments()
 
-    // 2. Simpan transaksi ke state lokal
     const newTxn = {
       id: txnId,
       buyerOrg: reservationDetails.buyerOrg || currentUserName,
@@ -274,7 +314,6 @@ export function AppProvider({ children }) {
     }
     setTransactions(prev => [newTxn, ...prev])
     
-    // 3. Simpan ke tabel reservations Supabase
     if (userSession?.user) {
       for (const cartItem of cartItems) {
         await supabase.from('reservations').insert([
@@ -295,7 +334,6 @@ export function AppProvider({ children }) {
       if (data) setReservations(data)
     }
 
-    // Salin cartItems saat ini ke activeReservation SEBELUM cartItems dikosongkan
     const updatedReservation = { 
       ...reservationDetails, 
       items: [...cartItems], 
@@ -303,6 +341,10 @@ export function AppProvider({ children }) {
     }
 
     setActiveReservation(updatedReservation)
+    if (userSession?.user) {
+      sessionStorage.setItem(`eventloop_active_res_${userSession.user.id}`, JSON.stringify(updatedReservation))
+    }
+
     setCartItems([])
     sessionStorage.removeItem('eventloop_cart_items')
     setUserPaymentStatus('pending_admin_approval')
@@ -383,13 +425,17 @@ export function AppProvider({ children }) {
         .select('*')
         .eq('user_id', userSession.user.id)
       if (data) setReservations(data)
+
+      sessionStorage.removeItem(`eventloop_active_res_${userSession.user.id}`)
     }
 
     setActiveReservation(prev => {
       if (!prev || !prev.items) return null;
       const remainingItems = prev.items.filter(item => item.id !== equipmentId);
       if (remainingItems.length === 0) {
-        sessionStorage.removeItem('eventloop_active_reservation')
+        if (userSession?.user) {
+          sessionStorage.removeItem(`eventloop_active_res_${userSession.user.id}`)
+        }
         return null;
       }
       return {
