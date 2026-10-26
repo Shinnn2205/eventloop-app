@@ -5,7 +5,6 @@ import { supabase } from '../lib/supabaseClient'
 const AppContext = createContext()
 
 export function AppProvider({ children }) {
-  // Menggunakan sessionStorage agar tab satu dan tab lainnya independen (tidak saling menimpa)
   const [currentUserRole, setCurrentUserRole] = useState(() => {
     return sessionStorage.getItem('eventloop_user_role') || 'user'
   })
@@ -27,7 +26,6 @@ export function AppProvider({ children }) {
   const [cartItems, setCartItems] = useState([])
   const [reservations, setReservations] = useState([])
 
-  // Sinkronisasi otomatis ke sessionStorage per tab browser
   useEffect(() => {
     sessionStorage.setItem('eventloop_user_role', currentUserRole)
     sessionStorage.setItem('eventloop_user_name', currentUserName)
@@ -58,6 +56,18 @@ export function AppProvider({ children }) {
     }
   }
 
+  // Tarik data transaksi riil dari Supabase
+  async function fetchTransactions() {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .order('paidAt', { ascending: false })
+
+    if (!error && data && data.length > 0) {
+      setTransactions(data)
+    }
+  }
+
   useEffect(() => {
     async function initSessionAndData() {
       const { data: { session } } = await supabase.auth.getSession()
@@ -79,6 +89,7 @@ export function AppProvider({ children }) {
 
       await fetchEquipments()
       await fetchPendingApprovals()
+      await fetchTransactions() // Jalankan saat web dimuat
       setLoading(false)
     }
 
@@ -196,9 +207,11 @@ export function AppProvider({ children }) {
     await fetchPendingApprovals()
   }
 
+  // Modifikasi: Simpan transaksi ke Supabase
   const submitUserQrisPayment = async (reservationDetails) => {
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
+    // Potong stok barang
     for (const reservedItem of cartItems) {
       const targetItem = equipments.find(e => e.id === reservedItem.id)
       if (targetItem) {
@@ -226,7 +239,9 @@ export function AppProvider({ children }) {
       adminFee: Math.round(reservationDetails.totalAmount * 0.05),
     }
 
-    setTransactions(prev => [newTxn, ...prev])
+    // Insert ke Database
+    await supabase.from('transactions').insert([newTxn])
+    await fetchTransactions()
     
     if (userSession?.user) {
       for (const cartItem of cartItems) {
@@ -258,32 +273,36 @@ export function AppProvider({ children }) {
     setUserPaymentStatus('pending_admin_approval')
   }
 
-  const approvePaymentByAdmin = (txnId) => {
-    setTransactions(prev => prev.map(t => {
-      if (t.id === txnId) {
-        return {
-          ...t,
-          qrisStatus: 'Payment Approved by Admin (Lunas)',
-          payoutStatus: 'Pending Transfer'
-        }
-      }
-      return t
-    }))
-    setUserPaymentStatus('approved_success')
+  // Modifikasi: Update status ACC di Supabase
+  const approvePaymentByAdmin = async (txnId) => {
+    const { error } = await supabase
+      .from('transactions')
+      .update({
+        qrisStatus: 'Payment Approved by Admin (Lunas)',
+        payoutStatus: 'Pending Transfer'
+      })
+      .eq('id', txnId)
+
+    if (!error) {
+      await fetchTransactions()
+      setUserPaymentStatus('approved_success')
+    }
   }
 
-  const transferPayoutToOwner = (txnId) => {
-    setTransactions(prev => prev.map(t => {
-      if (t.id === txnId) {
-        return {
-          ...t,
-          payoutStatus: 'Transferred',
-          payoutRef: `TRF-BCA-${Math.floor(100000 + Math.random() * 900000)}`,
-          transferredAt: 'Baru saja'
-        }
-      }
-      return t
-    }))
+  // Modifikasi: Update status transfer pencairan dana di Supabase
+  const transferPayoutToOwner = async (txnId) => {
+    const { error } = await supabase
+      .from('transactions')
+      .update({
+        payoutStatus: 'Transferred',
+        payoutRef: `TRF-BCA-${Math.floor(100000 + Math.random() * 900000)}`,
+        transferredAt: 'Baru saja'
+      })
+      .eq('id', txnId)
+
+    if (!error) {
+      await fetchTransactions()
+    }
   }
 
   const updateEquipmentPriceAndStock = async (id, newPrice, newAvailable) => {
