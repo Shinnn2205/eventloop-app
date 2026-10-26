@@ -22,13 +22,23 @@ export function AppProvider({ children }) {
   const [activeReservation, setActiveReservation] = useState(null)
   const [returnStatus, setReturnStatus] = useState('idle')
   const [pendingReturns, setPendingReturns] = useState([])
-  const [cartItems, setCartItems] = useState([])
+  
+  // Ambil cartItems dari sessionStorage agar tidak hilang saat refresh
+  const [cartItems, setCartItems] = useState(() => {
+    const savedCart = sessionStorage.getItem('eventloop_cart_items')
+    return savedCart ? JSON.parse(savedCart) : []
+  })
   const [reservations, setReservations] = useState([])
 
   useEffect(() => {
     sessionStorage.setItem('eventloop_user_role', currentUserRole)
     sessionStorage.setItem('eventloop_user_name', currentUserName)
   }, [currentUserRole, currentUserName])
+
+  // Simpan otomatis setiap ada perubahan cart ke sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('eventloop_cart_items', JSON.stringify(cartItems))
+  }, [cartItems])
 
   async function fetchEquipments() {
     const { data, error } = await supabase
@@ -216,7 +226,7 @@ export function AppProvider({ children }) {
     await fetchPendingApprovals()
   }
 
-  // Kirim data transaksi minimalis yang cocok dengan kolom dasar Supabase
+  // Kirim data transaksi super aman sesuai struktur dasar tabel Supabase
   const submitUserQrisPayment = async (reservationDetails) => {
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
@@ -233,13 +243,10 @@ export function AppProvider({ children }) {
     }
     await fetchEquipments()
 
-    // 2. Format data transaksi minimalis
+    // 2. Format data transaksi hanya berisi ID dan amount dasar
     const newTxn = {
       id: txnId,
-      buyerOrg: reservationDetails.buyerOrg || currentUserName,
-      itemName: reservationDetails.itemNames || cartItems.map(i => i.name).join(', ') || 'Reservasi Perlengkapan Event',
-      amount: reservationDetails.totalAmount,
-      qrisStatus: 'Pending Admin Verification'
+      amount: reservationDetails.totalAmount
     }
 
     // Insert ke tabel transactions Supabase
@@ -281,6 +288,7 @@ export function AppProvider({ children }) {
 
     setActiveReservation(updatedReservation)
     setCartItems([])
+    sessionStorage.removeItem('eventloop_cart_items')
     setUserPaymentStatus('pending_admin_approval')
   }
 
