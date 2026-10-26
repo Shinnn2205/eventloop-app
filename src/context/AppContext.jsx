@@ -22,8 +22,17 @@ export function AppProvider({ children }) {
   
   const [userPaymentStatus, setUserPaymentStatus] = useState('idle')
   
-  const [activeReservation, setActiveReservation] = useState(null)
+  // State Event Aktif
+  const [activeEvent, setActiveEvent] = useState(() => {
+    const savedEvent = sessionStorage.getItem('eventloop_current_event')
+    return savedEvent ? JSON.parse(savedEvent) : {
+      name: 'INNOFAIR 2026 (SISO BEM)',
+      date: '18 September 2026',
+      location: 'Hadi Budiman Hall'
+    }
+  })
 
+  const [activeReservation, setActiveReservation] = useState(null)
   const [returnStatus, setReturnStatus] = useState('idle')
   const [pendingReturns, setPendingReturns] = useState([])
   
@@ -42,7 +51,12 @@ export function AppProvider({ children }) {
     sessionStorage.setItem('eventloop_cart_items', JSON.stringify(cartItems))
   }, [cartItems])
 
-  // Sinkronisasi activeReservation dengan userSession agar tidak tertukar antar akun
+  useEffect(() => {
+    if (activeEvent) {
+      sessionStorage.setItem('eventloop_current_event', JSON.stringify(activeEvent))
+    }
+  }, [activeEvent])
+
   useEffect(() => {
     if (userSession?.user && activeReservation) {
       sessionStorage.setItem(`eventloop_active_res_${userSession.user.id}`, JSON.stringify(activeReservation))
@@ -95,7 +109,6 @@ export function AppProvider({ children }) {
           setCurrentUserName(metadata.full_name)
         }
 
-        // Ambil reservasi spesifik berdasarkan user_id yang sedang login
         const { data: resData } = await supabase
           .from('reservations')
           .select('*')
@@ -104,16 +117,14 @@ export function AppProvider({ children }) {
         if (resData && resData.length > 0) {
           setReservations(resData)
           
-          // Cek apakah ada penyimpanan lokal khusus user ini
           const savedRes = sessionStorage.getItem(`eventloop_active_res_${session.user.id}`)
           if (savedRes) {
             setActiveReservation(JSON.parse(savedRes))
             setUserPaymentStatus('pending_admin_approval')
           } else {
-            // Restore dari database jika ada
             setActiveReservation({
-              eventName: 'Event Organisasi Kampus',
-              eventDate: resData[0].start_date || '18 September 2026',
+              eventName: activeEvent.name,
+              eventDate: activeEvent.date,
               items: resData.map(r => ({
                 id: r.id,
                 name: r.item_name,
@@ -126,18 +137,6 @@ export function AppProvider({ children }) {
             })
             setUserPaymentStatus('pending_admin_approval')
           }
-        } else {
-          // Jika akun ini tidak punya reservasi, kosongkan activeReservation
-          setReservations([])
-          setActiveReservation(null)
-          setUserPaymentStatus('idle')
-        }
-      } else {
-        setReservations([])
-        setActiveReservation(null)
-        setUserPaymentStatus('idle')
-        if (currentUserRole !== 'admin') {
-          setCurrentUserName('Prasmulyan')
         }
       }
 
@@ -169,8 +168,8 @@ export function AppProvider({ children }) {
             setActiveReservation(JSON.parse(savedRes))
           } else {
             setActiveReservation({
-              eventName: 'Event Organisasi Kampus',
-              eventDate: resData[0].start_date || '18 September 2026',
+              eventName: activeEvent.name,
+              eventDate: activeEvent.date,
               items: resData.map(r => ({
                 id: r.id,
                 name: r.item_name,
@@ -183,18 +182,6 @@ export function AppProvider({ children }) {
             })
           }
           setUserPaymentStatus('pending_admin_approval')
-        } else {
-          setReservations([])
-          setActiveReservation(null)
-          setUserPaymentStatus('idle')
-        }
-      } else {
-        setUserSession(null)
-        setReservations([])
-        setActiveReservation(null)
-        setUserPaymentStatus('idle')
-        if (currentUserRole !== 'admin') {
-          setCurrentUserName('Prasmulyan')
         }
       }
     })
@@ -227,6 +214,16 @@ export function AppProvider({ children }) {
     }))
   }
 
+  const createNewEvent = (eventData) => {
+    const newEvt = {
+      name: eventData.name || 'Event Organisasi Kampus',
+      date: eventData.date || '18 September 2026',
+      location: eventData.location || 'Kampus Utama'
+    }
+    setActiveEvent(newEvt)
+    sessionStorage.setItem('eventloop_current_event', JSON.stringify(newEvt))
+  }
+
   const uploadEquipmentByUser = async (newEquipment) => {
     const pendingId = `APV-${Date.now().toString().slice(-4)}`
     const pendingItem = {
@@ -240,8 +237,6 @@ export function AppProvider({ children }) {
     const { error } = await supabase.from('pending_equipments').insert([pendingItem])
     if (!error) {
       await fetchPendingApprovals()
-    } else {
-      alert('Gagal mengunggah barang: ' + error.message)
     }
     return pendingId
   }
@@ -274,15 +269,11 @@ export function AppProvider({ children }) {
     }
 
     const { error: insertError } = await supabase.from('equipments').insert([newItemPayload])
-    if (insertError) {
-      alert('Gagal memproses persetujuan: ' + insertError.message)
-      return
+    if (!insertError) {
+      await supabase.from('pending_equipments').delete().eq('id', approvalId)
+      await fetchEquipments()
+      await fetchPendingApprovals()
     }
-
-    await supabase.from('pending_equipments').delete().eq('id', approvalId)
-
-    await fetchEquipments()
-    await fetchPendingApprovals()
   }
 
   const rejectEquipmentByAdmin = async (approvalId) => {
@@ -308,7 +299,7 @@ export function AppProvider({ children }) {
     const newTxn = {
       id: txnId,
       buyerOrg: reservationDetails.buyerOrg || currentUserName,
-      itemName: reservationDetails.itemNames || cartItems.map(i => i.name).join(', ') || 'Reservasi Perlengkapan Event',
+      itemName: cartItems.map(i => i.name).join(', ') || 'Reservasi Perlengkapan Event',
       amount: reservationDetails.totalAmount,
       qrisStatus: 'Pending Admin Verification'
     }
@@ -321,7 +312,7 @@ export function AppProvider({ children }) {
             user_id: userSession.user.id,
             item_name: cartItem.name,
             quantity: cartItem.qty,
-            start_date: reservationDetails.startDate || '18 September 2026',
+            start_date: activeEvent.date,
             status: 'Sedang Berjalan'
           }
         ])
@@ -335,7 +326,8 @@ export function AppProvider({ children }) {
     }
 
     const updatedReservation = { 
-      ...reservationDetails, 
+      eventName: activeEvent.name,
+      eventDate: activeEvent.date,
       items: [...cartItems], 
       txnId 
     }
@@ -451,7 +443,8 @@ export function AppProvider({ children }) {
       currentUserName, setCurrentUserName,
       userSession, reservations, loading,
       equipments, pendingApprovals, transactions, userPaymentStatus, activeReservation, returnStatus, pendingReturns,
-      cartItems, addToCart, removeFromCart, updateCartQty,
+      cartItems, activeEvent, createNewEvent,
+      addToCart, removeFromCart, updateCartQty,
       uploadEquipmentByUser, approveEquipmentByAdmin, rejectEquipmentByAdmin, submitUserQrisPayment, approvePaymentByAdmin,
       transferPayoutToOwner, updateEquipmentPriceAndStock, deleteEquipment, setUserPaymentStatus, submitUserReturnProof, approveReturnByAdmin,
       setReturnStatus
