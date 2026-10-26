@@ -15,16 +15,21 @@ import {
 } from 'lucide-react'
 
 export default function Dashboard() {
-  const { currentUserName, equipments, activeReservation, userPaymentStatus } = useApp()
+  const { currentUserName, equipments, activeReservation, userPaymentStatus, reservations } = useApp()
 
-  // Hitung statistik global sirkular economy
+  // Hitung statistik global sirkular economy secara dinamis
   const totalItemsReused = equipments.reduce((acc, curr) => acc + (curr.reusedCount || 0), 12)
+  const totalEventsSupported = Math.max(1, (reservations?.length || 0) + 12)
   const materialWasteAvoided = (totalItemsReused * 1.8).toFixed(1)
   const costAvoided = (totalItemsReused * 45000 / 1000000).toFixed(1)
 
   // Ambil daftar barang aktif dari activeReservation
   const activeItems = activeReservation?.items || []
   const hasActiveBorrow = activeReservation && activeItems.length > 0
+
+  // Ambil nama event yang diinput user dengan fallback yang tepat
+  const eventName = activeReservation?.eventName || activeReservation?.title || sessionStorage.getItem('eventloop_event_name') || 'INNOFAIR 2026 (SISO BEM)'
+  const eventDate = activeReservation?.eventDate || sessionStorage.getItem('eventloop_event_date') || '18 September 2026'
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
@@ -83,7 +88,7 @@ export default function Dashboard() {
               <span>Events Supported</span>
               <Calendar className="w-4 h-4 text-blue-600" />
             </div>
-            <div className="text-3xl font-black text-gray-900">14</div>
+            <div className="text-3xl font-black text-gray-900">{totalEventsSupported}</div>
             <p className="text-[11px] text-gray-500 font-medium">Seminar, Expo, Lomba & UKM</p>
           </div>
 
@@ -140,13 +145,13 @@ export default function Dashboard() {
                       Event Organisasi Kampus
                     </span>
                     <h4 className="text-lg font-black text-emerald-950 mt-1">
-                      {activeReservation.eventName || 'INNOFAIR 2026 (SISO BEM)'}
+                      {eventName}
                     </h4>
                   </div>
                   <div className="text-right sm:text-right">
                     <span className="text-[11px] text-gray-500 block font-medium">Batas Pengembalian (Deadline):</span>
                     <span className="text-sm font-extrabold text-emerald-900">
-                      {activeReservation.eventDate ? `H+1 (${activeReservation.eventDate})` : '19 September 2026, 16:00 WIB'}
+                      H+1 ({eventDate})
                     </span>
                   </div>
                 </div>
