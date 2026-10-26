@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { adminTransactions as initialTransactions } from '../data/mockData'
 import { supabase } from '../lib/supabaseClient'
 
 const AppContext = createContext()
@@ -17,7 +16,7 @@ export function AppProvider({ children }) {
 
   const [equipments, setEquipments] = useState([])
   const [pendingApprovals, setPendingApprovals] = useState([])
-  const [transactions, setTransactions] = useState(initialTransactions)
+  const [transactions, setTransactions] = useState([]) // Mulai dengan array kosong agar murni dari database
   
   const [userPaymentStatus, setUserPaymentStatus] = useState('idle')
   const [activeReservation, setActiveReservation] = useState(null)
@@ -56,15 +55,16 @@ export function AppProvider({ children }) {
     }
   }
 
-  // Tarik data transaksi dari Supabase untuk Admin & User
+  // Tarik data transaksi riil dari Supabase untuk Admin
   async function fetchTransactions() {
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
-      .order('paidAt', { ascending: false })
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       setTransactions(data)
+    } else {
+      console.error("Gagal mengambil transactions:", error?.message)
     }
   }
 
@@ -253,10 +253,10 @@ export function AppProvider({ children }) {
     const { error: txnError } = await supabase.from('transactions').insert([newTxn])
     if (txnError) {
       console.error("Gagal insert ke transactions:", txnError.message)
+      alert("Gagal mengirim data transaksi: " + txnError.message)
+      return
     }
     
-    // Gabungkan transaksi mock lokal dengan data baru agar langsung muncul di UI Admin tanpa delay
-    setTransactions(prev => [newTxn, ...prev])
     await fetchTransactions()
     
     // 3. Simpan ke tabel reservations Supabase
