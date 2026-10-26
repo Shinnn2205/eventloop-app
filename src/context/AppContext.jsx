@@ -216,7 +216,7 @@ export function AppProvider({ children }) {
     await fetchPendingApprovals()
   }
 
-  // Kirim data transaksi aman ke Supabase tanpa kolom ekstra yang memicu error schema cache
+  // Kirim data transaksi minimalis yang cocok dengan kolom dasar Supabase
   const submitUserQrisPayment = async (reservationDetails) => {
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
@@ -233,18 +233,13 @@ export function AppProvider({ children }) {
     }
     await fetchEquipments()
 
-    // 2. Format data transaksi standar yang cocok dengan tabel 'transactions'
+    // 2. Format data transaksi minimalis
     const newTxn = {
       id: txnId,
       buyerOrg: reservationDetails.buyerOrg || currentUserName,
       itemName: reservationDetails.itemNames || cartItems.map(i => i.name).join(', ') || 'Reservasi Perlengkapan Event',
       amount: reservationDetails.totalAmount,
-      qrisStatus: 'Pending Admin Verification',
-      paidAt: `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`,
-      bankAdminRef: `BCA-QRIS-${Math.floor(1000000 + Math.random() * 9000000)}`,
-      ownerOrg: 'Organisasi Pemilik & Sarpras',
-      ownerBank: 'BCA 8012345678 a.n Owner',
-      payoutStatus: 'Waiting Admin Approval'
+      qrisStatus: 'Pending Admin Verification'
     }
 
     // Insert ke tabel transactions Supabase
