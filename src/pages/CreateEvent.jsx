@@ -19,10 +19,8 @@ export default function CreateEvent() {
   const [participants, setParticipants] = useState('450')
   const [eventType, setEventType] = useState('Expo / Bazaar')
 
-  const handleSaveAndProceedToMarketplace = (e) => {
-    e.preventDefault()
-
-    // 1. Simpan detail event ke state global agar data tersimpan dengan aman
+  const handleSaveAndProceedToMarketplace = () => {
+    // 1. Simpan detail event ke state global
     setActiveReservation({
       eventName,
       eventDate,
@@ -32,7 +30,7 @@ export default function CreateEvent() {
       items: [] 
     })
 
-    // 2. Langsung arahkan user ke marketplace tanpa hambatan
+    // 2. Langsung arahkan user ke marketplace
     navigate('/marketplace')
   }
 
@@ -51,7 +49,7 @@ export default function CreateEvent() {
       </div>
 
       <div className="card p-6 md:p-8 space-y-6">
-        <form onSubmit={handleSaveAndProceedToMarketplace} className="space-y-5">
+        <div className="space-y-5">
           <div className="grid md:grid-cols-2 gap-5">
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
@@ -143,7 +141,8 @@ export default function CreateEvent() {
 
           <div className="pt-4 flex items-center justify-end">
             <button
-              type="submit"
+              type="button"
+              onClick={handleSaveAndProceedToMarketplace}
               className="btn-primary text-sm !py-3 !px-6 flex items-center gap-2 shadow-green-600/20 cursor-pointer"
             >
               <Package className="w-4 h-4" />
@@ -151,7 +150,7 @@ export default function CreateEvent() {
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   )
