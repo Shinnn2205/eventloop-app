@@ -18,7 +18,6 @@ export function AppProvider({ children }) {
   const [pendingApprovals, setPendingApprovals] = useState([])
   const [transactions, setTransactions] = useState([])
   
-  // Status pembayaran & event unik per user session
   const [userPaymentStatus, setUserPaymentStatus] = useState('idle')
   
   const [activeEvent, setActiveEvent] = useState({
@@ -34,22 +33,33 @@ export function AppProvider({ children }) {
   const [cartItems, setCartItems] = useState([])
   const [reservations, setReservations] = useState([])
 
-  // Load data spesifik begitu user login / ganti akun
-  useEffect(() => {
-    async function loadUserData(userId) {
-      const savedCart = sessionStorage.getItem(`eventloop_cart_${userId}`)
-      if (savedCart) setCartItems(JSON.parse(savedCart))
+  // Load data dari Supabase berdasarkan user login
+  async function fetchUserReservations(userId) {
+    const { data, error } = await supabase
+      .from('reservations')
+      .select('*')
+      .eq('user_id', userId)
 
-      const savedStatus = sessionStorage.getItem(`eventloop_payment_status_${userId}`)
-      if (savedStatus) setUserPaymentStatus(savedStatus)
-
-      const savedEvent = sessionStorage.getItem(`eventloop_event_${userId}`)
-      if (savedEvent) setActiveEvent(JSON.parse(savedEvent))
-
-      const savedRes = sessionStorage.getItem(`eventloop_active_res_${userId}`)
-      if (savedRes) setActiveReservation(JSON.parse(savedRes))
+    if (!error && data) {
+      setReservations(data)
+      if (data.length > 0) {
+        setActiveReservation({
+          eventName: activeEvent.name,
+          eventDate: activeEvent.date,
+          items: data.map(r => ({
+            id: r.id,
+            name: r.item_name,
+            qty: r.quantity,
+            price: r.price || 50000,
+            listingType: r.listing_type || 'rental',
+            circularScore: 90
+          }))
+        })
+      }
     }
+  }
 
+  useEffect(() => {
     async function initSessionAndData() {
       const { data: { session } } = await supabase.auth.getSession()
       setUserSession(session)
@@ -59,7 +69,7 @@ export function AppProvider({ children }) {
         if (metadata?.full_name && currentUserRole !== 'admin') {
           setCurrentUserName(metadata.full_name)
         }
-        await loadUserData(session.user.id)
+        await fetchUserReservations(session.user.id)
       }
 
       await fetchEquipments()
@@ -77,15 +87,10 @@ export function AppProvider({ children }) {
         if (metadata?.full_name && currentUserRole !== 'admin') {
           setCurrentUserName(metadata.full_name)
         }
-        // Reset state atau load data milik akun baru ini
-        setCartItems([])
-        setUserPaymentStatus('idle')
-        setActiveReservation(null)
-        await loadUserData(session.user.id)
+        await fetchUserReservations(session.user.id)
       } else {
-        // Jika logout, bersihkan state
         setCartItems([])
-        setUserPaymentStatus('idle')
+        setReservations([])
         setActiveReservation(null)
       }
       await fetchTransactions()
@@ -93,27 +98,6 @@ export function AppProvider({ children }) {
 
     return () => subscription.unsubscribe()
   }, [currentUserRole])
-
-  // Simpan cart unik per user
-  useEffect(() => {
-    if (userSession?.user?.id) {
-      sessionStorage.setItem(`eventloop_cart_${userSession.user.id}`, JSON.stringify(cartItems))
-    }
-  }, [cartItems, userSession])
-
-  // Simpan payment status unik per user
-  useEffect(() => {
-    if (userSession?.user?.id) {
-      sessionStorage.setItem(`eventloop_payment_status_${userSession.user.id}`, userPaymentStatus)
-    }
-  }, [userPaymentStatus, userSession])
-
-  // Simpan active event unik per user
-  useEffect(() => {
-    if (userSession?.user?.id && activeEvent) {
-      sessionStorage.setItem(`eventloop_event_${userSession.user.id}`, JSON.stringify(activeEvent))
-    }
-  }, [activeEvent, userSession])
 
   async function fetchEquipments() {
     const { data, error } = await supabase
@@ -182,9 +166,6 @@ export function AppProvider({ children }) {
       location: eventData.location || 'Kampus Utama'
     }
     setActiveEvent(newEvt)
-    if (userSession?.user?.id) {
-      sessionStorage.setItem(`eventloop_event_${userSession.user.id}`, JSON.stringify(newEvt))
-    }
   }
 
   const uploadEquipmentByUser = async (newEquipment) => {
@@ -251,6 +232,7 @@ export function AppProvider({ children }) {
     const adminFee = totalAmount * 0.05
     const netPayout = totalAmount - adminFee
 
+    // 1. Update stok equipment di Supabase
     for (const reservedItem of cartItems) {
       const targetItem = equipments.find(e => e.id === reservedItem.id)
       if (targetItem) {
@@ -281,25 +263,29 @@ export function AppProvider({ children }) {
       paidAt: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     }
 
+    // 2. Simpan transaksi ke tabel Supabase transactions
     await supabase.from('transactions').insert([newTxn])
     setTransactions(prev => [newTxn, ...prev])
 
-    const updatedReservation = { 
-      eventName: activeEvent.name,
-      eventDate: activeEvent.date,
-      items: [...cartItems], 
-      txnId 
-    }
-
-    setActiveReservation(updatedReservation)
+    // 3. Simpan permanen ke tabel reservations Supabase
     if (userSession?.user?.id) {
-      sessionStorage.setItem(`eventloop_active_res_${userSession.user.id}`, JSON.stringify(updatedReservation))
+      for (const cartItem of cartItems) {
+        await supabase.from('reservations').insert([
+          {
+            user_id: userSession.user.id,
+            item_name: cartItem.name,
+            quantity: cartItem.qty || 1,
+            price: cartItem.listingType === 'sale' ? (cartItem.salePrice || cartItem.price) : (cartItem.price || 50000),
+            listing_type: cartItem.listingType || 'rental',
+            start_date: activeEvent.date,
+            status: 'Sedang Berjalan'
+          }
+        ])
+      }
+      await fetchUserReservations(userSession.user.id)
     }
 
     setCartItems([])
-    if (userSession?.user?.id) {
-      sessionStorage.removeItem(`eventloop_cart_${userSession.user.id}`)
-    }
     setUserPaymentStatus('pending_admin_approval')
   }
 
@@ -377,20 +363,11 @@ export function AppProvider({ children }) {
       await fetchEquipments()
     }
 
-    setActiveReservation(prev => {
-      if (!prev || !prev.items) return null;
-      const remainingItems = prev.items.filter(item => item.id !== equipmentId);
-      if (remainingItems.length === 0) {
-        if (userSession?.user?.id) {
-          sessionStorage.removeItem(`eventloop_active_res_${userSession.user.id}`)
-        }
-        return null;
-      }
-      return {
-        ...prev,
-        items: remainingItems
-      }
-    })
+    if (userSession?.user?.id) {
+      await supabase.from('reservations').delete().eq('user_id', userSession.user.id)
+      await fetchUserReservations(userSession.user.id)
+    }
+    setActiveReservation(null)
   }
 
   return (

@@ -20,35 +20,40 @@ export default function Reservation() {
     updateCartQty, 
     removeFromCart,
     activeReservation,
-    activeEvent 
+    activeEvent,
+    reservations 
   } = useApp()
   
   const [showQrisModal, setShowQrisModal] = useState(false)
 
-  // Gunakan cartItems jika masih di keranjang, atau activeReservation.items jika sudah checkout/pending
+  // Prioritaskan cartItems, jika kosong ambil dari activeReservation atau reservations Supabase
   const displayItems = (cartItems && cartItems.length > 0) 
     ? cartItems 
-    : (activeReservation?.items || [])
+    : (activeReservation?.items || reservations.map(r => ({
+        id: r.id,
+        name: r.item_name,
+        qty: r.quantity,
+        price: r.price || 50000,
+        listingType: r.listing_type || 'rental',
+        circularScore: 90
+      })))
 
-  // Kalkulasi Biaya & Impact
   const totalCost = displayItems.reduce((sum, item) => sum + ((item.listingType === 'sale' ? (item.salePrice || item.price) : item.price) * (item.qty || 1)), 0)
   const estimatedAvoidedCost = totalCost * 4.8 
   const estimatedWasteAvoided = (displayItems.reduce((sum, item) => sum + (item.qty || 1), 0) * 1.8).toFixed(1)
 
-  // Ambil Nama Event & Tanggal Murni dari input user (activeEvent / activeReservation)
   const eventName = activeReservation?.eventName || activeEvent?.name || 'Event Organisasi Kampus'
   const rawEventDate = activeReservation?.eventDate || activeEvent?.date || '2026-09-18'
   
   const eventDateObj = new Date(rawEventDate)
   const pickupDateObj = new Date(eventDateObj)
-  pickupDateObj.setDate(pickupDateObj.getDate() - 1) // H-1 Pengambilan
+  pickupDateObj.setDate(pickupDateObj.getDate() - 1)
 
   const formattedEventDate = isNaN(eventDateObj) ? rawEventDate : eventDateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
   const formattedPickupDate = isNaN(pickupDateObj) ? 'H-1' : pickupDateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto animate-fade-in-up pb-12">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full mb-1">
@@ -69,7 +74,6 @@ export default function Reservation() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
-        {/* Reservation Items Table */}
         <div className="lg:col-span-2 space-y-6">
           <div className="card overflow-hidden">
             <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
@@ -92,7 +96,7 @@ export default function Reservation() {
                 <tbody className="divide-y divide-gray-100">
                   {displayItems.map((item, idx) => {
                     const itemQty = item.qty || 1
-                    const itemPrice = item.listingType === 'sale' ? (item.salePrice || item.price) : (item.price || 25000)
+                    const itemPrice = item.listingType === 'sale' ? (item.salePrice || item.price) : (item.price || 50000)
                     const subtotal = itemPrice * itemQty
 
                     return (
@@ -178,7 +182,6 @@ export default function Reservation() {
           </div>
         </div>
 
-        {/* Right Summary Card */}
         <div className="space-y-6">
           <div className="card p-6 space-y-6">
             <h3 className="font-bold text-gray-900 text-base pb-3 border-b border-gray-100">
@@ -207,7 +210,6 @@ export default function Reservation() {
               </div>
             </div>
 
-            {/* Circular Impact Badge */}
             <div className="bg-green-50 p-4 rounded-2xl border border-green-200/70 space-y-2 text-xs shadow-sm">
               <div className="font-bold text-green-900 flex items-center gap-1.5">
                 <Recycle className="w-4 h-4 text-green-600" />
@@ -223,7 +225,6 @@ export default function Reservation() {
               </div>
             </div>
 
-            {/* Action Checkout & QRIS Payment */}
             <div className="space-y-3 pt-2">
               {cartItems.length > 0 ? (
                 <button
@@ -233,7 +234,7 @@ export default function Reservation() {
                   <QrCode className="w-4 h-4" />
                   <span>Bayar via QRIS (Rp{totalCost.toLocaleString('id-ID')})</span>
                 </button>
-              ) : userPaymentStatus === 'pending_admin_approval' ? (
+              ) : userPaymentStatus === 'pending_admin_approval' || reservations.length > 0 ? (
                 <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 text-center space-y-3 animate-fade-in-up">
                   <div className="w-12 h-12 bg-amber-500 text-white rounded-full flex items-center justify-center mx-auto shadow-md animate-pulse">
                     <Clock className="w-6 h-6" />
@@ -244,36 +245,6 @@ export default function Reservation() {
                   <p className="text-[11px] text-amber-800 leading-relaxed">
                     Bukti bayar Anda sebesar <strong>Rp{totalCost.toLocaleString('id-ID')}</strong> telah masuk ke antrean verifikasi Sarpras. Status akan otomatis berubah menjadi <strong>BERHASIL</strong> begitu Admin mengklik ACC di panel admin.
                   </p>
-                  <div className="text-[10px] bg-white p-2.5 rounded-xl border border-amber-200 text-left font-mono space-y-0.5">
-                    <div>Status: <strong className="text-amber-700">Pending Admin Verification</strong></div>
-                    <div>Rekening Tujuan: <strong>BCA 0829102830 a.n EventLoop Escrow</strong></div>
-                  </div>
-                </div>
-              ) : userPaymentStatus === 'approved_success' ? (
-                <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-5 text-center space-y-3 animate-fade-in-up">
-                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center mx-auto shadow-md">
-                    <CheckCircle2 className="w-7 h-7" />
-                  </div>
-                  <div className="font-extrabold text-emerald-950 text-sm">
-                    PEMBAYARAN TELAH DI-ACC & LUNAS! ✓ 💳
-                  </div>
-                  <p className="text-[11px] text-emerald-800 leading-relaxed">
-                    Admin Sarpras telah memverifikasi dana sebesar <strong>Rp{totalCost.toLocaleString('id-ID')}</strong>. Booking disetujui, silakan tunjukkan halaman ini saat mengambil barang di warehouse!
-                  </p>
-                  <div className="text-[10px] bg-white p-2.5 rounded-xl border border-emerald-200 text-left font-mono space-y-0.5">
-                    <div>No. Trx: <strong>#TXN-QRIS-2026-092</strong></div>
-                    <div>Ref Bank: <strong>BCA-QRIS-9912048</strong></div>
-                    <div>Verifikasi: <strong className="text-green-700">Approved by Admin Sarpras ✓</strong></div>
-                  </div>
-                  <div className="pt-2 flex flex-col gap-2">
-                    <Link
-                      to="/return"
-                      className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-green-800 bg-white px-4 py-2.5 rounded-xl border border-green-300 hover:bg-green-50 transition-colors"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Ke Form Pengembalian Nanti</span>
-                    </Link>
-                  </div>
                 </div>
               ) : (
                 <button
@@ -296,7 +267,6 @@ export default function Reservation() {
         </div>
       </div>
 
-      {/* QRIS PAYMENT MODAL */}
       {showQrisModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl border border-gray-100 animate-fade-in-up">
@@ -353,10 +323,6 @@ export default function Reservation() {
                 Rp{totalCost.toLocaleString('id-ID')}
               </span>
             </div>
-
-            <p className="text-[10px] text-gray-400 leading-relaxed">
-              Buka aplikasi BCA Mobile, Mandiri Livin, GoPay, OVO, ShopeePay atau bank lain lalu scan kode QR di atas.
-            </p>
 
             <div className="pt-1 space-y-2">
               <button
