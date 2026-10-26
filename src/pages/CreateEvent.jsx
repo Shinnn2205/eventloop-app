@@ -8,10 +8,7 @@ import {
   Sparkles, 
   ArrowRight, 
   CheckCircle2, 
-  Plus, 
-  Recycle,
-  Layers,
-  HelpCircle
+  Recycle
 } from 'lucide-react'
 
 export default function CreateEvent() {
@@ -84,36 +81,45 @@ export default function CreateEvent() {
   }
 
   const handleSaveAndProceed = () => {
-    // 1. Simpan detail event ke state global agar halaman Reservation membaca tanggal yang benar
+    // 1. Simpan detail event & rincian items ke state global agar halaman Reservation langsung membaca tanggal dan barangnya
     setActiveReservation({
       eventName,
       eventDate,
       location,
       participants,
       eventType,
-      items: []
+      items: recommendedList.map((rec, index) => ({
+        id: `rec-item-${index}`,
+        name: rec.name,
+        price: rec.price,
+        qty: rec.qty,
+        circularScore: rec.score,
+        listingType: 'rental'
+      }))
     })
 
-    // 2. Masukkan item rekomendasi yang cocok dengan database equipments ke cart
-    recommendedList.forEach(rec => {
-      // Cari item di database Supabase yang namanya mirip dengan rekomendasi
+    // 2. Masukkan item ke cart global satu per satu dengan aman
+    recommendedList.forEach((rec, index) => {
       const actualItem = equipments.find(eq => eq.name.toLowerCase().includes(rec.name.toLowerCase()))
-      if (actualItem) {
-        addToCart(actualItem, rec.qty)
-      } else {
-        // Fallback jika item spesifik belum ada di DB, buatkan item darurat agar tetap masuk keranjang
-        const fallbackItem = {
-          id: `rec-${Math.random()}`,
-          name: rec.name,
-          price: rec.price,
-          available: 50,
-          circularScore: rec.score,
-          listingType: 'rental'
-        }
-        addToCart(fallbackItem, rec.qty)
+      
+      const cartPayload = actualItem ? {
+        ...actualItem,
+        qty: rec.qty,
+        listingType: 'rental'
+      } : {
+        id: `rec-item-${index}`,
+        name: rec.name,
+        price: rec.price,
+        available: 50,
+        circularScore: rec.score,
+        listingType: 'rental',
+        qty: rec.qty
       }
+
+      addToCart(cartPayload, rec.qty)
     })
 
+    // 3. Pindah halaman ke reservasi
     navigate('/reservation')
   }
 
