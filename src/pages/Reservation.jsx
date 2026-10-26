@@ -35,8 +35,8 @@ export default function Reservation() {
   const estimatedAvoidedCost = totalCost * 4.8 
   const estimatedWasteAvoided = (displayItems.reduce((sum, item) => sum + (item.qty || 1), 0) * 1.8).toFixed(1)
 
-  // Format Nama Event & Tanggal Dinamis
-  const eventName = activeReservation?.eventName || activeEvent?.name || 'INNOFAIR 2026'
+  // Ambil Nama Event & Tanggal Murni dari input user (activeEvent / activeReservation)
+  const eventName = activeReservation?.eventName || activeEvent?.name || 'Event Organisasi Kampus'
   const rawEventDate = activeReservation?.eventDate || activeEvent?.date || '2026-09-18'
   
   const eventDateObj = new Date(rawEventDate)
@@ -58,7 +58,7 @@ export default function Reservation() {
             Your Event Equipment Reservation
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Kepanitiaan: <strong>{eventName}</strong> (SISO BEM) • Tanggal Event: <strong>{formattedEventDate}</strong>
+            Kepanitiaan: <strong>{eventName}</strong> • Tanggal Event: <strong>{formattedEventDate}</strong>
           </p>
         </div>
 
@@ -363,7 +363,7 @@ export default function Reservation() {
                 type="button"
                 onClick={() => {
                   submitUserQrisPayment({
-                    buyerOrg: 'SISO Prasmulyan',
+                    buyerOrg: eventName,
                     totalAmount: totalCost,
                     itemNames: displayItems.map(i => `${i.qty || 1}x ${i.name}`).join(', ')
                   })
