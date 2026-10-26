@@ -19,29 +19,35 @@ export default function Reservation() {
     cartItems, 
     updateCartQty, 
     removeFromCart,
-    activeReservation 
+    activeReservation,
+    activeEvent 
   } = useApp()
   
   const [showQrisModal, setShowQrisModal] = useState(false)
 
-  // Kalkulasi Biaya & Impact
-  const totalCost = cartItems.reduce((sum, item) => sum + ((item.listingType === 'sale' ? (item.salePrice || item.price) : item.price) * item.qty), 0)
-  const estimatedAvoidedCost = totalCost * 4.8 
-  const estimatedWasteAvoided = (cartItems.reduce((sum, item) => sum + item.qty, 0) * 1.8).toFixed(1)
+  // Gunakan cartItems jika masih di keranjang, atau activeReservation.items jika sudah checkout/pending
+  const displayItems = (cartItems && cartItems.length > 0) 
+    ? cartItems 
+    : (activeReservation?.items || [])
 
-  // Format Tanggal Dinamis (H-1 Pengambilan)
-  const eventName = activeReservation?.eventName || 'INNOFAIR 2026'
-  const rawEventDate = activeReservation?.eventDate || '2026-09-18' // Fallback tanggal mock
+  // Kalkulasi Biaya & Impact
+  const totalCost = displayItems.reduce((sum, item) => sum + ((item.listingType === 'sale' ? (item.salePrice || item.price) : item.price) * (item.qty || 1)), 0)
+  const estimatedAvoidedCost = totalCost * 4.8 
+  const estimatedWasteAvoided = (displayItems.reduce((sum, item) => sum + (item.qty || 1), 0) * 1.8).toFixed(1)
+
+  // Format Nama Event & Tanggal Dinamis
+  const eventName = activeReservation?.eventName || activeEvent?.name || 'INNOFAIR 2026'
+  const rawEventDate = activeReservation?.eventDate || activeEvent?.date || '2026-09-18'
   
   const eventDateObj = new Date(rawEventDate)
   const pickupDateObj = new Date(eventDateObj)
-  pickupDateObj.setDate(pickupDateObj.getDate() - 1) // Set H-1
+  pickupDateObj.setDate(pickupDateObj.getDate() - 1) // H-1 Pengambilan
 
-  const formattedEventDate = eventDateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-  const formattedPickupDate = pickupDateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+  const formattedEventDate = isNaN(eventDateObj) ? rawEventDate : eventDateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+  const formattedPickupDate = isNaN(pickupDateObj) ? 'H-1' : pickupDateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto animate-fade-in-up">
+    <div className="space-y-8 max-w-5xl mx-auto animate-fade-in-up pb-12">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -68,7 +74,7 @@ export default function Reservation() {
           <div className="card overflow-hidden">
             <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
               <h3 className="font-bold text-gray-900 text-sm">Daftar Peralatan Dipesan</h3>
-              <span className="text-xs text-gray-500 font-semibold">{cartItems.length} jenis item</span>
+              <span className="text-xs text-gray-500 font-semibold">{displayItems.length} jenis item</span>
             </div>
 
             <div className="overflow-x-auto">
@@ -84,65 +90,77 @@ export default function Reservation() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {cartItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50/60 transition-colors">
-                      <td className="p-4">
-                        <div className="font-bold text-gray-900 text-sm">{item.name}</div>
-                        <div className="text-[11px] text-gray-500 flex items-center gap-1.5 mt-0.5">
-                          <span className={`px-1.5 py-0.2 rounded font-bold text-[10px] ${
-                            item.listingType === 'sale' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
-                          }`}>
-                            {item.listingType === 'sale' ? '🏷️ Beli Permanen' : '🔄 Sewa Event'}
+                  {displayItems.map((item, idx) => {
+                    const itemQty = item.qty || 1
+                    const itemPrice = item.listingType === 'sale' ? (item.salePrice || item.price) : (item.price || 25000)
+                    const subtotal = itemPrice * itemQty
+
+                    return (
+                      <tr key={item.id || idx} className="hover:bg-gray-50/60 transition-colors">
+                        <td className="p-4">
+                          <div className="font-bold text-gray-900 text-sm">{item.name}</div>
+                          <div className="text-[11px] text-gray-500 flex items-center gap-1.5 mt-0.5">
+                            <span className={`px-1.5 py-0.2 rounded font-bold text-[10px] ${
+                              item.listingType === 'sale' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
+                            }`}>
+                              {item.listingType === 'sale' ? '🏷️ Beli Permanen' : '🔄 Sewa Event'}
+                            </span>
+                            <span>Rp{itemPrice.toLocaleString('id-ID')} / unit</span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className="font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full text-[11px]">
+                            {item.circularScore || 90}
                           </span>
-                          <span>Rp{(item.listingType === 'sale' ? (item.salePrice || item.price) : item.price).toLocaleString('id-ID')} / unit</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-center">
-                        <span className="font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full text-[11px]">
-                          {item.circularScore || 90}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center">
-                        <div className="inline-flex items-center border border-gray-200 rounded-lg bg-white">
-                          <button 
-                            onClick={() => updateCartQty(item.id, -1)}
-                            className="px-2 py-1 hover:bg-gray-100 rounded-l-lg font-bold text-gray-600"
-                          >
-                            -
-                          </button>
-                          <span className="px-2.5 py-1 font-bold text-gray-900">{item.qty}</span>
-                          <button 
-                            onClick={() => updateCartQty(item.id, 1)}
-                            className="px-2 py-1 hover:bg-gray-100 rounded-r-lg font-bold text-gray-600"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </td>
-                      <td className="p-4 text-right font-bold text-gray-900 text-sm">
-                        Rp{((item.listingType === 'sale' ? (item.salePrice || item.price) : item.price) * item.qty).toLocaleString('id-ID')}
-                      </td>
-                      <td className="p-4 text-center">
-                        <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 font-bold px-2.5 py-0.5 rounded-full text-[10px]">
-                          <CheckCircle2 className="w-3 h-3" /> Reserved
-                        </span>
-                      </td>
-                      <td className="p-4 text-center">
-                        <button 
-                          onClick={() => removeFromCart(item.id)}
-                          className="text-gray-400 hover:text-red-600 p-1 transition-colors"
-                          title="Hapus"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="p-4 text-center">
+                          {cartItems.length > 0 ? (
+                            <div className="inline-flex items-center border border-gray-200 rounded-lg bg-white">
+                              <button 
+                                onClick={() => updateCartQty(item.id, -1)}
+                                className="px-2 py-1 hover:bg-gray-100 rounded-l-lg font-bold text-gray-600"
+                              >
+                                -
+                              </button>
+                              <span className="px-2.5 py-1 font-bold text-gray-900">{itemQty}</span>
+                              <button 
+                                onClick={() => updateCartQty(item.id, 1)}
+                                className="px-2 py-1 hover:bg-gray-100 rounded-r-lg font-bold text-gray-600"
+                              >
+                                +
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="font-bold text-gray-900">{itemQty} unit</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-right font-bold text-gray-900 text-sm">
+                          Rp{subtotal.toLocaleString('id-ID')}
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 font-bold px-2.5 py-0.5 rounded-full text-[10px]">
+                            <CheckCircle2 className="w-3 h-3" /> Reserved
+                          </span>
+                        </td>
+                        <td className="p-4 text-center">
+                          {cartItems.length > 0 && (
+                            <button 
+                              onClick={() => removeFromCart(item.id)}
+                              className="text-gray-400 hover:text-red-600 p-1 transition-colors"
+                              title="Hapus"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
 
-            {cartItems.length === 0 && (
+            {displayItems.length === 0 && (
               <div className="p-8 text-center text-gray-400 text-xs">
                 Belum ada equipment yang dimasukkan ke reservasi. Silakan tambahkan barang dari Marketplace.
               </div>
@@ -170,7 +188,7 @@ export default function Reservation() {
             <div className="space-y-3 text-xs">
               <div className="flex justify-between text-gray-600">
                 <span>Total Items Dipesan</span>
-                <span className="font-bold text-gray-900">{cartItems.reduce((s, i) => s + i.qty, 0)} unit</span>
+                <span className="font-bold text-gray-900">{displayItems.reduce((s, i) => s + (i.qty || 1), 0)} unit</span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>Subtotal Rental</span>
@@ -347,7 +365,7 @@ export default function Reservation() {
                   submitUserQrisPayment({
                     buyerOrg: 'SISO Prasmulyan',
                     totalAmount: totalCost,
-                    itemNames: cartItems.map(i => `${i.qty}x ${i.name}`).join(', ')
+                    itemNames: displayItems.map(i => `${i.qty || 1}x ${i.name}`).join(', ')
                   })
                   setShowQrisModal(false)
                 }}
