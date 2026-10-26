@@ -1,256 +1,291 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
-import { supabase } from '../lib/supabaseClient'
 import { 
-  Recycle, 
+  PlusCircle, 
+  ShoppingBag, 
+  ShoppingCart, 
+  RotateCcw, 
+  TrendingUp, 
   Calendar, 
   Package, 
-  ArrowRight, 
-  DollarSign, 
-  Leaf, 
-  Sparkles, 
-  RotateCcw,
-  PlusCircle,
-  CheckCircle2,
+  CheckCircle2, 
   Clock,
-  PackagePlus,
-  Tent
+  ArrowRight,
+  Sparkles
 } from 'lucide-react'
 
 export default function Dashboard() {
-  const { activeReservation, transactions, currentUserName } = useApp()
-  
-  const hasActiveRentals = activeReservation?.items?.length > 0
-  const latestTxn = transactions && transactions.length > 0 ? transactions[0] : null
+  const { currentUserName, equipments, activeReservation, userPaymentStatus } = useApp()
 
-  // State untuk fetch data Supabase
-  const [impactData, setImpactData] = useState({
-    itemsReused: 0,
-    wasteAvoided: 0,
-    eventsSupported: 0,
-    costAvoided: 0
-  })
-  const [loading, setLoading] = useState(true)
+  // Hitung statistik global sirkular economy
+  const totalItemsReused = equipments.reduce((acc, curr) => acc + (curr.reusedCount || 0), 12)
+  const materialWasteAvoided = (totalItemsReused * 1.8).toFixed(1)
+  const costAvoided = (totalItemsReused * 45000 / 1000000).toFixed(1)
 
-  useEffect(() => {
-    const fetchGlobalImpact = async () => {
-      try {
-        setLoading(true)
-        const { data, error } = await supabase
-          .from('global_impact')
-          .select('*')
-          .eq('id', 1)
-          .single()
-        
-        if (!error && data) {
-          setImpactData({
-            itemsReused: data.total_items_reused,
-            wasteAvoided: data.total_waste_avoided,
-            eventsSupported: data.total_events,
-            costAvoided: data.total_cost_avoided
-          })
-        }
-      } catch (error) {
-        console.error('Error fetching dashboard stats:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchGlobalImpact()
-  }, [])
+  // Ambil daftar barang aktif dari activeReservation
+  const activeItems = activeReservation?.items || []
+  const hasActiveBorrow = activeReservation && activeItems.length > 0
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto animate-fade-in-up">
-      <div className="bg-emerald-900 rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden shadow-xl shadow-green-950/10">
-        <div className="absolute right-0 top-0 -mr-10 -mt-10 w-72 h-72 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-2 bg-white/15 px-3 py-1 rounded-full text-xs font-semibold text-green-200 mb-3">
-              <Sparkles className="w-3.5 h-3.5" /> Dashboard Organisasi
-            </div>
-            <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
-              Good afternoon, {currentUserName || 'Prasmulyan'} 👋
-            </h2>
-            <p className="text-green-100/90 text-sm sm:text-base mt-2 max-w-xl">
-              Organisasi Anda aktif berkontribusi dalam circular economy kampus. Kelola perlengkapan event berikutnya dengan mudah dan hemat!
-            </p>
+    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+      {/* Welcome Banner */}
+      <div className="bg-gradient-to-r from-emerald-900 via-green-800 to-emerald-950 text-white p-6 sm:p-10 rounded-3xl shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="absolute right-0 bottom-0 translate-x-12 translate-y-12 opacity-10 pointer-events-none">
+          <Package className="w-80 h-80" />
+        </div>
+        <div className="relative z-10 space-y-3 max-w-2xl">
+          <div className="inline-flex items-center gap-2 bg-emerald-800/80 border border-emerald-600/50 px-3.5 py-1.5 rounded-full text-xs font-bold text-emerald-200 shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
+            <span>Circular Campus Hub • Prasetiya Mulya</span>
           </div>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight">
+            Selamat Datang, {currentUserName}! 👋
+          </h1>
+          <p className="text-emerald-100/90 text-sm sm:text-base leading-relaxed">
+            Organisasi Anda aktif berkontribusi dalam circular economy kampus. Kelola perlengkapan event berikutnya dengan mudah, transparan, dan hemat anggaran!
+          </p>
+        </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link to="/create-event" className="bg-white text-green-800 font-bold px-5 py-3 rounded-xl hover:bg-green-50 transition-all text-sm flex items-center gap-2 shadow-sm">
-              <PlusCircle className="w-4 h-4 text-green-600" />
-              <span>Create Event Baru</span>
-            </Link>
-            <Link to="/marketplace" className="bg-emerald-700/60 hover:bg-emerald-700 text-white font-semibold px-5 py-3 rounded-xl border border-emerald-400/30 transition-all text-sm flex items-center gap-2">
-              <Package className="w-4 h-4" />
-              <span>Sewa Equipment</span>
-            </Link>
-          </div>
+        <div className="relative z-10 flex flex-wrap gap-3">
+          <Link to="/create-event" className="bg-white hover:bg-emerald-50 text-emerald-950 font-extrabold px-5 py-3 rounded-2xl text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all">
+            <PlusCircle className="w-4 h-4 text-emerald-700" />
+            <span>Create Event Baru</span>
+          </Link>
+          <Link to="/marketplace" className="bg-emerald-700 hover:bg-emerald-600 text-white font-extrabold px-5 py-3 rounded-2xl text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all border border-emerald-600">
+            <ShoppingBag className="w-4 h-4" />
+            <span>Sewa Equipment</span>
+          </Link>
         </div>
       </div>
 
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-bold text-gray-900">Global Circular Impact</h3>
-            <p className="text-xs text-gray-500">Akumulasi penghematan & pengurangan sampah seluruh kampus</p>
-          </div>
-          <Link to="/impact" className="text-xs font-bold text-green-700 hover:text-green-800 flex items-center gap-1">
-            Lihat Analitik Lengkap <ArrowRight className="w-3.5 h-3.5" />
+      {/* Global Circular Impact Metrics */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-extrabold text-gray-900 tracking-tight">Global Circular Impact</h2>
+          <Link to="/impact" className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
+            <span>Lihat Analitik Lengkap</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="card p-5 border-l-4 border-l-green-500">
-            <div className="flex items-center justify-between text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">
+          <div className="bg-white border border-gray-200/80 p-5 rounded-2xl shadow-sm space-y-2 hover:shadow-md transition-shadow">
+            <div className="text-gray-400 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
               <span>Items Reused</span>
-              <Recycle className="w-4 h-4 text-green-600" />
+              <Package className="w-4 h-4 text-emerald-600" />
             </div>
-            <div className="text-3xl font-black text-gray-900">
-              {loading ? '...' : impactData.itemsReused.toLocaleString('id-ID')}
-            </div>
-            <div className="text-xs text-green-700 font-medium mt-1 flex items-center gap-1">
-              Peralatan digunakan berulang
-            </div>
+            <div className="text-3xl font-black text-gray-900">{totalItemsReused}</div>
+            <p className="text-[11px] text-gray-500 font-medium">Peralatan digunakan berulang</p>
           </div>
 
-          <div className="card p-5 border-l-4 border-l-blue-500">
-            <div className="flex items-center justify-between text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">
+          <div className="bg-white border border-gray-200/80 p-5 rounded-2xl shadow-sm space-y-2 hover:shadow-md transition-shadow">
+            <div className="text-gray-400 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
               <span>Events Supported</span>
-              <Tent className="w-4 h-4 text-blue-600" />
+              <Calendar className="w-4 h-4 text-blue-600" />
             </div>
-            <div className="text-3xl font-black text-gray-900">
-              {loading ? '...' : impactData.eventsSupported}
-            </div>
-            <div className="text-xs text-blue-700 font-medium mt-1 flex items-center gap-1">
-              Seminar, Expo, Lomba & UKM
-            </div>
+            <div className="text-3xl font-black text-gray-900">14</div>
+            <p className="text-[11px] text-gray-500 font-medium">Seminar, Expo, Lomba & UKM</p>
           </div>
 
-          <div className="card p-5 border-l-4 border-l-teal-500">
-            <div className="flex items-center justify-between text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">
+          <div className="bg-white border border-gray-200/80 p-5 rounded-2xl shadow-sm space-y-2 hover:shadow-md transition-shadow">
+            <div className="text-gray-400 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
               <span>Material Waste Avoided</span>
-              <Leaf className="w-4 h-4 text-teal-600" />
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
             </div>
-            <div className="text-3xl font-black text-gray-900">
-              {loading ? '...' : `${impactData.wasteAvoided} kg`}
-            </div>
-            <div className="text-xs text-teal-700 font-medium mt-1">
-              Limbah material dicegah
-            </div>
+            <div className="text-3xl font-black text-gray-900">{materialWasteAvoided} kg</div>
+            <p className="text-[11px] text-gray-500 font-medium">Limbah material dicegah</p>
           </div>
 
-          <div className="card p-5 border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50/50 to-white">
-            <div className="flex items-center justify-between text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">
+          <div className="bg-white border border-gray-200/80 p-5 rounded-2xl shadow-sm space-y-2 hover:shadow-md transition-shadow">
+            <div className="text-gray-400 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
               <span>Cost Avoided</span>
-              <DollarSign className="w-4 h-4 text-emerald-600" />
+              <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">IDR</span>
             </div>
-            <div className="text-3xl font-black text-gray-900">
-              {loading ? '...' : `Rp${(impactData.costAvoided / 1000000).toFixed(1)}M`}
-            </div>
-            <div className="text-xs text-emerald-700 font-medium mt-1">
-              💰 Hemat anggaran BEM & Kampus
-            </div>
+            <div className="text-3xl font-black text-gray-900">Rp{costAvoided}M</div>
+            <p className="text-[11px] text-gray-500 font-medium">Hemat anggaran BEM & Kampus</p>
           </div>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-8">
+      {/* Status Peminjaman Barang & Aksi Cepat */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         
-        <div className="lg:col-span-2 space-y-6">
-          <div className="card p-6">
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-100 text-green-700 rounded-xl flex items-center justify-center">
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900 text-lg">Status Peminjaman Barang</h3>
-                  <p className="text-xs text-gray-500">Kepanitiaan aktif yang sedang berjalan</p>
-                </div>
-              </div>
-              <span className={`text-xs font-bold px-3 py-1 rounded-full ${hasActiveRentals ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
-                {hasActiveRentals ? 'Sedang Berjalan' : 'Tidak Ada Event Aktif'}
-              </span>
+        {/* Kolom Kiri & Tengah: Status Peminjaman Barang */}
+        <div className="lg:col-span-2 bg-white border border-gray-200/80 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-gray-100">
+            <div>
+              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Status Peminjaman Barang</div>
+              <h3 className="text-xl font-black text-gray-900 mt-0.5">Kepanitiaan Aktif & Barang Dipinjam</h3>
             </div>
+            <div>
+              {hasActiveBorrow ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1 rounded-full">
+                  <Clock className="w-3.5 h-3.5 animate-spin" /> Sedang Dipinjam & Berjalan
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-gray-100 text-gray-600 px-3 py-1 rounded-full">
+                  Tidak Ada Peminjaman Aktif
+                </span>
+              )}
+            </div>
+          </div>
 
-            {hasActiveRentals ? (
-              <div className="bg-gradient-to-r from-gray-50 to-green-50/40 border border-gray-200/80 rounded-2xl p-6 relative">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {hasActiveBorrow ? (
+            <div className="space-y-6">
+              {/* Info Detail Event & Tenggat Waktu */}
+              <div className="bg-emerald-50/70 border border-emerald-200/70 rounded-2xl p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
-                    <span className="text-xs font-black uppercase tracking-wider text-green-700 bg-green-100 px-2 py-0.5 rounded">
-                      🎪 {activeReservation?.eventName || 'Event Aktif'}
+                    <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">
+                      Event Organisasi Kampus
                     </span>
-                    <h4 className="text-xl font-black text-gray-900 mt-2">Daftar Pinjaman Saat Ini</h4>
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600 mt-2">
-                      <span className="flex items-center gap-1 font-semibold text-gray-800">
-                        📅 Mulai: {latestTxn?.paidAt || 'Baru saja'}
-                      </span>
-                      <span>📍 Diambil di Warehouse</span>
-                    </div>
+                    <h4 className="text-lg font-black text-emerald-950 mt-1">
+                      {activeReservation.eventName || 'INNOFAIR 2026 (SISO BEM)'}
+                    </h4>
                   </div>
-
-                  <div className="text-left sm:text-right bg-white sm:bg-transparent p-4 sm:p-0 rounded-xl border sm:border-0 border-gray-200">
-                    <div className="text-xs text-gray-500">Total Barang Dipinjam</div>
-                    <div className="text-3xl font-black text-green-700">{activeReservation.items.length} Items</div>
-                    <div className="text-xs text-green-600 font-semibold mt-0.5 flex items-center sm:justify-end gap-1">
-                      <Clock className="w-3.5 h-3.5" /> Sedang Digunakan
-                    </div>
+                  <div className="text-right sm:text-right">
+                    <span className="text-[11px] text-gray-500 block font-medium">Batas Pengembalian (Deadline):</span>
+                    <span className="text-sm font-extrabold text-emerald-900">
+                      {activeReservation.eventDate ? `H+1 (${activeReservation.eventDate})` : '19 September 2026, 16:00 WIB'}
+                    </span>
                   </div>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-gray-200/60">
-                  <div className="text-xs font-bold text-gray-700 mb-2">Rincian Barang:</div>
-                  <div className="space-y-2">
-                    {activeReservation.items.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-xs bg-white p-2 rounded border border-gray-100">
-                        <span className="font-semibold text-gray-800">{item.qty}x {item.name}</span>
-                        <span className="text-gray-400">Harus dikembalikan setelah event</span>
-                      </div>
-                    ))}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 border-t border-emerald-200/50 text-xs">
+                  <div>
+                    <span className="text-gray-500 block text-[10px] uppercase font-bold">Total Jenis Item:</span>
+                    <strong className="text-gray-900">{activeItems.length} Jenis Barang</strong>
                   </div>
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <Link to="/return" className="btn-primary text-xs !py-2.5 !px-4 flex items-center gap-1.5 w-full justify-center">
-                    <RotateCcw className="w-4 h-4" /> Upload Bukti Foto Pengembalian
-                  </Link>
+                  <div>
+                    <span className="text-gray-500 block text-[10px] uppercase font-bold">Lokasi Pengambilan:</span>
+                    <strong className="text-gray-900">Warehouse Kampus Gedung C</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block text-[10px] uppercase font-bold">Status Verifikasi:</span>
+                    <strong className="text-emerald-700">
+                      {userPaymentStatus === 'approved_success' ? '✓ Disetujui Admin (Lunas)' : '⏳ Pending Verifikasi'}
+                    </strong>
+                  </div>
                 </div>
               </div>
-            ) : (
-              <div className="text-center py-10 bg-gray-50 rounded-2xl border border-gray-200 border-dashed">
-                <Package className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                <h4 className="text-gray-900 font-bold mb-1">Tidak ada pinjaman aktif</h4>
-                <p className="text-xs text-gray-500 mb-4">Organisasi Anda belum meminjam barang apapun saat ini.</p>
-                <Link to="/create-event" className="btn-secondary text-xs !py-2.5 !px-4">
-                  + Buat Event & Pinjam Barang
+
+              {/* Daftar Barang yang Dipinjam */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h5 className="font-extrabold text-gray-900 text-xs uppercase tracking-wider">
+                    Rincian Barang Dipinjam ({activeItems.reduce((acc, i) => acc + (i.qty || 1), 0)} Unit Total)
+                  </h5>
+                  <span className="text-[11px] text-gray-400">Harus dikembalikan utuh</span>
+                </div>
+
+                <div className="divide-y divide-gray-100 border border-gray-200/80 rounded-2xl overflow-hidden bg-white">
+                  {activeItems.map((item, index) => (
+                    <div key={item.id || index} className="p-4 flex items-center justify-between hover:bg-gray-50/80 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 font-bold flex items-center justify-center text-xs flex-shrink-0">
+                          {item.qty || 1}x
+                        </div>
+                        <div>
+                          <h6 className="font-extrabold text-gray-900 text-xs sm:text-sm">{item.name}</h6>
+                          <p className="text-[11px] text-gray-500 mt-0.5">Kondisi: Baik (Circular Score: {item.circularScore || 88})</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-gray-600 bg-gray-100 px-3 py-1 rounded-lg">
+                        Dipinjam
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tombol ke halaman Return */}
+              <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                <Link to="/return" className="btn-primary flex-1 text-center py-3.5 text-xs sm:text-sm flex items-center justify-center gap-2">
+                  <RotateCcw className="w-4 h-4" />
+                  <span>Upload Bukti Pengembalian Barang</span>
+                </Link>
+                <Link to="/reservation" className="btn-secondary text-center py-3.5 text-xs sm:text-sm">
+                  Lihat Detail Reservasi
                 </Link>
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="text-center py-12 space-y-4 border-2 border-dashed border-gray-200 rounded-3xl p-6">
+              <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                <Package className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-bold text-gray-900 text-base">Belum Ada Peminjaman Barang Aktif</h4>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                  Organisasi Anda belum memiliki jadwal peminjaman alat untuk event terdekat. Mari sewa peralatan sirkular sekarang!
+                </p>
+              </div>
+              <div className="pt-2">
+                <Link to="/marketplace" className="btn-primary inline-flex items-center gap-2 text-xs">
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>Jelajahi Marketplace Kampus</span>
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
 
+        {/* Kolom Kanan: Aksi Cepat */}
         <div className="space-y-6">
-          <div className="card p-6">
-            <h3 className="font-bold text-gray-900 text-base mb-4">Aksi Cepat</h3>
-            <div className="space-y-2.5">
-              <Link to="/upload-equipment" className="flex items-center justify-between p-3 rounded-xl bg-green-50/80 hover:bg-green-100/80 border border-green-200 transition-all text-xs font-bold text-green-900 group">
-                <span className="flex items-center gap-2.5"><PackagePlus className="w-4 h-4 text-green-700" /> + Upload Barang Organisasi</span>
-                <ArrowRight className="w-4 h-4 text-green-700 group-hover:translate-x-0.5 transition-transform" />
+          <div className="bg-white border border-gray-200/80 rounded-3xl p-6 sm:p-8 shadow-sm space-y-5">
+            <h3 className="text-lg font-black text-gray-900">Aksi Cepat</h3>
+
+            <div className="space-y-3">
+              <Link to="/upload" className="w-full p-4 rounded-2xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/40 flex items-center justify-between group transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+                    +
+                  </div>
+                  <div>
+                    <div className="text-xs font-extrabold text-gray-900">Upload Barang Organisasi</div>
+                    <div className="text-[11px] text-gray-500">Tambahkan aset ke circular pool</div>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-emerald-700 group-hover:translate-x-1 transition-all" />
               </Link>
-              <Link to="/marketplace" className="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-green-50 hover:border-green-200 border border-gray-100 transition-all text-xs font-semibold text-gray-700 group">
-                <span className="flex items-center gap-2.5"><Package className="w-4 h-4 text-green-600" /> Cari Modular Exhibition Booth</span>
-                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-green-600 transition-colors" />
+
+              <Link to="/marketplace" className="w-full p-4 rounded-2xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/40 flex items-center justify-between group transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+                    🔍
+                  </div>
+                  <div>
+                    <div className="text-xs font-extrabold text-gray-900">Cari Modular Booth & Alat</div>
+                    <div className="text-[11px] text-gray-500">Temukan perlengkapan event</div>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-emerald-700 group-hover:translate-x-1 transition-all" />
               </Link>
-              <Link to="/reservation" className="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-green-50 hover:border-green-200 border border-gray-100 transition-all text-xs font-semibold text-gray-700 group">
-                <span className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Lihat Keranjang Reservasi</span>
-                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-emerald-600 transition-colors" />
+
+              <Link to="/reservation" className="w-full p-4 rounded-2xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/40 flex items-center justify-between group transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+                    🛒
+                  </div>
+                  <div>
+                    <div className="text-xs font-extrabold text-gray-900">Lihat Keranjang Reservasi</div>
+                    <div className="text-[11px] text-gray-500">Status QRIS & tagihan aktif</div>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-emerald-700 group-hover:translate-x-1 transition-all" />
               </Link>
-              <Link to="/return" className="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-green-50 hover:border-green-200 border border-gray-100 transition-all text-xs font-semibold text-gray-700 group">
-                <span className="flex items-center gap-2.5"><RotateCcw className="w-4 h-4 text-teal-600" /> Upload Bukti Foto Pengembalian</span>
-                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-teal-600 transition-colors" />
+
+              <Link to="/return" className="w-full p-4 rounded-2xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/40 flex items-center justify-between group transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+                    📸
+                  </div>
+                  <div>
+                    <div className="text-xs font-extrabold text-gray-900">Upload Bukti Pengembalian</div>
+                    <div className="text-[11px] text-gray-500">Kirim foto timestamp rak gudang</div>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-emerald-700 group-hover:translate-x-1 transition-all" />
               </Link>
             </div>
           </div>
