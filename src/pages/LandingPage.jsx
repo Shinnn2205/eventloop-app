@@ -1,7 +1,45 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { supabase } from '../lib/supabaseClient' // Pastikan ini mengarah ke file client Supabase Anda
 import { Recycle, ArrowRight, Package, BarChart3, Shield, Zap, Sparkles, CheckCircle2, ChevronRight, Layers } from 'lucide-react'
 
 export default function LandingPage() {
+  // State untuk menyimpan data dari Supabase (diberi nilai default awal)
+  const [impactData, setImpactData] = useState({
+    itemsReused: 1284,
+    wasteAvoided: 186.5,
+    eventsSupported: 42
+  })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchGlobalImpact = async () => {
+      try {
+        setLoading(true)
+        // Menarik data dari tabel 'global_impact' yang barusan dibuat
+        const { data, error } = await supabase
+          .from('global_impact')
+          .select('*')
+          .eq('id', 1)
+          .single()
+        
+        if (!error && data) {
+          setImpactData({
+            itemsReused: data.total_items_reused,
+            wasteAvoided: data.total_waste_avoided,
+            eventsSupported: data.total_events
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching global impact:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchGlobalImpact()
+  }, [])
+
   return (
     <div className="min-h-screen bg-white text-gray-900 selection:bg-green-100 selection:text-green-800">
       {/* Navbar */}
@@ -70,23 +108,29 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Impact Stats Highlight */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-16 max-w-3xl mx-auto">
+          {/* Impact Stats Highlight - TERKONEKSI SUPABASE */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-16 max-w-3xl mx-auto animate-fade-in-up">
             <div className="card p-6 border-green-100/80 bg-white/80 backdrop-blur">
               <div className="text-3xl mb-1">♻️</div>
-              <div className="text-3xl font-black text-gray-900">1,284</div>
+              <div className="text-3xl font-black text-gray-900">
+                {loading ? '...' : impactData.itemsReused.toLocaleString('id-ID')}
+              </div>
               <div className="text-xs text-green-700 font-bold uppercase tracking-wider mt-1">Items Reused</div>
               <div className="text-xs text-gray-500 mt-1">Peralatan digunakan berulang</div>
             </div>
             <div className="card p-6 border-green-100/80 bg-white/80 backdrop-blur">
               <div className="text-3xl mb-1">🌱</div>
-              <div className="text-3xl font-black text-gray-900">186.5 kg</div>
+              <div className="text-3xl font-black text-gray-900">
+                {loading ? '...' : `${impactData.wasteAvoided} kg`}
+              </div>
               <div className="text-xs text-emerald-700 font-bold uppercase tracking-wider mt-1">Material Waste Avoided</div>
               <div className="text-xs text-gray-500 mt-1">Limbah material dicegah</div>
             </div>
             <div className="card p-6 border-green-100/80 bg-white/80 backdrop-blur">
               <div className="text-3xl mb-1">🎪</div>
-              <div className="text-3xl font-black text-gray-900">42</div>
+              <div className="text-3xl font-black text-gray-900">
+                {loading ? '...' : impactData.eventsSupported}
+              </div>
               <div className="text-xs text-blue-700 font-bold uppercase tracking-wider mt-1">Events Supported</div>
               <div className="text-xs text-gray-500 mt-1">Seminar, Expo, Lomba & UKM</div>
             </div>
