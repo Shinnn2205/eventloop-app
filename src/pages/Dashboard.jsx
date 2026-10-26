@@ -174,7 +174,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Daftar Barang yang Dipinjam */}
+              {/* Daftar Barang yang Dipinjam (Diberi max-height & scroll agar tidak kepanjangan) */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h5 className="font-extrabold text-gray-900 text-xs uppercase tracking-wider">
@@ -183,11 +183,11 @@ export default function Dashboard() {
                   <span className="text-[11px] text-gray-400">Harus dikembalikan utuh</span>
                 </div>
 
-                <div className="divide-y divide-gray-100 border border-gray-200/80 rounded-2xl overflow-hidden bg-white">
+                <div className="max-h-72 overflow-y-auto divide-y divide-gray-100 border border-gray-200/80 rounded-2xl bg-white pr-1">
                   {activeItems.map((item, index) => (
-                    <div key={item.id || index} className="p-4 flex items-center justify-between hover:bg-gray-50/80 transition-colors">
+                    <div key={item.id || index} className="p-3.5 flex items-center justify-between hover:bg-gray-50/80 transition-colors">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 font-bold flex items-center justify-center text-xs flex-shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 font-bold flex items-center justify-center text-xs flex-shrink-0">
                           {item.qty || 1}x
                         </div>
                         <div>
@@ -195,7 +195,7 @@ export default function Dashboard() {
                           <p className="text-[11px] text-gray-500 mt-0.5">Kondisi: Baik (Circular Score: {item.circularScore || 88})</p>
                         </div>
                       </div>
-                      <span className="text-xs font-bold text-gray-600 bg-gray-100 px-3 py-1 rounded-lg">
+                      <span className="text-xs font-bold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-lg">
                         Dipinjam
                       </span>
                     </div>
