@@ -17,16 +17,20 @@ export function AppProvider({ children }) {
   const [equipments, setEquipments] = useState([])
   const [pendingApprovals, setPendingApprovals] = useState([])
   const [transactions, setTransactions] = useState([
-    // Data dummy lokal untuk admin agar panel tetap tampil normal
     { id: 'TXN-QRIS-789', buyerOrg: 'HMPR', itemName: 'Tenda Kerucut 3x3 Meter', amount: 195000, qrisStatus: 'Pending Admin Verification' }
   ])
   
   const [userPaymentStatus, setUserPaymentStatus] = useState('idle')
-  const [activeReservation, setActiveReservation] = useState(null)
+  
+  // Ambil activeReservation dari sessionStorage agar tidak hilang saat refresh
+  const [activeReservation, setActiveReservation] = useState(() => {
+    const savedRes = sessionStorage.getItem('eventloop_active_reservation')
+    return savedRes ? JSON.parse(savedRes) : null
+  })
+
   const [returnStatus, setReturnStatus] = useState('idle')
   const [pendingReturns, setPendingReturns] = useState([])
   
-  // Ambil cartItems dari sessionStorage agar tidak hilang saat refresh
   const [cartItems, setCartItems] = useState(() => {
     const savedCart = sessionStorage.getItem('eventloop_cart_items')
     return savedCart ? JSON.parse(savedCart) : []
@@ -38,10 +42,17 @@ export function AppProvider({ children }) {
     sessionStorage.setItem('eventloop_user_name', currentUserName)
   }, [currentUserRole, currentUserName])
 
-  // Simpan otomatis setiap ada perubahan cart ke sessionStorage
   useEffect(() => {
     sessionStorage.setItem('eventloop_cart_items', JSON.stringify(cartItems))
   }, [cartItems])
+
+  useEffect(() => {
+    if (activeReservation) {
+      sessionStorage.setItem('eventloop_active_reservation', JSON.stringify(activeReservation))
+    } else {
+      sessionStorage.removeItem('eventloop_active_reservation')
+    }
+  }, [activeReservation])
 
   async function fetchEquipments() {
     const { data, error } = await supabase
@@ -96,13 +107,23 @@ export function AppProvider({ children }) {
 
         if (resData && resData.length > 0) {
           setReservations(resData)
-          setActiveReservation({
-            eventName: resData[0].item_name || 'Event Kampus',
-            eventDate: resData[0].start_date,
-            items: resData,
-            txnId: resData[0].id
-          })
-          setUserPaymentStatus('pending_admin_approval')
+          // Jika activeReservation kosong tapi ada data di database, restore
+          if (!activeReservation) {
+            setActiveReservation({
+              eventName: 'Event Organisasi Kampus',
+              eventDate: resData[0].start_date || '18 September 2026',
+              items: resData.map(r => ({
+                id: r.id,
+                name: r.item_name,
+                qty: r.quantity,
+                price: 25000,
+                circularScore: 88,
+                status: r.status
+              })),
+              txnId: 'TXN-QRIS-789'
+            })
+            setUserPaymentStatus('pending_admin_approval')
+          }
         }
       }
 
@@ -226,7 +247,7 @@ export function AppProvider({ children }) {
     await fetchPendingApprovals()
   }
 
-  // Proses pembayaran QRIS dan kurangi stok di database equipments tanpa error transactions
+  // Submit QRIS dan pastikan cartItems disalin ke activeReservation.items sebelum cart dikosongkan
   const submitUserQrisPayment = async (reservationDetails) => {
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
@@ -243,7 +264,7 @@ export function AppProvider({ children }) {
     }
     await fetchEquipments()
 
-    // 2. Simpan transaksi ke state lokal agar langsung muncul di admin panel tanpa gangguan schema cache
+    // 2. Simpan transaksi ke state lokal
     const newTxn = {
       id: txnId,
       buyerOrg: reservationDetails.buyerOrg || currentUserName,
@@ -261,7 +282,7 @@ export function AppProvider({ children }) {
             user_id: userSession.user.id,
             item_name: cartItem.name,
             quantity: cartItem.qty,
-            start_date: reservationDetails.startDate || new Date().toISOString().split('T')[0],
+            start_date: reservationDetails.startDate || '18 September 2026',
             status: 'Sedang Berjalan'
           }
         ])
@@ -274,9 +295,10 @@ export function AppProvider({ children }) {
       if (data) setReservations(data)
     }
 
+    // Salin cartItems saat ini ke activeReservation SEBELUM cartItems dikosongkan
     const updatedReservation = { 
       ...reservationDetails, 
-      items: cartItems, 
+      items: [...cartItems], 
       txnId 
     }
 
@@ -364,8 +386,12 @@ export function AppProvider({ children }) {
     }
 
     setActiveReservation(prev => {
-      if (!prev || !prev.items) return prev;
+      if (!prev || !prev.items) return null;
       const remainingItems = prev.items.filter(item => item.id !== equipmentId);
+      if (remainingItems.length === 0) {
+        sessionStorage.removeItem('eventloop_active_reservation')
+        return null;
+      }
       return {
         ...prev,
         items: remainingItems
