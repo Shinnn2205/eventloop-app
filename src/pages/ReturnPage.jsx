@@ -62,8 +62,7 @@ export default function ReturnPage() {
     returnedToOriginalPlace: true,
   })
 
-  const handleItemChange = (e) => {
-    const newId = e.target.value
+  const handleItemChange = (newId) => {
     setSelectedItemId(newId)
     
     const isPending = pendingReturns?.some(r => r.equipmentId === newId)
@@ -160,8 +159,8 @@ export default function ReturnPage() {
           </div>
         </div>
       ) : (
-        <div className="grid md:grid-cols-3 gap-6">
-          {/* Left Column: Quick Item Selector Cards (Lebih User-Friendly daripada Dropdown biasa) */}
+        <div className="grid md:grid-cols-3 gap-6 items-start">
+          {/* Left Column: Daftar Item dengan max-height dan scroll */}
           <div className="space-y-4">
             <div className="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
@@ -173,7 +172,8 @@ export default function ReturnPage() {
                 </span>
               </div>
 
-              <div className="space-y-2 mt-2">
+              {/* Kontainer dengan scroll vertikal agar tidak terlalu panjang ke bawah */}
+              <div className="space-y-2 mt-2 max-h-[480px] overflow-y-auto pr-1">
                 {rentedItems.map(item => {
                   const isSelected = item.id === selectedItemId
                   const isPending = pendingReturns?.some(r => r.equipmentId === item.id)
@@ -181,11 +181,7 @@ export default function ReturnPage() {
                   return (
                     <button
                       key={item.id}
-                      onClick={() => {
-                        setSelectedItemId(item.id)
-                        if (isPending) setReturnStatus('pending_admin_approval')
-                        else setReturnStatus('idle')
-                      }}
+                      onClick={() => handleItemChange(item.id)}
                       className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-center justify-between ${
                         isSelected 
                           ? 'border-emerald-600 bg-emerald-50/70 shadow-sm ring-1 ring-emerald-600/30' 
