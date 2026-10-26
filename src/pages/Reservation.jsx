@@ -8,7 +8,8 @@ import {
   CheckCircle2, 
   QrCode, 
   Recycle, 
-  Clock
+  Clock,
+  RotateCcw
 } from 'lucide-react'
 
 export default function Reservation() {
@@ -223,19 +224,11 @@ export default function Reservation() {
                     MENUNGGU ACC PEMBAYARAN DARI ADMIN KAMPUS ⏳
                   </div>
                   <p className="text-[11px] text-amber-800 leading-relaxed">
-                    Bukti bayar Anda sebesar <strong>Rp{totalCost.toLocaleString('id-ID')}</strong> telah masuk ke antrean verifikasi Sarpras. Status akan otomatis berubah menjadi <strong>BERHASIL</strong> begitu Admin mengklik ACC.
+                    Bukti bayar Anda sebesar <strong>Rp{totalCost.toLocaleString('id-ID')}</strong> telah masuk ke antrean verifikasi Sarpras. Status akan otomatis berubah menjadi <strong>BERHASIL</strong> begitu Admin mengklik ACC di panel admin.
                   </p>
                   <div className="text-[10px] bg-white p-2.5 rounded-xl border border-amber-200 text-left font-mono space-y-0.5">
                     <div>Status: <strong className="text-amber-700">Pending Admin Verification</strong></div>
                     <div>Rekening Tujuan: <strong>BCA 0829102830 a.n EventLoop Escrow</strong></div>
-                  </div>
-                  <div className="pt-2">
-                    <Link
-                      to="/admin"
-                      className="text-xs font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 px-4 py-2 rounded-xl inline-flex items-center gap-1.5 transition-colors"
-                    >
-                      <span>👉 Buka Admin Panel untuk ACC (Simulasi)</span>
-                    </Link>
                   </div>
                 </div>
               ) : userPaymentStatus === 'approved_success' ? (
@@ -358,7 +351,7 @@ export default function Reservation() {
                   })
                   setShowQrisModal(false)
                 }}
-                className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-1.5"
+                className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-1.5"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Kirim Bukti Pembayaran QRIS (Menunggu ACC)</span>
