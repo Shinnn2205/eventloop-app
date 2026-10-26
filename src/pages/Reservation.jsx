@@ -12,26 +12,46 @@ import {
 } from 'lucide-react'
 
 export default function Reservation() {
-  const { userPaymentStatus, submitUserQrisPayment, cartItems, updateCartQty, removeFromCart } = useApp()
+  const { 
+    userPaymentStatus, 
+    submitUserQrisPayment, 
+    cartItems, 
+    updateCartQty, 
+    removeFromCart,
+    activeReservation 
+  } = useApp()
+  
   const [showQrisModal, setShowQrisModal] = useState(false)
 
+  // Kalkulasi Biaya & Impact
   const totalCost = cartItems.reduce((sum, item) => sum + ((item.listingType === 'sale' ? (item.salePrice || item.price) : item.price) * item.qty), 0)
   const estimatedAvoidedCost = totalCost * 4.8 
   const estimatedWasteAvoided = (cartItems.reduce((sum, item) => sum + item.qty, 0) * 1.8).toFixed(1)
 
+  // Format Tanggal Dinamis (H-1 Pengambilan)
+  const eventName = activeReservation?.eventName || 'INNOFAIR 2026'
+  const rawEventDate = activeReservation?.eventDate || '2026-09-18' // Fallback tanggal mock
+  
+  const eventDateObj = new Date(rawEventDate)
+  const pickupDateObj = new Date(eventDateObj)
+  pickupDateObj.setDate(pickupDateObj.getDate() - 1) // Set H-1
+
+  const formattedEventDate = eventDateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+  const formattedPickupDate = pickupDateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
+    <div className="space-y-8 max-w-5xl mx-auto animate-fade-in-up">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full mb-1">
-            <ClipboardList className="w-3.5 h-3.5" /> Screen 6 — Reservation
+            <ClipboardList className="w-3.5 h-3.5" /> Keranjang Reservasi
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
             Your Event Equipment Reservation
           </h2>
-          <p className="text-sm text-gray-500">
-            Kepanitiaan: <strong>INNOFAIR 2026</strong> (SISO BEM) • Tanggal: 18 September 2026
+          <p className="text-sm text-gray-500 mt-1">
+            Kepanitiaan: <strong>{eventName}</strong> (SISO BEM) • Tanggal Event: <strong>{formattedEventDate}</strong>
           </p>
         </div>
 
@@ -128,13 +148,13 @@ export default function Reservation() {
             )}
           </div>
 
-          <div className="card p-5 bg-gradient-to-r from-blue-50/50 to-indigo-50/30 border-blue-200/60">
+          <div className="card p-5 bg-gradient-to-r from-blue-50/50 to-indigo-50/30 border-blue-200/60 shadow-inner">
             <h4 className="font-bold text-blue-950 text-xs uppercase tracking-wider mb-2 flex items-center gap-2">
               <Clock className="w-4 h-4 text-blue-700" />
               Jadwal & Lokasi Pengambilan (Pick-up)
             </h4>
             <p className="text-xs text-blue-800 leading-relaxed">
-              Barang dapat diambil di <strong>Warehouse Kampus Gedung C (Lantai Dasar)</strong> pada <strong>H-1 (17 September 2026, 09:00 - 16:00 WIB)</strong> dengan menunjukkan QR Code booking kepada petugas Sarpras.
+              Barang dapat diambil di <strong>Warehouse Kampus Gedung C (Lantai Dasar)</strong> pada <strong>H-1 ({formattedPickupDate}, 09:00 - 16:00 WIB)</strong> dengan menunjukkan <strong>Bukti Pembayaran QRIS / Foto Verifikasi</strong> booking kepada petugas Sarpras.
             </p>
           </div>
         </div>
@@ -169,7 +189,7 @@ export default function Reservation() {
             </div>
 
             {/* Circular Impact Badge */}
-            <div className="bg-green-50 p-4 rounded-2xl border border-green-200/70 space-y-2 text-xs">
+            <div className="bg-green-50 p-4 rounded-2xl border border-green-200/70 space-y-2 text-xs shadow-sm">
               <div className="font-bold text-green-900 flex items-center gap-1.5">
                 <Recycle className="w-4 h-4 text-green-600" />
                 Dampak Sirkular Transaksi Ini:
@@ -203,7 +223,7 @@ export default function Reservation() {
                     MENUNGGU ACC PEMBAYARAN DARI ADMIN KAMPUS ⏳
                   </div>
                   <p className="text-[11px] text-amber-800 leading-relaxed">
-                    Bukti scan QRIS Anda sebesar <strong>Rp{totalCost.toLocaleString('id-ID')}</strong> telah masuk ke antrean verifikasi Bank Admin EventLoop. Status ini akan otomatis berubah menjadi <strong>BERHASIL</strong> begitu Admin mengklik ACC di Admin Panel.
+                    Bukti bayar Anda sebesar <strong>Rp{totalCost.toLocaleString('id-ID')}</strong> telah masuk ke antrean verifikasi Sarpras. Status akan otomatis berubah menjadi <strong>BERHASIL</strong> begitu Admin mengklik ACC.
                   </p>
                   <div className="text-[10px] bg-white p-2.5 rounded-xl border border-amber-200 text-left font-mono space-y-0.5">
                     <div>Status: <strong className="text-amber-700">Pending Admin Verification</strong></div>
@@ -214,7 +234,7 @@ export default function Reservation() {
                       to="/admin"
                       className="text-xs font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 px-4 py-2 rounded-xl inline-flex items-center gap-1.5 transition-colors"
                     >
-                      <span>👉 Buka Admin Panel untuk ACC (Simulasi Pengujian)</span>
+                      <span>👉 Buka Admin Panel untuk ACC (Simulasi)</span>
                     </Link>
                   </div>
                 </div>
@@ -224,10 +244,10 @@ export default function Reservation() {
                     <CheckCircle2 className="w-7 h-7" />
                   </div>
                   <div className="font-extrabold text-emerald-950 text-sm">
-                    PEMBAYARAN QRIS TELAH DI-ACC & LUNAS! ✓ 💳
+                    PEMBAYARAN TELAH DI-ACC & LUNAS! ✓ 💳
                   </div>
                   <p className="text-[11px] text-emerald-800 leading-relaxed">
-                    Admin Keuangan Kampus telah mengkonfirmasi penerimaan dana sebesar <strong>Rp{totalCost.toLocaleString('id-ID')}</strong>. Booking Anda telah disetujui dan perlengkapan siap diambil di warehouse!
+                    Admin Sarpras telah memverifikasi dana sebesar <strong>Rp{totalCost.toLocaleString('id-ID')}</strong>. Booking disetujui, silakan tunjukkan halaman ini saat mengambil barang di warehouse!
                   </p>
                   <div className="text-[10px] bg-white p-2.5 rounded-xl border border-emerald-200 text-left font-mono space-y-0.5">
                     <div>No. Trx: <strong>#TXN-QRIS-2026-092</strong></div>
@@ -239,8 +259,8 @@ export default function Reservation() {
                       to="/return"
                       className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-green-800 bg-white px-4 py-2.5 rounded-xl border border-green-300 hover:bg-green-50 transition-colors"
                     >
-                      <QrCode className="w-3.5 h-3.5" />
-                      <span>Form Pengembalian (Untuk Barang Sewa)</span>
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Ke Form Pengembalian Nanti</span>
                     </Link>
                   </div>
                 </div>
