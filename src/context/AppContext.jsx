@@ -91,6 +91,7 @@ export function AppProvider({ children }) {
     }
   }
 
+  // Ambil data murni dari database Supabase tanpa mock data
   async function fetchTransactions() {
     const { data, error } = await supabase
       .from('transactions')
@@ -99,6 +100,8 @@ export function AppProvider({ children }) {
 
     if (!error && data) {
       setTransactions(data)
+    } else {
+      setTransactions([])
     }
   }
 
@@ -185,6 +188,7 @@ export function AppProvider({ children }) {
           }
         }
       }
+      await fetchTransactions()
     })
 
     return () => subscription.unsubscribe()
@@ -283,7 +287,7 @@ export function AppProvider({ children }) {
     const txnId = `TXN-QRIS-${Math.floor(1000 + Math.random() * 9000)}`
     const totalAmount = reservationDetails.totalAmount || 0
     
-    // Hitung Net Payout setelah dipotong fee admin 5%
+    // Potongan fee admin kampus sebesar 5%
     const adminFee = totalAmount * 0.05
     const netPayout = totalAmount - adminFee
 
@@ -311,11 +315,11 @@ export function AppProvider({ children }) {
       owner_bank: ownerAccount,
       qrisStatus: 'Pending Admin Verification'
     }
-    
-    // Simpan permanen ke Supabase transactions
+
+    // Insert langsung ke tabel transactions Supabase
     const { error: txnError } = await supabase.from('transactions').insert([newTxn])
     if (txnError) {
-      console.error('Gagal menyimpan transaksi ke database:', txnError.message)
+      console.error('Gagal insert transaksi ke database:', txnError.message)
     }
 
     await fetchTransactions()
