@@ -16,7 +16,7 @@ import {
 
 export default function CreateEvent() {
   const navigate = useNavigate()
-  const { addToCart, equipments } = useApp()
+  const { addToCart, equipments, setActiveReservation } = useApp()
   
   const [eventName, setEventName] = useState('INNOFAIR 2026')
   const [eventDate, setEventDate] = useState('2026-09-18')
@@ -33,23 +33,23 @@ export default function CreateEvent() {
 
     if (type === 'Music / Panggung Hiburan') {
       return [
-        { name: 'Modular Stage Platform (4x3m)', qty: 1, price: 100000, score: 94, note: 'Platform panggung utama musisi & MC' },
-        { name: 'Sound System Portable 200W (Mic + Speaker)', qty: 1, price: 75000, score: 75, note: 'Audio panggung & wireless mic' },
-        { name: 'LED Lighting Kit (Stage Lights)', qty: 2, price: 35000, score: 78, note: 'Pencahayaan panggung malam' },
-        { name: 'Extension Cable Set (10m+5m)', qty: 3, price: 10000, score: 90, note: 'Distribusi daya audio & lighting' },
-        { name: 'Backdrop Frame System (3x2.5m)', qty: 1, price: 45000, score: 90, note: 'Backdrop panggung belakang' },
+        { name: 'Modular Stage Platform', qty: 1, price: 100000, score: 94, note: 'Platform panggung utama musisi & MC' },
+        { name: 'Sound System Portable', qty: 1, price: 75000, score: 75, note: 'Audio panggung & wireless mic' },
+        { name: 'LED Lighting Kit', qty: 2, price: 35000, score: 78, note: 'Pencahayaan panggung malam' },
+        { name: 'Extension Cable Set', qty: 3, price: 10000, score: 90, note: 'Distribusi daya audio & lighting' },
+        { name: 'Backdrop Frame System', qty: 1, price: 45000, score: 90, note: 'Backdrop panggung belakang' },
       ]
     } else if (type === 'Seminar / Workshop') {
       return [
         { name: 'Standing Banner Frame', qty: 2, price: 15000, score: 95, note: 'Petunjuk arah & welcoming banner' },
-        { name: 'Registration Desk Professional', qty: 1, price: 25000, score: 86, note: 'Meja registrasi & absensi peserta' },
+        { name: 'Registration Desk', qty: 1, price: 25000, score: 86, note: 'Meja registrasi & absensi peserta' },
         { name: 'Sound System Portable', qty: 1, price: 75000, score: 75, note: 'Speaker & mic narasumber' },
         { name: 'Extension Cable Set', qty: 2, price: 10000, score: 90, note: 'Colokan laptop narasumber & panitia' },
-        { name: 'Reusable Cup Set (50pcs)', qty: cupSets, price: 30000, score: 85, note: `Coffee break zero waste (${cupSets * 50} gelas)` },
+        { name: 'Reusable Cup Set', qty: cupSets, price: 30000, score: 85, note: `Coffee break zero waste (${cupSets * 50} gelas)` },
       ]
     } else if (type === 'Lomba / Kompetisi') {
       return [
-        { name: 'Folding Table Set (Meja Juri & Peserta)', qty: 4, price: 20000, score: 88, note: 'Meja juri & briefing' },
+        { name: 'Folding Table Set', qty: 4, price: 20000, score: 88, note: 'Meja juri & briefing' },
         { name: 'Standing Banner Frame', qty: 2, price: 15000, score: 95, note: 'Bracket bagan lomba & jadwal' },
         { name: 'Sound System Portable', qty: 1, price: 75000, score: 75, note: 'Pengumuman pemenang & MC' },
         { name: 'Backdrop Frame System', qty: 1, price: 45000, score: 90, note: 'Podium penyerahan piala' },
@@ -59,7 +59,7 @@ export default function CreateEvent() {
         { name: 'Backdrop Frame System', qty: 1, price: 45000, score: 90, note: 'Latar sidang & foto bersama' },
         { name: 'Folding Table Set', qty: 6, price: 20000, score: 88, note: 'Meja bundar/U-shape rapat pleno' },
         { name: 'Registration Desk', qty: 1, price: 25000, score: 86, note: 'Meja presensi sidang' },
-        { name: 'Reusable Cup Set (50pcs)', qty: cupSets, price: 30000, score: 85, note: 'Minum rapat ramah lingkungan' },
+        { name: 'Reusable Cup Set', qty: cupSets, price: 30000, score: 85, note: 'Minum rapat ramah lingkungan' },
       ]
     } else {
       return [
@@ -67,7 +67,7 @@ export default function CreateEvent() {
         { name: 'Standing Banner Frame', qty: 3, price: 15000, score: 95, note: 'Signage denah booth & rundown' },
         { name: 'Folding Table Set', qty: 4, price: 20000, score: 88, note: 'Meja kasir & display produk' },
         { name: 'Extension Cable Set', qty: 3, price: 10000, score: 90, note: 'Daya listrik tiap stan bazaar' },
-        { name: 'Reusable Cup Set (50pcs)', qty: cupSets, price: 30000, score: 85, note: `Minum bazaar zero plastic (${cupSets * 50} gelas)` },
+        { name: 'Reusable Cup Set', qty: cupSets, price: 30000, score: 85, note: `Minum bazaar zero plastic (${cupSets * 50} gelas)` },
       ]
     }
   }
@@ -84,17 +84,41 @@ export default function CreateEvent() {
   }
 
   const handleSaveAndProceed = () => {
+    // 1. Simpan detail event ke state global agar halaman Reservation membaca tanggal yang benar
+    setActiveReservation({
+      eventName,
+      eventDate,
+      location,
+      participants,
+      eventType,
+      items: []
+    })
+
+    // 2. Masukkan item rekomendasi yang cocok dengan database equipments ke cart
     recommendedList.forEach(rec => {
-      const actualItem = equipments.find(eq => eq.name.includes(rec.name.split(' ')[0]))
+      // Cari item di database Supabase yang namanya mirip dengan rekomendasi
+      const actualItem = equipments.find(eq => eq.name.toLowerCase().includes(rec.name.toLowerCase()))
       if (actualItem) {
         addToCart(actualItem, rec.qty)
+      } else {
+        // Fallback jika item spesifik belum ada di DB, buatkan item darurat agar tetap masuk keranjang
+        const fallbackItem = {
+          id: `rec-${Math.random()}`,
+          name: rec.name,
+          price: rec.price,
+          available: 50,
+          circularScore: rec.score,
+          listingType: 'rental'
+        }
+        addToCart(fallbackItem, rec.qty)
       }
     })
+
     navigate('/reservation')
   }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
+    <div className="space-y-8 max-w-4xl mx-auto animate-fade-in-up">
       <div>
         <div className="inline-flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full mb-1">
           <Calendar className="w-3.5 h-3.5" /> Wizard Event Kampus
