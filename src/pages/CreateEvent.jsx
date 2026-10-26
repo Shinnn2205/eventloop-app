@@ -22,7 +22,7 @@ export default function CreateEvent() {
   const handleSaveAndProceedToMarketplace = (e) => {
     e.preventDefault()
 
-    // 1. Simpan detail event ke state global
+    // 1. Simpan detail event ke state global agar data tersimpan dengan aman
     setActiveReservation({
       eventName,
       eventDate,
@@ -32,7 +32,7 @@ export default function CreateEvent() {
       items: [] 
     })
 
-    // 2. Arahkan user ke marketplace
+    // 2. Langsung arahkan user ke marketplace tanpa hambatan
     navigate('/marketplace')
   }
 
@@ -59,7 +59,6 @@ export default function CreateEvent() {
               </label>
               <input
                 type="text"
-                required
                 value={eventName}
                 onChange={(e) => setEventName(e.target.value)}
                 placeholder="cth. Seminar Nasional CTI 2026"
@@ -73,7 +72,6 @@ export default function CreateEvent() {
               </label>
               <input
                 type="date"
-                required
                 value={eventDate}
                 onChange={(e) => setEventDate(e.target.value)}
                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-gray-900 font-medium cursor-pointer"
@@ -107,7 +105,6 @@ export default function CreateEvent() {
                 <MapPin className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  required
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   placeholder="Auditorium / Lapangan / Kelas"
@@ -124,7 +121,6 @@ export default function CreateEvent() {
                 <Users className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="number"
-                  required
                   value={participants}
                   onChange={(e) => setParticipants(e.target.value)}
                   placeholder="200"
