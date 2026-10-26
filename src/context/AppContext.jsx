@@ -17,7 +17,7 @@ export function AppProvider({ children }) {
   const [equipments, setEquipments] = useState([])
   const [pendingApprovals, setPendingApprovals] = useState([])
   
-  // Transaksi disinkronkan dengan sessionStorage agar admin langsung melihat data masuk
+  // Ambil transaksi dari Supabase dan simpan cadangan di sessionStorage agar admin selalu bisa melihatnya
   const [transactions, setTransactions] = useState(() => {
     const saved = sessionStorage.getItem('eventloop_transactions')
     return saved ? JSON.parse(saved) : []
@@ -68,6 +68,18 @@ export function AppProvider({ children }) {
 
     if (!error && data) {
       setReservations(data)
+    }
+  }
+
+  async function fetchTransactions() {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (!error && data && data.length > 0) {
+      setTransactions(data)
+      sessionStorage.setItem('eventloop_transactions', JSON.stringify(data))
     }
   }
 
@@ -134,17 +146,6 @@ export function AppProvider({ children }) {
 
     if (!error && data) {
       setPendingApprovals(data)
-    }
-  }
-
-  async function fetchTransactions() {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (!error && data && data.length > 0) {
-      setTransactions(data)
     }
   }
 
@@ -243,18 +244,6 @@ export function AppProvider({ children }) {
     const adminFee = totalAmount * 0.05
     const netPayout = totalAmount - adminFee
 
-    for (const reservedItem of cartItems) {
-      const targetItem = equipments.find(e => e.id === reservedItem.id)
-      if (targetItem) {
-        const newAvailable = Math.max(0, targetItem.available - reservedItem.qty)
-        await supabase
-          .from('equipments')
-          .update({ available: newAvailable })
-          .eq('id', reservedItem.id)
-      }
-    }
-    await fetchEquipments()
-
     const itemNames = cartItems.map(i => `${i.qty || 1}x ${i.name}`).join(', ') || 'Reservasi Perlengkapan Event'
     const ownerOrgName = cartItems[0]?.owner || currentUserName
     const ownerAccount = cartItems[0]?.ownerBank || 'BCA 8012345678 a.n Owner Organisasi'
@@ -273,11 +262,10 @@ export function AppProvider({ children }) {
       paidAt: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     }
 
-    // Simpan ke Supabase & state lokal agar langsung tampil
+    // Simpan transaksi ke database Supabase dan state
     await supabase.from('transactions').insert([newTxn])
     setTransactions(prev => [newTxn, ...prev])
 
-    // Simpan data reservasi aktif agar tidak hilang saat di-refresh
     const reservationPayload = {
       eventName: reservationDetails.buyerOrg || activeEvent.name,
       eventDate: activeEvent.date,
@@ -372,16 +360,6 @@ export function AppProvider({ children }) {
     setPendingReturns(prev => prev.filter(r => r.id !== returnId))
     setReturnStatus('approved_success')
     
-    const targetItem = equipments.find(e => e.id === equipmentId)
-    if (targetItem) {
-      const restoredAvailable = targetItem.available + returnedQty
-      await supabase
-        .from('equipments')
-        .update({ available: restoredAvailable })
-        .eq('id', equipmentId)
-      await fetchEquipments()
-    }
-
     if (userSession?.user?.id) {
       await supabase.from('reservations').delete().eq('user_id', userSession.user.id)
       await fetchUserReservations(userSession.user.id)

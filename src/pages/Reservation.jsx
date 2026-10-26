@@ -8,8 +8,7 @@ import {
   CheckCircle2, 
   QrCode, 
   Recycle, 
-  Clock,
-  RotateCcw
+  Clock
 } from 'lucide-react'
 
 export default function Reservation() {
@@ -25,7 +24,6 @@ export default function Reservation() {
   
   const [showQrisModal, setShowQrisModal] = useState(false)
 
-  // Ambil item dari cart atau dari activeReservation yang sedang menunggu ACC
   const displayItems = (cartItems && cartItems.length > 0) 
     ? cartItems 
     : (activeReservation?.items || [])
@@ -73,10 +71,11 @@ export default function Reservation() {
               <span className="text-xs text-gray-500 font-semibold">{displayItems.length} jenis item</span>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Diberi pembatas tinggi max-h-[420px] dan overflow-y-auto agar bisa di-scroll */}
+            <div className="max-h-[420px] overflow-y-auto">
               <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50/80 text-gray-500 uppercase tracking-wider text-[10px]">
+                <thead className="sticky top-0 bg-gray-50 z-10 shadow-sm">
+                  <tr className="border-b border-gray-200 text-gray-500 uppercase tracking-wider text-[10px]">
                     <th className="p-4">Equipment</th>
                     <th className="p-4 text-center">Score</th>
                     <th className="p-4 text-center">Qty</th>
@@ -85,7 +84,7 @@ export default function Reservation() {
                     <th className="p-4 text-center">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 bg-white">
                   {displayItems.map((item, idx) => {
                     const itemQty = item.qty || 1
                     const itemPrice = item.listingType === 'sale' ? (item.salePrice || item.price) : (item.price || 50000)
