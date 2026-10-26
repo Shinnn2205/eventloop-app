@@ -69,15 +69,14 @@ export default function CreateEvent() {
 
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Tanggal Pelaksanaan (YYYY-MM-DD)
+                Tanggal Pelaksanaan
               </label>
               <input
-                type="text"
+                type="date"
                 required
                 value={eventDate}
                 onChange={(e) => setEventDate(e.target.value)}
-                placeholder="2026-09-18"
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-gray-900 font-medium"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-gray-900 font-medium cursor-pointer"
               />
             </div>
           </div>
