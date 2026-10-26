@@ -12,7 +12,7 @@ import {
 export default function CreateEvent() {
   const navigate = useNavigate()
   const app = useApp() || {}
-  const setActiveReservation = app.setActiveReservation || (() => {})
+  const createNewEvent = app.createNewEvent || (() => {})
   
   const [eventName, setEventName] = useState('INNOFAIR 2026')
   const [eventDate, setEventDate] = useState('2026-09-18')
@@ -21,31 +21,27 @@ export default function CreateEvent() {
   const [eventType, setEventType] = useState('Expo / Bazaar')
 
   const handleSaveAndProceedToMarketplace = (e) => {
-    // Mencegah konflik event bawaan
     if (e) e.stopPropagation()
     
-    console.log("Tombol Simpan Event diklik, mengarahkan ke marketplace...")
-
     try {
-      // Simpan data event jika fungsinya ada
-      setActiveReservation({
-        eventName,
-        eventDate,
-        location,
-        participants,
-        eventType,
-        items: [] 
+      // Panggil fungsi createNewEvent agar tersimpan secara global di AppContext & sessionStorage
+      createNewEvent({
+        name: eventName,
+        date: eventDate,
+        location: location,
+        participants: participants,
+        type: eventType
       })
     } catch (err) {
-      console.error("Gagal menyimpan state reservation:", err)
+      console.error("Gagal menyimpan event:", err)
     }
 
-    // Paksa navigasi ke marketplace
+    // Navigasi ke marketplace
     navigate('/marketplace')
   }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto animate-fade-in-up relative z-10">
+    <div className="space-y-8 max-w-4xl mx-auto animate-fade-in-up relative z-10 pb-12">
       <div>
         <div className="inline-flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full mb-1">
           <Calendar className="w-3.5 h-3.5" /> Wizard Event Kampus
