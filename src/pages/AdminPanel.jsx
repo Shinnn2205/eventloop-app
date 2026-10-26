@@ -62,7 +62,7 @@ export default function AdminPanel() {
     .reduce((sum, t) => sum + (t.payoutAmount || 0), 0)
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
+    <div className="space-y-8 max-w-7xl mx-auto animate-fade-in-up">
       {/* Admin Header */}
       <div className="bg-gradient-to-r from-slate-900 via-gray-900 to-emerald-950 text-white p-6 sm:p-8 rounded-3xl relative overflow-hidden shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
