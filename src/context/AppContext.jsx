@@ -16,7 +16,7 @@ export function AppProvider({ children }) {
 
   const [equipments, setEquipments] = useState([])
   const [pendingApprovals, setPendingApprovals] = useState([])
-  const [transactions, setTransactions] = useState([]) // Mulai dengan array kosong agar murni dari database
+  const [transactions, setTransactions] = useState([])
   
   const [userPaymentStatus, setUserPaymentStatus] = useState('idle')
   const [activeReservation, setActiveReservation] = useState(null)
@@ -216,7 +216,7 @@ export function AppProvider({ children }) {
     await fetchPendingApprovals()
   }
 
-  // Kirim data transaksi lengkap ke Supabase agar langsung tampil di panel Admin
+  // Kirim data transaksi aman ke Supabase tanpa kolom ekstra yang memicu error schema cache
   const submitUserQrisPayment = async (reservationDetails) => {
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
@@ -233,7 +233,7 @@ export function AppProvider({ children }) {
     }
     await fetchEquipments()
 
-    // 2. Format data transaksi untuk tabel 'transactions' di Supabase
+    // 2. Format data transaksi standar yang cocok dengan tabel 'transactions'
     const newTxn = {
       id: txnId,
       buyerOrg: reservationDetails.buyerOrg || currentUserName,
@@ -244,9 +244,7 @@ export function AppProvider({ children }) {
       bankAdminRef: `BCA-QRIS-${Math.floor(1000000 + Math.random() * 9000000)}`,
       ownerOrg: 'Organisasi Pemilik & Sarpras',
       ownerBank: 'BCA 8012345678 a.n Owner',
-      payoutStatus: 'Waiting Admin Approval',
-      payoutAmount: Math.round(reservationDetails.totalAmount * 0.95),
-      adminFee: Math.round(reservationDetails.totalAmount * 0.05),
+      payoutStatus: 'Waiting Admin Approval'
     }
 
     // Insert ke tabel transactions Supabase
