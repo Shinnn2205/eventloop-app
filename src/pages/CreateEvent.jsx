@@ -81,46 +81,43 @@ export default function CreateEvent() {
   }
 
   const handleSaveAndProceed = () => {
-    // 1. Simpan detail event & rincian items ke state global agar halaman Reservation langsung membaca tanggal dan barangnya
-    setActiveReservation({
-      eventName,
-      eventDate,
-      location,
-      participants,
-      eventType,
-      items: recommendedList.map((rec, index) => ({
-        id: `rec-item-${index}`,
-        name: rec.name,
-        price: rec.price,
-        qty: rec.qty,
-        circularScore: rec.score,
-        listingType: 'rental'
-      }))
-    })
+    try {
+      // 1. Format items agar kompatibel dengan halaman Reservation
+      const formattedItems = recommendedList.map((rec, index) => {
+        // Cek apakah item ada di database equipments utama
+        const match = equipments.find(eq => eq.name.toLowerCase().includes(rec.name.toLowerCase()))
+        return {
+          id: match ? match.id : `fallback-${index}-${Date.now()}`,
+          name: rec.name,
+          price: rec.price,
+          qty: rec.qty,
+          circularScore: rec.score,
+          listingType: 'rental',
+          available: match ? match.available : 100
+        }
+      })
 
-    // 2. Masukkan item ke cart global satu per satu dengan aman
-    recommendedList.forEach((rec, index) => {
-      const actualItem = equipments.find(eq => eq.name.toLowerCase().includes(rec.name.toLowerCase()))
-      
-      const cartPayload = actualItem ? {
-        ...actualItem,
-        qty: rec.qty,
-        listingType: 'rental'
-      } : {
-        id: `rec-item-${index}`,
-        name: rec.name,
-        price: rec.price,
-        available: 50,
-        circularScore: rec.score,
-        listingType: 'rental',
-        qty: rec.qty
-      }
+      // 2. Set active reservation dengan data lengkap
+      setActiveReservation({
+        eventName,
+        eventDate,
+        location,
+        participants,
+        eventType,
+        items: formattedItems
+      })
 
-      addToCart(cartPayload, rec.qty)
-    })
+      // 3. Masukkan item satu per satu ke keranjang global via addToCart
+      formattedItems.forEach(item => {
+        addToCart(item, item.qty)
+      })
 
-    // 3. Pindah halaman ke reservasi
-    navigate('/reservation')
+      // 4. Navigasi langsung ke halaman reservation
+      navigate('/reservation')
+    } catch (err) {
+      console.error('Gagal melanjutkan ke reservasi:', err)
+      alert('Terjadi kesalahan saat memproses data event. Silakan coba lagi.')
+    }
   }
 
   return (
@@ -294,7 +291,7 @@ export default function CreateEvent() {
               <button
                 type="button"
                 onClick={handleSaveAndProceed}
-                className="btn-primary text-xs !py-3 !px-6 flex items-center gap-2 whitespace-nowrap"
+                className="btn-primary text-xs !py-3 !px-6 flex items-center gap-2 whitespace-nowrap cursor-pointer"
               >
                 <span>Lanjut ke Formulir Reservasi</span>
                 <ArrowRight className="w-4 h-4" />
