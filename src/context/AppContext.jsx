@@ -79,17 +79,27 @@ export function AppProvider({ children }) {
           setCurrentUserName(metadata.full_name)
         }
 
+        // Murni tarik dari tabel reservations Supabase
         const { data: resData } = await supabase
           .from('reservations')
           .select('*')
           .eq('user_id', session.user.id)
 
-        if (resData) setReservations(resData)
+        if (resData && resData.length > 0) {
+          setReservations(resData)
+          setActiveReservation({
+            eventName: resData[0].item_name || 'Event Kampus',
+            eventDate: resData[0].start_date,
+            items: resData,
+            txnId: resData[0].id
+          })
+          setUserPaymentStatus('pending_admin_approval')
+        }
       }
 
       await fetchEquipments()
       await fetchPendingApprovals()
-      await fetchTransactions() // Jalankan saat web dimuat
+      await fetchTransactions()
       setLoading(false)
     }
 
@@ -207,7 +217,7 @@ export function AppProvider({ children }) {
     await fetchPendingApprovals()
   }
 
-  // Modifikasi: Simpan transaksi ke Supabase
+  // Simpan transaksi & reservasi ke Supabase
   const submitUserQrisPayment = async (reservationDetails) => {
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
@@ -239,7 +249,6 @@ export function AppProvider({ children }) {
       adminFee: Math.round(reservationDetails.totalAmount * 0.05),
     }
 
-    // Insert ke Database
     await supabase.from('transactions').insert([newTxn])
     await fetchTransactions()
     
@@ -263,17 +272,17 @@ export function AppProvider({ children }) {
       if (data) setReservations(data)
     }
 
-    setActiveReservation({ 
+    const updatedReservation = { 
       ...reservationDetails, 
       items: cartItems, 
       txnId 
-    })
-    
+    }
+
+    setActiveReservation(updatedReservation)
     setCartItems([])
     setUserPaymentStatus('pending_admin_approval')
   }
 
-  // Modifikasi: Update status ACC di Supabase
   const approvePaymentByAdmin = async (txnId) => {
     const { error } = await supabase
       .from('transactions')
@@ -289,7 +298,6 @@ export function AppProvider({ children }) {
     }
   }
 
-  // Modifikasi: Update status transfer pencairan dana di Supabase
   const transferPayoutToOwner = async (txnId) => {
     const { error } = await supabase
       .from('transactions')
@@ -347,8 +355,6 @@ export function AppProvider({ children }) {
   }
 
   const approveReturnByAdmin = async (returnId, equipmentId, returnedQty) => {
-    const returnData = pendingReturns.find(r => r.id === returnId)
-    
     setPendingReturns(prev => prev.filter(r => r.id !== returnId))
     setReturnStatus('approved_success')
     
