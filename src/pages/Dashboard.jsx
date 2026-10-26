@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
-import { impactData } from '../data/mockData' // <-- Mengambil data langsung dari mockData lokal
+import { supabase } from '../lib/supabaseClient'
 import { 
   Recycle, 
   Calendar, 
@@ -23,10 +24,45 @@ export default function Dashboard() {
   const hasActiveRentals = activeReservation?.items?.length > 0
   const latestTxn = transactions && transactions.length > 0 ? transactions[0] : null
 
+  // State untuk fetch data Supabase
+  const [impactData, setImpactData] = useState({
+    itemsReused: 0,
+    wasteAvoided: 0,
+    eventsSupported: 0,
+    costAvoided: 0
+  })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchGlobalImpact = async () => {
+      try {
+        setLoading(true)
+        const { data, error } = await supabase
+          .from('global_impact')
+          .select('*')
+          .eq('id', 1)
+          .single()
+        
+        if (!error && data) {
+          setImpactData({
+            itemsReused: data.total_items_reused,
+            wasteAvoided: data.total_waste_avoided,
+            eventsSupported: data.total_events,
+            costAvoided: data.total_cost_avoided
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchGlobalImpact()
+  }, [])
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto animate-fade-in-up">
-      {/* Banner Utama */}
-      <div className="bg-gradient-to-r from-green-800 via-emerald-800 to-teal-900 rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden shadow-xl shadow-green-950/10">
+      <div className="bg-emerald-900 rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden shadow-xl shadow-green-950/10">
         <div className="absolute right-0 top-0 -mr-10 -mt-10 w-72 h-72 bg-white/10 rounded-full blur-3xl pointer-events-none" />
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -43,17 +79,11 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Link 
-              to="/create-event" 
-              className="bg-white text-green-800 font-bold px-5 py-3 rounded-xl hover:bg-green-50 transition-all text-sm flex items-center gap-2 shadow-sm"
-            >
+            <Link to="/create-event" className="bg-white text-green-800 font-bold px-5 py-3 rounded-xl hover:bg-green-50 transition-all text-sm flex items-center gap-2 shadow-sm">
               <PlusCircle className="w-4 h-4 text-green-600" />
               <span>Create Event Baru</span>
             </Link>
-            <Link 
-              to="/marketplace" 
-              className="bg-green-700/60 hover:bg-green-700 text-white font-semibold px-5 py-3 rounded-xl border border-green-400/30 transition-all text-sm flex items-center gap-2"
-            >
+            <Link to="/marketplace" className="bg-emerald-700/60 hover:bg-emerald-700 text-white font-semibold px-5 py-3 rounded-xl border border-emerald-400/30 transition-all text-sm flex items-center gap-2">
               <Package className="w-4 h-4" />
               <span>Sewa Equipment</span>
             </Link>
@@ -61,7 +91,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Statistik Impact - Menarik data dinamis dari mockData.js */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -79,7 +108,9 @@ export default function Dashboard() {
               <span>Items Reused</span>
               <Recycle className="w-4 h-4 text-green-600" />
             </div>
-            <div className="text-3xl font-black text-gray-900">{impactData.totalItemsReused.toLocaleString('id-ID')}</div>
+            <div className="text-3xl font-black text-gray-900">
+              {loading ? '...' : impactData.itemsReused.toLocaleString('id-ID')}
+            </div>
             <div className="text-xs text-green-700 font-medium mt-1 flex items-center gap-1">
               Peralatan digunakan berulang
             </div>
@@ -90,7 +121,9 @@ export default function Dashboard() {
               <span>Events Supported</span>
               <Tent className="w-4 h-4 text-blue-600" />
             </div>
-            <div className="text-3xl font-black text-gray-900">{impactData.totalEventsSupported}</div>
+            <div className="text-3xl font-black text-gray-900">
+              {loading ? '...' : impactData.eventsSupported}
+            </div>
             <div className="text-xs text-blue-700 font-medium mt-1 flex items-center gap-1">
               Seminar, Expo, Lomba & UKM
             </div>
@@ -101,7 +134,9 @@ export default function Dashboard() {
               <span>Material Waste Avoided</span>
               <Leaf className="w-4 h-4 text-teal-600" />
             </div>
-            <div className="text-3xl font-black text-gray-900">{impactData.wasteAvoided} kg</div>
+            <div className="text-3xl font-black text-gray-900">
+              {loading ? '...' : `${impactData.wasteAvoided} kg`}
+            </div>
             <div className="text-xs text-teal-700 font-medium mt-1">
               Limbah material dicegah
             </div>
@@ -112,7 +147,9 @@ export default function Dashboard() {
               <span>Cost Avoided</span>
               <DollarSign className="w-4 h-4 text-emerald-600" />
             </div>
-            <div className="text-3xl font-black text-gray-900">Rp{(impactData.costAvoided / 1000000).toFixed(1)}M</div>
+            <div className="text-3xl font-black text-gray-900">
+              {loading ? '...' : `Rp${(impactData.costAvoided / 1000000).toFixed(1)}M`}
+            </div>
             <div className="text-xs text-emerald-700 font-medium mt-1">
               💰 Hemat anggaran BEM & Kampus
             </div>
@@ -122,7 +159,6 @@ export default function Dashboard() {
 
       <div className="grid lg:grid-cols-3 gap-8">
         
-        {/* Kolom Peminjaman Berjalan */}
         <div className="lg:col-span-2 space-y-6">
           <div className="card p-6">
             <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-6">
@@ -196,7 +232,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Kolom Kanan (Aksi Cepat) */}
         <div className="space-y-6">
           <div className="card p-6">
             <h3 className="font-bold text-gray-900 text-base mb-4">Aksi Cepat</h3>

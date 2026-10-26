@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient' // Pastikan ini mengarah ke file client Supabase Anda
-import { Recycle, ArrowRight, Package, BarChart3, Shield, Zap, Sparkles, CheckCircle2, ChevronRight, Layers } from 'lucide-react'
+import { supabase } from '../lib/supabaseClient'
+import { Recycle, ArrowRight, Package, BarChart3, Shield, Zap, Sparkles, CheckCircle2 } from 'lucide-react'
 
 export default function LandingPage() {
-  // State untuk menyimpan data dari Supabase (diberi nilai default awal)
   const [impactData, setImpactData] = useState({
-    itemsReused: 1284,
-    wasteAvoided: 186.5,
-    eventsSupported: 42
+    itemsReused: 0,
+    wasteAvoided: 0,
+    eventsSupported: 0
   })
   const [loading, setLoading] = useState(true)
 
@@ -16,7 +15,6 @@ export default function LandingPage() {
     const fetchGlobalImpact = async () => {
       try {
         setLoading(true)
-        // Menarik data dari tabel 'global_impact' yang barusan dibuat
         const { data, error } = await supabase
           .from('global_impact')
           .select('*')
@@ -36,13 +34,11 @@ export default function LandingPage() {
         setLoading(false)
       }
     }
-
     fetchGlobalImpact()
   }, [])
 
   return (
     <div className="min-h-screen bg-white text-gray-900 selection:bg-green-100 selection:text-green-800">
-      {/* Navbar */}
       <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-xl border-b border-gray-100 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
@@ -75,7 +71,6 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
       <section className="pt-32 pb-20 px-6 relative overflow-hidden bg-gradient-to-b from-green-50/50 via-white to-white">
         <div className="absolute top-20 left-1/4 w-96 h-96 bg-green-200/40 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-emerald-200/30 rounded-full blur-3xl pointer-events-none" />
@@ -108,7 +103,6 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Impact Stats Highlight - TERKONEKSI SUPABASE */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-16 max-w-3xl mx-auto animate-fade-in-up">
             <div className="card p-6 border-green-100/80 bg-white/80 backdrop-blur">
               <div className="text-3xl mb-1">♻️</div>
@@ -138,7 +132,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Problem & Circular Paradigm */}
       <section id="masalah" className="py-20 px-6 bg-gray-50 border-y border-gray-100">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -150,7 +143,6 @@ export default function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Linear Old Way */}
             <div className="bg-red-50/60 border border-red-200 rounded-3xl p-8 relative">
               <div className="inline-flex items-center gap-2 bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-full mb-4">
                 Pola Lama (Linier)
@@ -167,7 +159,6 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Circular EventLoop Way */}
             <div className="bg-green-50/80 border-2 border-green-300 rounded-3xl p-8 relative shadow-lg shadow-green-600/5">
               <div className="inline-flex items-center gap-2 bg-green-200 text-green-900 text-xs font-bold px-3 py-1 rounded-full mb-4">
                 Pola Baru (EventLoop)
@@ -187,7 +178,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 3 Core Components */}
       <section className="py-20 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -239,7 +229,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Circular Score Feature Deep Dive */}
       <section id="circular-score" className="py-20 px-6 bg-gradient-to-br from-emerald-900 via-green-900 to-teal-950 text-white">
         <div className="max-w-6xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -274,7 +263,6 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Live Comparison Card */}
             <div className="space-y-4">
               <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-6">
                 <div className="flex items-start justify-between mb-4">
@@ -323,7 +311,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Flow Diagram */}
       <section id="flow" className="py-20 px-6 bg-gray-50 border-t border-gray-100">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -356,7 +343,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Business Model & Sustainability */}
       <section id="business-model" className="py-20 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -408,7 +394,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA Footer */}
       <section className="py-20 px-6 bg-gradient-to-br from-green-600 to-emerald-700 text-white text-center">
         <div className="max-w-3xl mx-auto">
           <h3 className="text-3xl sm:text-4xl font-extrabold mb-4">
@@ -428,7 +413,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Bottom Bar */}
       <footer className="bg-gray-950 text-gray-400 py-10 px-6 text-sm">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
