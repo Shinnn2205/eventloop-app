@@ -13,7 +13,7 @@ import {
 
 export default function CreateEvent() {
   const navigate = useNavigate()
-  const { addToCart, equipments, setActiveReservation } = useApp()
+  const { addToCart, setActiveReservation } = useApp()
   
   const [eventName, setEventName] = useState('INNOFAIR 2026')
   const [eventDate, setEventDate] = useState('2026-09-18')
@@ -30,41 +30,41 @@ export default function CreateEvent() {
 
     if (type === 'Music / Panggung Hiburan') {
       return [
-        { name: 'Modular Stage Platform', qty: 1, price: 100000, score: 94, note: 'Platform panggung utama musisi & MC' },
-        { name: 'Sound System Portable', qty: 1, price: 75000, score: 75, note: 'Audio panggung & wireless mic' },
-        { name: 'LED Lighting Kit', qty: 2, price: 35000, score: 78, note: 'Pencahayaan panggung malam' },
-        { name: 'Extension Cable Set', qty: 3, price: 10000, score: 90, note: 'Distribusi daya audio & lighting' },
-        { name: 'Backdrop Frame System', qty: 1, price: 45000, score: 90, note: 'Backdrop panggung belakang' },
+        { id: 'rec-1', name: 'Modular Stage Platform', qty: 1, price: 100000, score: 94, note: 'Platform panggung utama musisi & MC' },
+        { id: 'rec-2', name: 'Sound System Portable', qty: 1, price: 75000, score: 75, note: 'Audio panggung & wireless mic' },
+        { id: 'rec-3', name: 'LED Lighting Kit', qty: 2, price: 35000, score: 78, note: 'Pencahayaan panggung malam' },
+        { id: 'rec-4', name: 'Extension Cable Set', qty: 3, price: 10000, score: 90, note: 'Distribusi daya audio & lighting' },
+        { id: 'rec-5', name: 'Backdrop Frame System', qty: 1, price: 45000, score: 90, note: 'Backdrop panggung belakang' },
       ]
     } else if (type === 'Seminar / Workshop') {
       return [
-        { name: 'Standing Banner Frame', qty: 2, price: 15000, score: 95, note: 'Petunjuk arah & welcoming banner' },
-        { name: 'Registration Desk', qty: 1, price: 25000, score: 86, note: 'Meja registrasi & absensi peserta' },
-        { name: 'Sound System Portable', qty: 1, price: 75000, score: 75, note: 'Speaker & mic narasumber' },
-        { name: 'Extension Cable Set', qty: 2, price: 10000, score: 90, note: 'Colokan laptop narasumber & panitia' },
-        { name: 'Reusable Cup Set', qty: cupSets, price: 30000, score: 85, note: `Coffee break zero waste (${cupSets * 50} gelas)` },
+        { id: 'rec-6', name: 'Standing Banner Frame', qty: 2, price: 15000, score: 95, note: 'Petunjuk arah & welcoming banner' },
+        { id: 'rec-7', name: 'Registration Desk', qty: 1, price: 25000, score: 86, note: 'Meja registrasi & absensi peserta' },
+        { id: 'rec-2', name: 'Sound System Portable', qty: 1, price: 75000, score: 75, note: 'Speaker & mic narasumber' },
+        { id: 'rec-4', name: 'Extension Cable Set', qty: 2, price: 10000, score: 90, note: 'Colokan laptop narasumber & panitia' },
+        { id: 'rec-8', name: 'Reusable Cup Set', qty: cupSets, price: 30000, score: 85, note: `Coffee break zero waste (${cupSets * 50} gelas)` },
       ]
     } else if (type === 'Lomba / Kompetisi') {
       return [
-        { name: 'Folding Table Set', qty: 4, price: 20000, score: 88, note: 'Meja juri & briefing' },
-        { name: 'Standing Banner Frame', qty: 2, price: 15000, score: 95, note: 'Bracket bagan lomba & jadwal' },
-        { name: 'Sound System Portable', qty: 1, price: 75000, score: 75, note: 'Pengumuman pemenang & MC' },
-        { name: 'Backdrop Frame System', qty: 1, price: 45000, score: 90, note: 'Podium penyerahan piala' },
+        { id: 'rec-9', name: 'Folding Table Set', qty: 4, price: 20000, score: 88, note: 'Meja juri & briefing' },
+        { id: 'rec-6', name: 'Standing Banner Frame', qty: 2, price: 15000, score: 95, note: 'Bracket bagan lomba & jadwal' },
+        { id: 'rec-2', name: 'Sound System Portable', qty: 1, price: 75000, score: 75, note: 'Pengumuman pemenang & MC' },
+        { id: 'rec-5', name: 'Backdrop Frame System', qty: 1, price: 45000, score: 90, note: 'Podium penyerahan piala' },
       ]
     } else if (type === 'Rapat Kerja / Dies Natalis') {
       return [
-        { name: 'Backdrop Frame System', qty: 1, price: 45000, score: 90, note: 'Latar sidang & foto bersama' },
-        { name: 'Folding Table Set', qty: 6, price: 20000, score: 88, note: 'Meja bundar/U-shape rapat pleno' },
-        { name: 'Registration Desk', qty: 1, price: 25000, score: 86, note: 'Meja presensi sidang' },
-        { name: 'Reusable Cup Set', qty: cupSets, price: 30000, score: 85, note: 'Minum rapat ramah lingkungan' },
+        { id: 'rec-5', name: 'Backdrop Frame System', qty: 1, price: 45000, score: 90, note: 'Latar sidang & foto bersama' },
+        { id: 'rec-9', name: 'Folding Table Set', qty: 6, price: 20000, score: 88, note: 'Meja bundar/U-shape rapat pleno' },
+        { id: 'rec-7', name: 'Registration Desk', qty: 1, price: 25000, score: 86, note: 'Meja presensi sidang' },
+        { id: 'rec-8', name: 'Reusable Cup Set', qty: cupSets, price: 30000, score: 85, note: 'Minum rapat ramah lingkungan' },
       ]
     } else {
       return [
-        { name: 'Modular Exhibition Booth', qty: 3, price: 50000, score: 92, note: 'Booth tenant pameran & bazaar' },
-        { name: 'Standing Banner Frame', qty: 3, price: 15000, score: 95, note: 'Signage denah booth & rundown' },
-        { name: 'Folding Table Set', qty: 4, price: 20000, score: 88, note: 'Meja kasir & display produk' },
-        { name: 'Extension Cable Set', qty: 3, price: 10000, score: 90, note: 'Daya listrik tiap stan bazaar' },
-        { name: 'Reusable Cup Set', qty: cupSets, price: 30000, score: 85, note: `Minum bazaar zero plastic (${cupSets * 50} gelas)` },
+        { id: 'rec-10', name: 'Modular Exhibition Booth', qty: 3, price: 50000, score: 92, note: 'Booth tenant pameran & bazaar' },
+        { id: 'rec-6', name: 'Standing Banner Frame', qty: 3, price: 15000, score: 95, note: 'Signage denah booth & rundown' },
+        { id: 'rec-9', name: 'Folding Table Set', qty: 4, price: 20000, score: 88, note: 'Meja kasir & display produk' },
+        { id: 'rec-4', name: 'Extension Cable Set', qty: 3, price: 10000, score: 90, note: 'Daya listrik tiap stan bazaar' },
+        { id: 'rec-8', name: 'Reusable Cup Set', qty: cupSets, price: 30000, score: 85, note: `Minum bazaar zero plastic (${cupSets * 50} gelas)` },
       ]
     }
   }
@@ -81,43 +81,34 @@ export default function CreateEvent() {
   }
 
   const handleSaveAndProceed = () => {
-    try {
-      // 1. Format items agar kompatibel dengan halaman Reservation
-      const formattedItems = recommendedList.map((rec, index) => {
-        // Cek apakah item ada di database equipments utama
-        const match = equipments.find(eq => eq.name.toLowerCase().includes(rec.name.toLowerCase()))
-        return {
-          id: match ? match.id : `fallback-${index}-${Date.now()}`,
-          name: rec.name,
-          price: rec.price,
-          qty: rec.qty,
-          circularScore: rec.score,
-          listingType: 'rental',
-          available: match ? match.available : 100
-        }
-      })
+    // 1. Siapkan data items yang bersih
+    const itemsToSave = recommendedList.map((rec) => ({
+      id: rec.id,
+      name: rec.name,
+      price: rec.price,
+      qty: rec.qty,
+      circularScore: rec.score,
+      listingType: 'rental',
+      available: 50
+    }))
 
-      // 2. Set active reservation dengan data lengkap
-      setActiveReservation({
-        eventName,
-        eventDate,
-        location,
-        participants,
-        eventType,
-        items: formattedItems
-      })
+    // 2. Set active reservation dengan tanggal & detail event pilihan user
+    setActiveReservation({
+      eventName,
+      eventDate,
+      location,
+      participants,
+      eventType,
+      items: itemsToSave
+    })
 
-      // 3. Masukkan item satu per satu ke keranjang global via addToCart
-      formattedItems.forEach(item => {
-        addToCart(item, item.qty)
-      })
+    // 3. Masukkan ke cart global satu per satu
+    itemsToSave.forEach(item => {
+      addToCart(item, item.qty)
+    })
 
-      // 4. Navigasi langsung ke halaman reservation
-      navigate('/reservation')
-    } catch (err) {
-      console.error('Gagal melanjutkan ke reservasi:', err)
-      alert('Terjadi kesalahan saat memproses data event. Silakan coba lagi.')
-    }
+    // 4. Langsung navigasi ke halaman reservasi tanpa error
+    navigate('/reservation')
   }
 
   return (
