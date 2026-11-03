@@ -4,19 +4,20 @@ import {
   ArrowLeft, 
   MapPin, 
   Star, 
-  RefreshCw, 
   Building,
   Image as ImageIcon,
   History,
-  ShieldCheck
+  ShieldCheck,
+  Lock
 } from 'lucide-react'
 
 export default function EquipmentDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { equipments, cartItems, addToCart, removeFromCart } = useApp()
+  const { equipments, cartItems, addToCart, removeFromCart, userPaymentStatus, currentUserRole } = useApp()
 
   const item = equipments.find(eq => eq.id.toString() === id)
+  const isLockedByActivePayment = currentUserRole === 'user' && userPaymentStatus !== 'idle'
   
   if (!item) {
     return (
@@ -31,6 +32,7 @@ export default function EquipmentDetail() {
   const isReserved = cartItems.some(cartItem => cartItem.id === item.id)
 
   const toggleReserve = () => {
+    if (isLockedByActivePayment) return
     if (isReserved) {
       removeFromCart(item.id)
     } else {
@@ -43,7 +45,7 @@ export default function EquipmentDetail() {
       {/* Header Breadcrumb */}
       <button 
         onClick={() => navigate('/marketplace')}
-        className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-gray-900 transition-colors"
+        className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
       >
         <ArrowLeft className="w-4 h-4" />
         Kembali ke Katalog
@@ -67,27 +69,31 @@ export default function EquipmentDetail() {
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
             <h4 className="font-extrabold text-gray-900 text-sm flex items-center gap-2 border-b border-gray-100 pb-3">
               <MapPin className="w-4 h-4 text-blue-600" />
-              Lokasi Gudang & Posisi Rak Terakhir
+              Lokasi Pengambilan & Pengembalian Asal
             </h4>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <span className="text-[10px] text-gray-400 font-bold uppercase block">Lokasi Rak Terkini</span>
-                <span className="text-xs font-bold text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-200 block truncate" title={item.lastLocation}>
-                  {item.lastLocation || 'Warehouse Kampus (Default)'}
+                <span className="text-[10px] text-gray-400 font-bold uppercase block">Lokasi Penyimpanan</span>
+                <span className="text-xs font-bold text-blue-800 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-200 block truncate" title={item.lastLocation}>
+                  {item.lastLocation || 'Warehouse Kampus Gedung C'}
                 </span>
               </div>
               <div className="space-y-1">
                 <span className="text-[10px] text-gray-400 font-bold uppercase block">Kondisi Fisik Saat Ini</span>
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200 block">
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 block">
                   {item.condition || 'Good / Siap Pakai'}
                 </span>
               </div>
             </div>
 
+            <p className="text-[11px] text-gray-500 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+              📌 <strong>Aturan Sirkular:</strong> Barang ini wajib diambil dan dikembalikan tepat di lokasi <strong>{item.lastLocation || 'Warehouse Kampus Gedung C'}</strong> setelah kegiatan selesai.
+            </p>
+
             {/* FOTO RAK PENYIMPANAN TERAKHIR (DARI UPLOAD ATAU RETURN) */}
-            <div className="pt-2">
-              <span className="text-[10px] text-gray-400 font-bold uppercase block mb-2">Foto Bukti Rak Terakhir Tersimpan</span>
+            <div className="pt-1">
+              <span className="text-[10px] text-gray-400 font-bold uppercase block mb-2">Foto Bukti Lokasi Terakhir Tersimpan</span>
               {item.lastStoragePhoto ? (
                 <div className="h-36 rounded-xl overflow-hidden border border-gray-200 shadow-sm relative group">
                   <img src={item.lastStoragePhoto} alt="Rak Terakhir" className="w-full h-full object-cover" />
@@ -101,7 +107,7 @@ export default function EquipmentDetail() {
               ) : (
                 <div className="h-28 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 bg-gray-50/50">
                   <ImageIcon className="w-6 h-6 mb-2 opacity-50" />
-                  <span className="text-[10px] font-semibold">Foto rak belum tersedia di sistem</span>
+                  <span className="text-[10px] font-semibold">Foto lokasi rak belum tersedia di sistem</span>
                 </div>
               )}
             </div>
@@ -131,7 +137,7 @@ export default function EquipmentDetail() {
                 Rp{(item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price).toLocaleString('id-ID')}
               </span>
               <span className="text-sm text-gray-500 font-semibold">
-                {item.listingType === 'sale' ? 'Sekali Bayar' : '/ Unit / Hari'}
+                {item.listingType === 'sale' ? 'Sekali Bayar / Unit' : '/ Unit / Hari'}
               </span>
             </div>
           </div>
@@ -225,26 +231,45 @@ export default function EquipmentDetail() {
             </div>
           </div>
 
-          <div className="pt-4 border-t border-gray-100">
-            <button
-              disabled={item.available <= 0 && !isReserved}
-              onClick={toggleReserve}
-              className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md ${
-                isReserved
-                  ? 'bg-gray-900 text-white hover:bg-gray-800'
-                  : item.available <= 0 
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'btn-primary'
-              }`}
-            >
-              {isReserved ? 'Hapus dari Reservasi' : item.available <= 0 ? 'Stok Habis Saat Ini' : 'Tambahkan ke Reservasi Saya'}
-            </button>
-            {isReserved && (
-              <Link to="/reservation" className="block text-center mt-3 text-xs font-bold text-green-700 hover:underline">
-                Buka Halaman Pembayaran & Reservasi →
-              </Link>
-            )}
-          </div>
+          {currentUserRole === 'user' && (
+            <div className="pt-4 border-t border-gray-100">
+              {isLockedByActivePayment ? (
+                <div className="space-y-2">
+                  <button
+                    disabled
+                    className="w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span>Reservasi Terkunci (1 Akun = 1 Event Aktif)</span>
+                  </button>
+                  <Link to="/reservation" className="block text-center text-xs font-bold text-amber-700 hover:underline">
+                    Lihat Tiket Reservasi Event Aktif Saya →
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <button
+                    disabled={item.available <= 0 && !isReserved}
+                    onClick={toggleReserve}
+                    className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer ${
+                      isReserved
+                        ? 'bg-gray-900 text-white hover:bg-gray-800'
+                        : item.available <= 0 
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'btn-primary'
+                    }`}
+                  >
+                    {isReserved ? '✓ Sudah di Keranjang (Klik untuk Hapus)' : item.available <= 0 ? 'Stok Habis Saat Ini' : '+ Tambahkan ke Reservasi Saya'}
+                  </button>
+                  {isReserved && (
+                    <Link to="/reservation" className="block text-center mt-3 text-xs font-bold text-green-700 hover:underline">
+                      Lanjut ke Halaman Pembayaran & Reservasi →
+                    </Link>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
