@@ -17,7 +17,6 @@ import {
   X
 } from 'lucide-react'
 
-// Fungsi Kompresi Bukti Foto Transfer Admin
 const compressImage = (file, callback) => {
   const reader = new FileReader()
   reader.onload = (e) => {
@@ -101,30 +100,30 @@ export default function AdminPanel() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      {/* Renewable Sustainability Admin Header */}
-      <div className="bg-gradient-to-r from-emerald-800 via-green-800 to-teal-800 text-white p-6 sm:p-8 rounded-3xl relative overflow-hidden shadow-md shadow-emerald-950/10">
+      {/* Soft, Low-Contrast Renewable Sustainability Admin Header */}
+      <div className="bg-gradient-to-br from-emerald-50/95 via-green-50/75 to-teal-50/80 border border-emerald-200/70 p-6 sm:p-8 rounded-3xl relative overflow-hidden shadow-xs">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <span className="inline-flex items-center gap-1.5 bg-white/15 text-emerald-100 text-xs font-semibold px-3 py-1 rounded-full mb-3 border border-white/15">
-              <ShieldCheck className="w-3.5 h-3.5" />
+            <span className="inline-flex items-center gap-1.5 bg-white/85 text-emerald-700 text-xs font-semibold px-3 py-1 rounded-full mb-3 border border-emerald-200/60">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
               Portal Pengelola EventLoop
             </span>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               Admin & Escrow Hub 🌿
             </h2>
-            <p className="text-emerald-100/90 text-xs sm:text-sm mt-1.5 max-w-2xl leading-relaxed">
+            <p className="text-slate-600 text-xs sm:text-sm mt-1.5 max-w-2xl leading-relaxed">
               Kelola verifikasi bukti pembayaran QRIS mahasiswa, persetujuan perlengkapan baru, pengembalian sesuai lokasi asal, serta pengiriman bukti payout ke pemilik barang.
             </p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/20 text-left min-w-[230px]">
-            <span className="text-[11px] text-emerald-100 font-medium block">
+          <div className="bg-white/90 backdrop-blur-xs p-5 rounded-2xl border border-emerald-200/70 text-left min-w-[230px] shadow-2xs">
+            <span className="text-[11px] text-slate-500 font-medium block">
               Dana Escrow Aktif
             </span>
-            <span className="text-2xl font-bold text-white mt-0.5 block">
+            <span className="text-2xl font-bold text-emerald-700 mt-0.5 block">
               Rp{totalFundsInEscrow.toLocaleString('id-ID')}
             </span>
-            <span className="text-[11px] text-emerald-100/80 block mt-1">
+            <span className="text-[11px] text-slate-500 block mt-1">
               {pendingQrisCount} verifikasi bayar · {pendingPayoutCount} siap payout
             </span>
           </div>

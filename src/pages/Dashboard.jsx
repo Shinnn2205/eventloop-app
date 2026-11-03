@@ -9,11 +9,11 @@ import {
   Leaf, 
   RotateCcw, 
   PlusCircle, 
-  Clock, 
   PackagePlus, 
   CheckCircle2,
   ClipboardList,
-  Sparkles
+  Sparkles,
+  Award
 } from 'lucide-react'
 
 export default function Dashboard() {
@@ -68,107 +68,156 @@ export default function Dashboard() {
   const steps = [
     { num: 1, title: 'Buat Event', desc: 'Tentukan jadwal & durasi', link: '/create-event' },
     { num: 2, title: 'Pilih Equipment', desc: 'Cari di Marketplace', link: '/marketplace' },
-    { num: 3, title: 'Reservasi & QRIS', desc: 'Upload bukti pembayaran', link: '/reservation' },
+    { num: 3, title: 'Reservasi & QRIS', desc: 'Upload bukti bayar', link: '/reservation' },
     { num: 4, title: 'Kembalikan', desc: 'Pulangkan ke lokasi asal', link: '/return' },
   ]
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      {/* Renewable Sustainability Welcome Card */}
-      <div className="bg-gradient-to-r from-emerald-700 via-green-700 to-teal-700 rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden shadow-md shadow-emerald-900/10">
-        <div className="absolute right-0 top-0 -mr-12 -mt-12 w-64 h-64 bg-emerald-400/15 rounded-full blur-3xl pointer-events-none" />
+      {/* Soft, Low-Contrast Renewable Green Hero Card + Integrated Stepper */}
+      <div className="bg-gradient-to-br from-emerald-50/95 via-green-50/75 to-teal-50/80 border border-emerald-200/70 rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-xs">
+        <div className="absolute right-0 top-0 -mr-16 -mt-16 w-72 h-72 bg-emerald-200/25 rounded-full blur-3xl pointer-events-none" />
+        
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-xs text-emerald-100 text-xs font-medium px-3 py-1 rounded-full mb-3 border border-white/15">
-              <Sparkles className="w-3.5 h-3.5" /> Circular Campus Dashboard
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 bg-white/80 text-emerald-700 text-xs font-semibold px-3 py-1 rounded-full border border-emerald-200/60">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Circular Campus Dashboard</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              {greeting}, {currentUserName || 'Prasmulyan'} 🌿
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight pt-1">
+              {greeting}, <span className="text-emerald-800">{currentUserName || 'Prasmulyan'}</span> 🌿
             </h2>
-            <p className="text-emerald-50/90 text-sm mt-1.5 max-w-xl leading-relaxed">
-              Wujudkan kegiatan kampus yang ramah lingkungan dan bebas limbah sekali pakai melalui peminjaman perlengkapan sirkular.
+            <p className="text-slate-600 text-sm max-w-xl leading-relaxed">
+              Kelola peminjaman perlengkapan acara kampus secara sirkular, hemat anggaran, dan ramah lingkungan.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             {!hasActiveEvent ? (
               <Link 
                 to="/create-event" 
-                className="bg-white text-emerald-800 hover:bg-emerald-50 font-semibold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all"
+                className="btn-primary text-xs !py-2.5 !px-5 flex items-center gap-2"
               >
-                <PlusCircle className="w-4 h-4 text-emerald-600" />
+                <PlusCircle className="w-4 h-4" />
                 <span>Mulai Buat Event</span>
               </Link>
             ) : userPaymentStatus === 'idle' ? (
               <Link 
                 to={hasItems ? "/reservation" : "/marketplace"} 
-                className="bg-white text-emerald-800 hover:bg-emerald-50 font-semibold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all"
+                className="btn-primary text-xs !py-2.5 !px-5 flex items-center gap-2"
               >
-                <ClipboardList className="w-4 h-4 text-emerald-600" />
+                <ClipboardList className="w-4 h-4" />
                 <span>{hasItems ? `Lanjut Pembayaran (${displayItems.length})` : 'Pilih Equipment'}</span>
               </Link>
             ) : (
               <Link 
                 to="/reservation" 
-                className="bg-white text-emerald-800 hover:bg-emerald-50 font-semibold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all"
+                className="btn-primary text-xs !py-2.5 !px-5 flex items-center gap-2"
               >
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <CheckCircle2 className="w-4 h-4" />
                 <span>Lihat Detail Reservasi</span>
               </Link>
             )}
             <Link 
               to="/marketplace" 
-              className="bg-emerald-800/50 hover:bg-emerald-800/70 text-white font-medium px-4 py-2.5 rounded-xl border border-emerald-400/30 text-xs flex items-center gap-2 transition-all"
+              className="btn-secondary text-xs !py-2.5 !px-4 flex items-center gap-2"
             >
-              <Package className="w-4 h-4" />
-              <span>Katalog</span>
+              <Package className="w-4 h-4 text-emerald-600" />
+              <span>Buka Katalog</span>
             </Link>
+          </div>
+        </div>
+
+        {/* Integrated Soft Stepper */}
+        <div className="relative z-10 mt-6 pt-5 border-t border-emerald-200/60">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            {steps.map((s) => {
+              const isDone = currentStep > s.num || (s.num === 4 && userPaymentStatus === 'approved' && !hasItems)
+              const isCurrent = currentStep === s.num
+              return (
+                <Link
+                  key={s.num}
+                  to={s.link}
+                  className={`p-3 rounded-2xl border transition-all flex items-center gap-3 ${
+                    isCurrent
+                      ? 'bg-white border-emerald-300 text-slate-900 shadow-2xs'
+                      : isDone
+                      ? 'bg-white/70 border-emerald-200/70 text-slate-700 hover:bg-white'
+                      : 'bg-white/45 border-emerald-100/80 text-slate-500 hover:bg-white/80'
+                  }`}
+                >
+                  <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                    isDone
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : isCurrent
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-emerald-100/60 text-emerald-700/70'
+                  }`}>
+                    {isDone ? '✓' : s.num}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold truncate">{s.title}</div>
+                    <div className="text-[11px] text-slate-500 truncate">{s.desc}</div>
+                  </div>
+                </Link>
+              )
+            })}
           </div>
         </div>
       </div>
 
-      {/* Stepper Alur Peminjaman yang Bersih & Lembut */}
-      <div className="card p-5">
-        <div className="flex items-center justify-between mb-3.5">
-          <span className="text-xs font-semibold text-emerald-800">
-            Alur Peminjaman Event Sirkular
-          </span>
-          <span className="text-[11px] text-slate-400">
-            1 Akun · 1 Event Aktif
-          </span>
+      {/* 4 Soft Sustainability Metric Cards (No Harsh Left Borders) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="card p-5 flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 border border-emerald-100">
+            <Recycle className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-slate-500 text-xs font-medium block">Barang Dipakai Ulang</span>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">
+              {loadingDb ? '...' : totalItemsReused.toLocaleString('id-ID')}
+            </div>
+            <span className="text-[11px] text-emerald-700 block mt-0.5">Sirkulasi aktif</span>
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          {steps.map((s) => {
-            const isDone = currentStep > s.num || (s.num === 4 && userPaymentStatus === 'approved' && !hasItems)
-            const isCurrent = currentStep === s.num
-            return (
-              <Link
-                key={s.num}
-                to={s.link}
-                className={`p-3.5 rounded-xl border transition-all flex items-center gap-3 ${
-                  isCurrent
-                    ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950 shadow-2xs'
-                    : isDone
-                    ? 'bg-emerald-50/30 border-emerald-100 text-slate-700'
-                    : 'bg-slate-50/60 border-slate-100 text-slate-400 hover:bg-emerald-50/30'
-                }`}
-              >
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                  isDone
-                    ? 'bg-emerald-600 text-white'
-                    : isCurrent
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-200 text-slate-500'
-                }`}>
-                  {isDone ? '✓' : s.num}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold truncate">{s.title}</div>
-                  <div className="text-[11px] opacity-75 truncate">{s.desc}</div>
-                </div>
-              </Link>
-            )
-          })}
+
+        <div className="card p-5 flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center flex-shrink-0 border border-green-100">
+            <DollarSign className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-slate-500 text-xs font-medium block">Penghematan Biaya</span>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">
+              {loadingDb ? '...' : (totalCostAvoided >= 1000000 ? `Rp${(totalCostAvoided / 1000000).toFixed(1)} Jt` : `Rp${totalCostAvoided.toLocaleString('id-ID')}`)}
+            </div>
+            <span className="text-[11px] text-green-700 block mt-0.5">Efisiensi anggaran</span>
+          </div>
+        </div>
+
+        <div className="card p-5 flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center flex-shrink-0 border border-teal-100">
+            <Leaf className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-slate-500 text-xs font-medium block">Limbah Dicegah</span>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">
+              {loadingDb ? '...' : `${totalWasteAvoidedKg} kg`}
+            </div>
+            <span className="text-[11px] text-teal-700 block mt-0.5">Bebas sekali pakai</span>
+          </div>
+        </div>
+
+        <div className="card p-5 flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 border border-emerald-100">
+            <Award className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-slate-500 text-xs font-medium block">Skor Sirkularitas</span>
+            <div className="text-xl sm:text-2xl font-bold text-emerald-700 mt-0.5">
+              {loadingDb ? '...' : avgCircularScore}<span className="text-xs font-normal text-slate-400"> / 100</span>
+            </div>
+            <span className="text-[11px] text-emerald-700 block mt-0.5">Indeks keberlanjutan</span>
+          </div>
         </div>
       </div>
 
@@ -179,10 +228,15 @@ export default function Dashboard() {
           <div>
             <div className="flex items-center justify-between pb-4 mb-5 border-b border-emerald-100/80">
               <div className="flex items-center gap-2.5">
-                <Calendar className="w-4 h-4 text-emerald-600" />
-                <h3 className="font-bold text-slate-900 text-sm">
-                  Kegiatan & Peminjaman Aktif
-                </h3>
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">
+                    Kegiatan & Peminjaman Aktif
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Status event dan perlengkapan yang sedang Anda pinjam</p>
+                </div>
               </div>
               {hasActiveEvent && (
                 <span className={
@@ -203,7 +257,7 @@ export default function Dashboard() {
 
             {hasActiveEvent ? (
               <div className="space-y-4">
-                <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="p-4 rounded-2xl bg-emerald-50/45 border border-emerald-100/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <div className="text-xs text-emerald-700 font-medium">
                       {activeReservation.org} · {activeReservation.type || 'Kegiatan Kampus'}
@@ -230,9 +284,9 @@ export default function Dashboard() {
                     <div className="text-xs font-semibold text-slate-600">
                       Perlengkapan Dipesan ({displayItems.length} jenis)
                     </div>
-                    <div className="divide-y divide-emerald-100/60 border border-emerald-100 rounded-xl bg-white">
+                    <div className="divide-y divide-emerald-100/60 border border-emerald-100 rounded-2xl bg-white overflow-hidden">
                       {displayItems.map((item) => (
-                        <div key={item.id} className="p-3 flex items-center justify-between text-xs">
+                        <div key={item.id} className="p-3.5 flex items-center justify-between text-xs hover:bg-emerald-50/20 transition-colors">
                           <div className="flex items-center gap-3 min-w-0">
                             <span className="text-lg">{item.image || '📦'}</span>
                             <div className="min-w-0">
@@ -250,7 +304,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ) : (
-                  <div className="p-6 rounded-xl bg-emerald-50/30 border border-dashed border-emerald-200 text-center space-y-2">
+                  <div className="p-6 rounded-2xl bg-emerald-50/25 border border-dashed border-emerald-200 text-center space-y-2.5">
                     <p className="text-xs text-slate-600">
                       Belum ada perlengkapan yang dipilih untuk kegiatan ini.
                     </p>
@@ -275,11 +329,13 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-10 px-4 bg-emerald-50/30 rounded-2xl border border-dashed border-emerald-200 space-y-3">
-                <Calendar className="w-8 h-8 text-emerald-600 mx-auto" />
+              <div className="text-center py-10 px-4 bg-emerald-50/25 rounded-2xl border border-dashed border-emerald-200/80 space-y-3">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100">
+                  <Calendar className="w-5 h-5" />
+                </div>
                 <div>
                   <h4 className="text-sm font-bold text-slate-800">Belum Ada Kegiatan Aktif</h4>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
                     Daftarkan kegiatan Anda terlebih dahulu untuk menentukan durasi hari peminjaman perlengkapan.
                   </p>
                 </div>
@@ -299,7 +355,7 @@ export default function Dashboard() {
             <div className="space-y-2">
               <Link 
                 to="/upload-equipment" 
-                className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-100 transition-colors text-xs font-semibold text-emerald-900"
+                className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/60 hover:bg-emerald-100/60 border border-emerald-100 transition-colors text-xs font-semibold text-emerald-900"
               >
                 <span className="flex items-center gap-2.5">
                   <PackagePlus className="w-4 h-4 text-emerald-600" />
@@ -309,7 +365,7 @@ export default function Dashboard() {
               </Link>
               <Link 
                 to="/my-equipment" 
-                className="flex items-center justify-between p-3 rounded-xl bg-slate-50/80 hover:bg-emerald-50/50 border border-slate-100 transition-colors text-xs font-medium text-slate-700"
+                className="flex items-center justify-between p-3 rounded-xl bg-slate-50/70 hover:bg-emerald-50/40 border border-slate-100 transition-colors text-xs font-medium text-slate-700"
               >
                 <span className="flex items-center gap-2.5">
                   <DollarSign className="w-4 h-4 text-emerald-600" />
@@ -319,7 +375,7 @@ export default function Dashboard() {
               </Link>
               <Link 
                 to="/return" 
-                className="flex items-center justify-between p-3 rounded-xl bg-slate-50/80 hover:bg-emerald-50/50 border border-slate-100 transition-colors text-xs font-medium text-slate-700"
+                className="flex items-center justify-between p-3 rounded-xl bg-slate-50/70 hover:bg-emerald-50/40 border border-slate-100 transition-colors text-xs font-medium text-slate-700"
               >
                 <span className="flex items-center gap-2.5">
                   <RotateCcw className="w-4 h-4 text-emerald-600" />
@@ -331,13 +387,18 @@ export default function Dashboard() {
           </div>
 
           <div className="card p-5">
-            <h3 className="font-bold text-slate-900 text-sm mb-3">Ketersediaan Inventaris</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-slate-900 text-sm">Ketersediaan Inventaris</h3>
+              <Link to="/impact" className="text-[11px] font-semibold text-emerald-700 hover:underline">
+                Detail →
+              </Link>
+            </div>
             <div className="space-y-2.5 text-xs">
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+              <div className="flex items-center justify-between py-1.5 border-b border-emerald-50">
                 <span className="text-slate-500">Inventaris Kampus</span>
                 <span className="font-semibold text-slate-800">{loadingDb ? '...' : `${campusReady} unit`}</span>
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+              <div className="flex items-center justify-between py-1.5 border-b border-emerald-50">
                 <span className="text-slate-500">Sharing Organisasi</span>
                 <span className="font-semibold text-emerald-700">{loadingDb ? '...' : `${orgReady} unit`}</span>
               </div>
@@ -347,53 +408,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Sustainability Metrics Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card p-5 border-l-4 border-l-emerald-500">
-          <div className="flex items-center justify-between text-slate-500 text-xs mb-1.5 font-medium">
-            <span>Barang Dipakai Ulang</span>
-            <Recycle className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {loadingDb ? '...' : totalItemsReused.toLocaleString('id-ID')}
-          </div>
-          <div className="text-[11px] text-emerald-700 mt-1">Sirkulasi pemakaian ulang</div>
-        </div>
-
-        <div className="card p-5 border-l-4 border-l-green-500">
-          <div className="flex items-center justify-between text-slate-500 text-xs mb-1.5 font-medium">
-            <span>Penghematan Biaya</span>
-            <DollarSign className="w-4 h-4 text-green-600" />
-          </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {loadingDb ? '...' : (totalCostAvoided >= 1000000 ? `Rp${(totalCostAvoided / 1000000).toFixed(1)} Jt` : `Rp${totalCostAvoided.toLocaleString('id-ID')}`)}
-          </div>
-          <div className="text-[11px] text-green-700 mt-1">Hemat anggaran kepanitiaan</div>
-        </div>
-
-        <div className="card p-5 border-l-4 border-l-teal-500">
-          <div className="flex items-center justify-between text-slate-500 text-xs mb-1.5 font-medium">
-            <span>Limbah Dicegah</span>
-            <Leaf className="w-4 h-4 text-teal-600" />
-          </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {loadingDb ? '...' : `${totalWasteAvoidedKg} kg`}
-          </div>
-          <div className="text-[11px] text-teal-700 mt-1">Mengurangi sampah dekorasi</div>
-        </div>
-
-        <div className="card p-5 border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50/50 to-white">
-          <div className="flex items-center justify-between text-slate-500 text-xs mb-1.5 font-medium">
-            <span>Skor Sirkularitas</span>
-            <span className="badge-sage !py-0.5 !px-2 !text-[10px]">Eco-Friendly</span>
-          </div>
-          <div className="text-2xl font-bold text-emerald-700">
-            {loadingDb ? '...' : avgCircularScore}<span className="text-xs font-normal text-slate-400"> / 100</span>
-          </div>
-          <div className="text-[11px] text-emerald-700 mt-1">Indeks keberlanjutan kampus</div>
         </div>
       </div>
     </div>

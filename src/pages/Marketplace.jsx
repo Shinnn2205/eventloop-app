@@ -293,27 +293,27 @@ export default function Marketplace() {
         })}
       </div>
 
-      {/* Floating Bottom Cart Bar */}
+      {/* Soft Floating Bottom Cart Bar (No Harsh Dark Contrast) */}
       {currentUserRole === 'user' && cartItems.length > 0 && !isLockedByActivePayment && (
         <div className="fixed bottom-5 left-4 right-4 lg:left-72 lg:right-8 z-40 max-w-4xl mx-auto">
-          <div className="bg-emerald-900 text-white p-4 rounded-2xl shadow-lg shadow-emerald-950/20 border border-emerald-700 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="bg-white/95 backdrop-blur-md text-slate-800 p-4 rounded-2xl shadow-lg shadow-emerald-900/10 border border-emerald-200 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-emerald-700 text-emerald-100 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center flex-shrink-0">
                 <ShoppingBag className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-xs font-semibold text-white">
+                <div className="text-xs font-bold text-slate-900">
                   {cartItems.length} Jenis Barang Dipilih · Durasi {durationDays} Hari
                 </div>
-                <div className="text-xs text-emerald-200 mt-0.5">
-                  Estimasi Total: <strong className="text-white">Rp{cartTotalEstimate.toLocaleString('id-ID')}</strong>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  Estimasi Total: <strong className="text-emerald-700">Rp{cartTotalEstimate.toLocaleString('id-ID')}</strong>
                 </div>
               </div>
             </div>
 
             <Link
               to="/reservation"
-              className="w-full sm:w-auto bg-white hover:bg-emerald-50 text-emerald-900 px-5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+              className="w-full sm:w-auto btn-primary !py-2.5 !px-5 text-xs flex items-center justify-center gap-2"
             >
               <span>Lanjut ke Reservasi & Bayar</span>
               <ArrowRight className="w-4 h-4" />

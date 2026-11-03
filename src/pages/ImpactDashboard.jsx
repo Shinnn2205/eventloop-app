@@ -8,7 +8,11 @@ import {
   Trophy, 
   TrendingUp, 
   Award,
-  Share2
+  Share2,
+  Recycle,
+  Calendar,
+  Leaf,
+  DollarSign
 } from 'lucide-react'
 
 export default function ImpactDashboard() {
@@ -70,52 +74,73 @@ export default function ImpactDashboard() {
         </button>
       </div>
 
+      {/* 4 Soft KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card p-5 border-l-4 border-l-emerald-500">
-          <div className="text-slate-500 text-xs font-medium mb-1">
-            Perlengkapan Dipakai Ulang
+        <div className="card p-5 flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 border border-emerald-100">
+            <Recycle className="w-5 h-5" />
           </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {totalItemsReused.toLocaleString('id-ID')} <span className="text-xs font-normal text-slate-400">unit</span>
-          </div>
-          <div className="text-[11px] text-emerald-700 mt-2">
-            Mencegah pengadaan barang sekali pakai
-          </div>
-        </div>
-
-        <div className="card p-5 border-l-4 border-l-green-500">
-          <div className="text-slate-500 text-xs font-medium mb-1">
-            Kegiatan Terfasilitasi
-          </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {totalEventsSupported} <span className="text-xs font-normal text-slate-400">event</span>
-          </div>
-          <div className="text-[11px] text-green-700 mt-2">
-            Seminar, bazaar, lomba & kegiatan UKM
+          <div>
+            <div className="text-slate-500 text-xs font-medium">
+              Perlengkapan Dipakai Ulang
+            </div>
+            <div className="text-2xl font-bold text-slate-900 mt-0.5">
+              {totalItemsReused.toLocaleString('id-ID')} <span className="text-xs font-normal text-slate-400">unit</span>
+            </div>
+            <div className="text-[11px] text-emerald-700 mt-0.5">
+              Mencegah beli baru
+            </div>
           </div>
         </div>
 
-        <div className="card p-5 border-l-4 border-l-teal-500">
-          <div className="text-slate-500 text-xs font-medium mb-1">
-            Limbah Material Dicegah
+        <div className="card p-5 flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center flex-shrink-0 border border-green-100">
+            <Calendar className="w-5 h-5" />
           </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {wasteAvoided} <span className="text-xs font-normal text-slate-400">kg</span>
-          </div>
-          <div className="text-[11px] text-teal-700 mt-2">
-            Setara ~{co2Avoided} kg emisi CO₂
+          <div>
+            <div className="text-slate-500 text-xs font-medium">
+              Kegiatan Terfasilitasi
+            </div>
+            <div className="text-2xl font-bold text-slate-900 mt-0.5">
+              {totalEventsSupported} <span className="text-xs font-normal text-slate-400">event</span>
+            </div>
+            <div className="text-[11px] text-green-700 mt-0.5">
+              Seminar, bazaar & UKM
+            </div>
           </div>
         </div>
 
-        <div className="card p-5 border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50/40 to-white">
-          <div className="text-slate-500 text-xs font-medium mb-1">
-            Efisiensi Anggaran
+        <div className="card p-5 flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center flex-shrink-0 border border-teal-100">
+            <Leaf className="w-5 h-5" />
           </div>
-          <div className="text-2xl font-bold text-emerald-700">
-            Rp{(costAvoided / 1000000).toFixed(1)} Jt
+          <div>
+            <div className="text-slate-500 text-xs font-medium">
+              Limbah Material Dicegah
+            </div>
+            <div className="text-2xl font-bold text-slate-900 mt-0.5">
+              {wasteAvoided} <span className="text-xs font-normal text-slate-400">kg</span>
+            </div>
+            <div className="text-[11px] text-teal-700 mt-0.5">
+              Setara ~{co2Avoided} kg CO₂
+            </div>
           </div>
-          <div className="text-[11px] text-emerald-700 mt-2">
-            Dihemat oleh kepanitiaan mahasiswa
+        </div>
+
+        <div className="card p-5 flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 border border-emerald-100">
+            <DollarSign className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-slate-500 text-xs font-medium">
+              Efisiensi Anggaran
+            </div>
+            <div className="text-2xl font-bold text-emerald-700 mt-0.5">
+              Rp{(costAvoided / 1000000).toFixed(1)} Jt
+            </div>
+            <div className="text-[11px] text-emerald-700 mt-0.5">
+              Hemat dana mahasiswa
+            </div>
           </div>
         </div>
       </div>
