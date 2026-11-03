@@ -201,7 +201,7 @@ export default function LoginPage() {
       } else {
         setSignUpStep('otp')
         setResendTimer(60)
-        setSuccessMsg(`Kode verifikasi OTP 6-digit berhasil dikirim ke ${studentEmail}. Silakan periksa inbox Outlook Anda!`)
+        setSuccessMsg(`Kode verifikasi OTP 8-digit berhasil dikirim ke ${studentEmail}. Silakan periksa inbox Outlook Anda!`)
       }
     } catch (err) {
       setErrorMsg('Terjadi kesalahan koneksi saat mengirim kode verifikasi.')
@@ -218,9 +218,9 @@ export default function LoginPage() {
     setErrorMsg('')
     setSuccessMsg('')
 
-    const cleanOtp = (otpCode || '').replace(/\D/g, '').trim()
+    const cleanOtp = (otpCode || '').trim()
     if (cleanOtp.length < 6) {
-      setErrorMsg('Silakan masukkan 6 digit kode OTP yang diterima di email Outlook.')
+      setErrorMsg('Silakan masukkan kode OTP yang diterima di email Outlook.')
       return
     }
 
@@ -608,7 +608,7 @@ export default function LoginPage() {
                 </div>
               </form>
             ) : (
-              // STEP 2: FORM INPUT 6-DIGIT KODE OTP DARI EMAIL OUTLOOK
+              // STEP 2: FORM INPUT KODE OTP DARI EMAIL OUTLOOK (MENDUKUNG 6 ATAU 8 DIGIT)
               <form onSubmit={handleSignUpVerifyOtp} className="space-y-4 py-1 animate-fade-in text-center">
                 <div className="w-14 h-14 bg-green-100 text-green-700 rounded-2xl flex items-center justify-center mx-auto shadow-sm">
                   <KeyRound className="w-7 h-7" />
@@ -617,7 +617,7 @@ export default function LoginPage() {
                 <div>
                   <h4 className="text-base font-bold text-gray-900">Verifikasi Kode OTP</h4>
                   <p className="text-xs text-gray-500 mt-1">
-                    Masukkan 6-digit kode verifikasi yang kami kirimkan ke email Outlook:
+                    Masukkan kode verifikasi yang kami kirimkan ke email Outlook:
                   </p>
                   <div className="inline-block bg-green-50 border border-green-200 text-green-950 font-bold font-mono px-3 py-1 rounded-xl text-xs mt-1.5">
                     {nim}@student.prasetiyamulya.ac.id
@@ -629,34 +629,34 @@ export default function LoginPage() {
                     <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                     <span>Buka Tab Outlook Mahasiswa Anda:</span>
                   </div>
-                  <p>Salin 6 digit kode angka dari email masuk <strong>EventLoop Prasetiya Mulya</strong>, lalu ketik di kotak bawah ini:</p>
+                  <p>Salin kode verifikasi dari email <strong>EventLoop Prasetiya Mulya</strong>, lalu ketik di kotak bawah ini:</p>
                 </div>
 
                 <div className="space-y-1 text-left">
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider text-center">
-                    Kode OTP (6 Digit Angka)
+                    Kode OTP Verifikasi
                   </label>
                   <div className="relative max-w-xs mx-auto">
                     <input
                       type="text"
-                      maxLength={6}
+                      maxLength={8}
                       required
                       autoFocus
                       value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="123456"
-                      className="w-full text-center tracking-[0.4em] text-2xl font-black font-mono py-2.5 bg-gray-50 border-2 border-green-500/50 rounded-2xl focus:outline-none focus:ring-4 focus:ring-green-500/20 focus:border-green-600 transition-all text-green-950"
+                      onChange={(e) => setOtpCode(e.target.value.trim().slice(0, 8))}
+                      placeholder="12345678"
+                      className="w-full text-center tracking-[0.25em] text-2xl font-black font-mono py-2.5 bg-gray-50 border-2 border-green-500/50 rounded-2xl focus:outline-none focus:ring-4 focus:ring-green-500/20 focus:border-green-600 transition-all text-green-950"
                     />
                   </div>
                   <p className="text-[11px] text-gray-400 text-center mt-1">
-                    {otpCode.length}/6 digit angka
+                    {otpCode.length}/8 digit
                   </p>
                 </div>
 
                 <div className="pt-2 space-y-2">
                   <button
                     type="submit"
-                    disabled={loading || otpCode.trim().length !== 6}
+                    disabled={loading || otpCode.trim().length < 6}
                     className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-semibold shadow-md shadow-green-700/20 transition-all"
                   >
                     <CheckCircle2 className="w-4 h-4" />
