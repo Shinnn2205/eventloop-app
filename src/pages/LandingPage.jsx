@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom'
 import Spinner from '../components/Spinner'
-// import { useApp } from '../context/AppContext' // duplicate removed
+import { useApp } from '../context/AppContext'
 import { Recycle, ArrowRight, Package, BarChart3, Shield, Zap, Sparkles, CheckCircle2 } from 'lucide-react'
-// import { useApp } from '../context/AppContext' // duplicate removed
 
 export default function LandingPage() {
   const { sessionUser, currentUserRole, currentUserName, loadingDb, equipments, transactions } = useApp();
@@ -99,19 +98,19 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-16 max-w-3xl mx-auto">
             <div className="card p-6 border-green-100/80 bg-white/80 backdrop-blur">
               <div className="text-3xl mb-1">♻️</div>
-              <div className="text-3xl font-black text-gray-900">1,284</div>
+              <div className="text-3xl font-black text-gray-900">{loadingDb ? '...' : itemsReused.toLocaleString()}</div>
               <div className="text-xs text-green-700 font-bold uppercase tracking-wider mt-1">Items Reused</div>
               <div className="text-xs text-gray-500 mt-1">Peralatan digunakan berulang</div>
             </div>
             <div className="card p-6 border-green-100/80 bg-white/80 backdrop-blur">
               <div className="text-3xl mb-1">🌱</div>
-              <div className="text-3xl font-black text-gray-900">186.5 kg</div>
+              <div className="text-3xl font-black text-gray-900">{loadingDb ? '...' : `${wasteAvoidedKg} kg`}</div>
               <div className="text-xs text-emerald-700 font-bold uppercase tracking-wider mt-1">Material Waste Avoided</div>
               <div className="text-xs text-gray-500 mt-1">Limbah material dicegah</div>
             </div>
             <div className="card p-6 border-green-100/80 bg-white/80 backdrop-blur">
               <div className="text-3xl mb-1">🎪</div>
-              <div className="text-3xl font-black text-gray-900">42</div>
+              <div className="text-3xl font-black text-gray-900">{loadingDb ? '...' : eventsSupported}</div>
               <div className="text-xs text-blue-700 font-bold uppercase tracking-wider mt-1">Events Supported</div>
               <div className="text-xs text-gray-500 mt-1">Seminar, Expo, Lomba & UKM</div>
             </div>
