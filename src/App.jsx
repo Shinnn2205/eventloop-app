@@ -22,8 +22,11 @@ function AuthHandler() {
   const location = useLocation()
 
   useEffect(() => {
-    // Jangan otomatis redirect jika pengguna sedang dalam proses verifikasi kode OTP pendaftaran
-    const isPendingOtp = Boolean(typeof window !== 'undefined' && sessionStorage.getItem('eventloop_pending_signup_otp'))
+    // Jangan otomatis redirect jika pengguna sedang dalam proses verifikasi kode OTP (pendaftaran atau reset password)
+    const isPendingOtp = Boolean(typeof window !== 'undefined' && (
+      sessionStorage.getItem('eventloop_pending_signup_otp') ||
+      sessionStorage.getItem('eventloop_pending_forgot_otp')
+    ))
     if (isPendingOtp) return
 
     // Jika link email magic link diklik (membawa access_token di URL hash)

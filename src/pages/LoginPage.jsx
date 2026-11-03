@@ -5,6 +5,7 @@ import {
   Mail, 
   Lock, 
   ArrowRight, 
+  ArrowLeft,
   ShieldCheck, 
   Sparkles, 
   Building2, 
@@ -14,7 +15,9 @@ import {
   CheckCircle2, 
   AlertCircle,
   LogIn,
-  UserPlus
+  UserPlus,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useApp, isAdminEmail, isCampusEmail, validateNimStructure, getAdminDisplayName } from '../context/AppContext'
@@ -23,18 +26,29 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const { setCurrentUserRole, setCurrentUserName } = useApp()
   
-  // Tab Mode: 'login' (Masuk) atau 'signup' (Buat Akun Baru)
+  // Tab Mode: 'login' (Masuk), 'signup' (Buat Akun Baru), atau 'forgot' (Lupa Password)
   const [activeTab, setActiveTab] = useState('login')
   
-  // State verifikasi: 'form' (isi data akun) atau 'otp' (input 6-digit kode OTP)
+  // State verifikasi pendaftaran: 'form' (isi data akun) atau 'otp' (input 6-digit kode OTP)
   const [signUpStep, setSignUpStep] = useState('form')
   
-  // Field form
+  // Field form login / signup
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showLoginPassword, setShowLoginPassword] = useState(false)
   const [fullName, setFullName] = useState('')
   const [nim, setNim] = useState('')
   const [otpCode, setOtpCode] = useState('')
+
+  // State Lupa Password
+  // forgotStep: 'request' (input NIM/email) atau 'reset' (input OTP + password baru)
+  const [forgotIdentifier, setForgotIdentifier] = useState('')
+  const [forgotStep, setForgotStep] = useState('request')
+  const [forgotOtp, setForgotOtp] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [forgotTimer, setForgotTimer] = useState(0)
 
   // State status
   const [loading, setLoading] = useState(false)
@@ -42,7 +56,7 @@ export default function LoginPage() {
   const [successMsg, setSuccessMsg] = useState('')
   const [resendTimer, setResendTimer] = useState(0)
 
-  // Timer cooldown untuk kirim ulang kode OTP
+  // Timer cooldown untuk kirim ulang kode OTP pendaftaran
   useEffect(() => {
     let interval = null
     if (resendTimer > 0) {
@@ -53,9 +67,21 @@ export default function LoginPage() {
     return () => clearInterval(interval)
   }, [resendTimer])
 
+  // Timer cooldown untuk kirim ulang kode OTP lupa password
+  useEffect(() => {
+    let interval = null
+    if (forgotTimer > 0) {
+      interval = setInterval(() => {
+        setForgotTimer(prev => prev - 1)
+      }, 1000)
+    }
+    return () => clearInterval(interval)
+  }, [forgotTimer])
+
   // Pulihkan form jika pengguna me-refresh halaman saat sedang di tahap memasukkan kode OTP
   useEffect(() => {
     try {
+      // 1. Cek sesi pending pendaftaran akun
       const savedPending = sessionStorage.getItem('eventloop_pending_signup_otp')
       if (savedPending) {
         const parsed = JSON.parse(savedPending)
@@ -72,8 +98,27 @@ export default function LoginPage() {
           const remaining = Math.max(0, 60 - elapsed)
           setResendTimer(remaining)
           setSuccessMsg(`Sesi verifikasi OTP dipulihkan. Silakan cek inbox Outlook (${parsed.email}) dan masukkan kodenya.`)
+          return
         } else {
           sessionStorage.removeItem('eventloop_pending_signup_otp')
+        }
+      }
+
+      // 2. Cek sesi pending lupa password
+      const savedForgot = sessionStorage.getItem('eventloop_pending_forgot_otp')
+      if (savedForgot) {
+        const parsedForgot = JSON.parse(savedForgot)
+        if (parsedForgot && parsedForgot.email && (Date.now() - (parsedForgot.sentAt || 0) < 15 * 60 * 1000)) {
+          setActiveTab('forgot')
+          setForgotStep('reset')
+          setForgotIdentifier(parsedForgot.identifier || parsedForgot.email)
+
+          const elapsed = Math.floor((Date.now() - (parsedForgot.sentAt || 0)) / 1000)
+          const remaining = Math.max(0, 60 - elapsed)
+          setForgotTimer(remaining)
+          setSuccessMsg(`Sesi reset password dipulihkan. Silakan masukkan kode OTP yang telah dikirim ke ${parsedForgot.email}.`)
+        } else {
+          sessionStorage.removeItem('eventloop_pending_forgot_otp')
         }
       }
     } catch (err) {
@@ -92,16 +137,34 @@ export default function LoginPage() {
 
   const nimInfo = validateNimStructure(nim)
 
+  // Helper resolve identifier ke email mahasiswa atau admin
+  const resolveEmailFromIdentifier = (raw) => {
+    let target = (raw || '').trim()
+    if (/^\d{11}$/.test(target)) {
+      return `${target}@student.prasetiyamulya.ac.id`
+    }
+    return target
+  }
+
   // Reset pesan saat ganti tab
   const handleTabChange = (tab) => {
     setActiveTab(tab)
     if (tab === 'login') {
+      sessionStorage.removeItem('eventloop_pending_signup_otp')
+      sessionStorage.removeItem('eventloop_pending_forgot_otp')
+      setSignUpStep('form')
+      setForgotStep('request')
+    } else if (tab === 'signup') {
+      sessionStorage.removeItem('eventloop_pending_forgot_otp')
+      setForgotStep('request')
+    } else if (tab === 'forgot') {
       sessionStorage.removeItem('eventloop_pending_signup_otp')
       setSignUpStep('form')
     }
     setErrorMsg('')
     setSuccessMsg('')
     setOtpCode('')
+    setForgotOtp('')
   }
 
   // ============================================================
@@ -321,6 +384,173 @@ export default function LoginPage() {
     }
   }
 
+  // ============================================================
+  // 3. ALUR LUPA PASSWORD (RESET PASSWORD VIA OTP OUTLOOK)
+  // ============================================================
+  const handleForgotRequestOtp = async (e) => {
+    if (e && e.preventDefault) e.preventDefault()
+    setErrorMsg('')
+    setSuccessMsg('')
+
+    const resolvedEmail = resolveEmailFromIdentifier(forgotIdentifier)
+    if (!resolvedEmail) {
+      setErrorMsg('Silakan masukkan 11 digit NIM atau email akun terdaftar Anda.')
+      return
+    }
+
+    if (!isCampusEmail(resolvedEmail) && !isAdminEmail(resolvedEmail)) {
+      setErrorMsg('Format NIM atau email tidak valid. Gunakan 11 digit NIM resmi atau email kampus.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      // shouldCreateUser: false memastikan tidak membuat akun baru jika belum terdaftar
+      const { error } = await supabase.auth.signInWithOtp({
+        email: resolvedEmail,
+        options: {
+          shouldCreateUser: false
+        }
+      })
+
+      if (error) {
+        const msg = (error.message || '').toLowerCase()
+        if (msg.includes('signups not allowed') || msg.includes('user not found') || error.status === 400) {
+          setErrorMsg('Akun dengan NIM/email ini belum terdaftar di EventLoop. Silakan mendaftar akun baru terlebih dahulu.')
+        } else {
+          setErrorMsg('Gagal mengirimkan kode OTP: ' + error.message)
+        }
+        setLoading(false)
+        return
+      }
+
+      sessionStorage.setItem('eventloop_pending_forgot_otp', JSON.stringify({
+        email: resolvedEmail,
+        identifier: forgotIdentifier,
+        sentAt: Date.now()
+      }))
+
+      setForgotStep('reset')
+      setForgotTimer(60)
+      setSuccessMsg(`Kode OTP reset password telah dikirim ke ${resolvedEmail}. Cek inbox Outlook Anda.`)
+    } catch (err) {
+      setErrorMsg('Terjadi kendala saat mengirimkan OTP reset password: ' + (err.message || ''))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleForgotResendOtp = async () => {
+    if (forgotTimer > 0) return
+    const resolvedEmail = resolveEmailFromIdentifier(forgotIdentifier)
+    if (!resolvedEmail) return
+
+    setLoading(true)
+    setErrorMsg('')
+    setSuccessMsg('')
+
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: resolvedEmail,
+        options: {
+          shouldCreateUser: false
+        }
+      })
+
+      if (error) {
+        setErrorMsg('Gagal mengirim ulang OTP: ' + error.message)
+      } else {
+        sessionStorage.setItem('eventloop_pending_forgot_otp', JSON.stringify({
+          email: resolvedEmail,
+          identifier: forgotIdentifier,
+          sentAt: Date.now()
+        }))
+        setForgotTimer(60)
+        setSuccessMsg(`Kode OTP baru berhasil dikirim ulang ke ${resolvedEmail}.`)
+      }
+    } catch (err) {
+      setErrorMsg('Gagal mengirim ulang kode OTP.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleForgotSubmitNewPassword = async (e) => {
+    if (e && e.preventDefault) e.preventDefault()
+    setErrorMsg('')
+    setSuccessMsg('')
+
+    const cleanOtp = (forgotOtp || '').trim()
+    if (!cleanOtp) {
+      setErrorMsg('Silakan masukkan kode OTP yang diterima di email Outlook.')
+      return
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      setErrorMsg('Password baru minimal terdiri dari 6 karakter.')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setErrorMsg('Konfirmasi password tidak cocok dengan password baru.')
+      return
+    }
+
+    setLoading(true)
+    const resolvedEmail = resolveEmailFromIdentifier(forgotIdentifier)
+
+    try {
+      // 1. Verifikasi kode OTP dengan Supabase Auth
+      const { data, error: verifyErr } = await supabase.auth.verifyOtp({
+        email: resolvedEmail,
+        token: cleanOtp,
+        type: 'email'
+      })
+
+      if (verifyErr) {
+        setErrorMsg('Kode OTP salah atau sudah kadaluarsa: ' + verifyErr.message)
+        setLoading(false)
+        return
+      }
+
+      if (data?.session) {
+        // 2. Simpan password baru
+        const { error: updateErr } = await supabase.auth.updateUser({
+          password: newPassword
+        })
+
+        if (updateErr) {
+          setErrorMsg('Gagal memperbarui password: ' + updateErr.message)
+          setLoading(false)
+          return
+        }
+
+        // 3. Bersihkan status pending forgot OTP
+        sessionStorage.removeItem('eventloop_pending_forgot_otp')
+
+        // Sign out agar pengguna dapat login ulang secara bersih dan aman dengan password baru
+        await supabase.auth.signOut()
+
+        // Beralih ke tab login
+        setActiveTab('login')
+        setForgotStep('request')
+        setEmail(forgotIdentifier)
+        setPassword('')
+        setForgotOtp('')
+        setNewPassword('')
+        setConfirmPassword('')
+
+        setSuccessMsg('✅ Password baru Anda berhasil disimpan! Silakan masuk menggunakan password baru Anda.')
+      } else {
+        setErrorMsg('Verifikasi berhasil tetapi sesi tidak valid. Silakan coba lagi.')
+      }
+    } catch (err) {
+      setErrorMsg('Terjadi kesalahan saat memproses password baru: ' + (err.message || ''))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#F6FBF8] text-slate-800 flex items-center justify-center p-4 selection:bg-emerald-100 selection:text-emerald-800">
       <div className="max-w-4xl w-full grid md:grid-cols-2 bg-white rounded-3xl shadow-sm overflow-hidden border border-emerald-100/90">
@@ -401,20 +631,44 @@ export default function LoginPage() {
             </button>
           </div>
 
+          {/* Mode Lupa Password Bar */}
+          {activeTab === 'forgot' && (
+            <div className="flex items-center justify-between mb-4 pb-2.5 border-b border-emerald-100/80">
+              <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                <KeyRound className="w-4 h-4 text-emerald-600" />
+                Mode Pemulihan Password
+              </span>
+              <button
+                type="button"
+                onClick={() => handleTabChange('login')}
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 flex items-center gap-1 cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Kembali ke Masuk
+              </button>
+            </div>
+          )}
+
           {/* Header Title */}
           <div className="mb-5">
             <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
               {activeTab === 'login' 
                 ? 'Selamat Datang Kembali 👋' 
-                : (signUpStep === 'otp' ? 'Verifikasi Kode OTP Outlook' : 'Daftar Akun Mahasiswa')
+                : activeTab === 'signup'
+                  ? (signUpStep === 'otp' ? 'Verifikasi Kode OTP Outlook' : 'Daftar Akun Mahasiswa')
+                  : (forgotStep === 'reset' ? 'Setel Ulang Password' : 'Lupa Password Akun')
               }
             </h3>
             <p className="text-xs text-slate-500 mt-1">
               {activeTab === 'login'
                 ? 'Masukkan NIM/email dan password akun Anda untuk masuk'
-                : (signUpStep === 'otp'
-                    ? `Kode OTP telah dikirimkan ke ${nim}@student.prasetiyamulya.ac.id`
-                    : 'Pendaftaran resmi mahasiswa Universitas Prasetiya Mulya.')
+                : activeTab === 'signup'
+                  ? (signUpStep === 'otp'
+                      ? `Kode OTP telah dikirimkan ke ${nim}@student.prasetiyamulya.ac.id`
+                      : 'Pendaftaran resmi mahasiswa Universitas Prasetiya Mulya.')
+                  : (forgotStep === 'reset'
+                      ? 'Masukkan kode OTP dari email Outlook dan buat password baru Anda.'
+                      : 'Masukkan 11 digit NIM atau email terdaftar untuk menerima kode OTP pemulihan.')
               }
             </p>
           </div>
@@ -460,19 +714,36 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Password
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange('forgot')}
+                    className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                  >
+                    Lupa Password?
+                  </button>
+                </div>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
-                    type="password"
+                    type={showLoginPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-4 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+                    className="w-full pl-10 pr-10 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    title={showLoginPassword ? 'Sembunyikan password' : 'Lihat password'}
+                  >
+                    {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -485,6 +756,177 @@ export default function LoginPage() {
                 {!loading && <ArrowRight className="w-4 h-4" />}
               </button>
             </form>
+          )}
+
+          {/* ======================================================= */}
+          {/* TAB 3: LUPA PASSWORD (RESET VIA OTP OUTLOOK)            */}
+          {/* ======================================================= */}
+          {activeTab === 'forgot' && (
+            forgotStep === 'request' ? (
+              // STEP 1: Masukkan NIM / Email Terdaftar
+              <form onSubmit={handleForgotRequestOtp} className="space-y-4">
+                <div className="bg-emerald-50/70 border border-emerald-200/80 p-3 rounded-2xl flex items-start gap-2.5 text-[11px] text-emerald-950 font-medium leading-relaxed">
+                  <KeyRound className="w-5 h-5 text-emerald-700 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-emerald-900 block mb-0.5">Pemulihan Akun via OTP Outlook</span>
+                    Masukkan 11 digit NIM atau email kampus/admin yang terdaftar. Kami akan mengirimkan kode OTP verifikasi ke email resmi Anda.
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    NIM (11 Digit) atau Email Akun Terdaftar *
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={forgotIdentifier}
+                      onChange={(e) => setForgotIdentifier(e.target.value)}
+                      placeholder="Contoh: 23302410001 atau nama@student..."
+                      className="w-full pl-10 pr-4 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    💡 Jika memasukkan 11 digit NIM, sistem akan otomatis mengirim OTP ke email SSO Outlook resmi Anda.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 mt-2 cursor-pointer"
+                >
+                  <span>{loading ? 'Mengirim Kode OTP...' : 'Kirim Kode OTP Pemulihan'}</span>
+                  {!loading && <ArrowRight className="w-4 h-4" />}
+                </button>
+
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange('login')}
+                    className="text-xs font-semibold text-slate-500 hover:text-emerald-700 inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Ingat password? Kembali ke Masuk</span>
+                  </button>
+                </div>
+              </form>
+            ) : (
+              // STEP 2: Masukkan Kode OTP & Password Baru
+              <form onSubmit={handleForgotSubmitNewPassword} className="space-y-3.5">
+                <div className="bg-emerald-50/80 border border-emerald-200/80 p-3 rounded-2xl flex items-start gap-2.5 text-xs text-emerald-950 font-medium">
+                  <Mail className="w-4 h-4 text-emerald-700 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div>Kode OTP pemulihan telah dikirimkan ke:</div>
+                    <div className="font-mono font-bold text-emerald-900 mt-0.5">
+                      {resolveEmailFromIdentifier(forgotIdentifier)}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Kode Verifikasi OTP *
+                  </label>
+                  <div className="relative">
+                    <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      maxLength={8}
+                      value={forgotOtp}
+                      onChange={(e) => setForgotOtp(e.target.value.replace(/\s+/g, ''))}
+                      placeholder="Masukkan kode OTP"
+                      className="w-full pl-9 pr-3 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-center text-lg font-mono font-bold tracking-widest text-emerald-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all uppercase"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Password Baru (Min 6 Karakter) *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      {showNewPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      <span>{showNewPassword ? 'Sembunyikan' : 'Lihat'}</span>
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Password baru"
+                      className="w-full pl-10 pr-4 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Konfirmasi Password Baru *
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Ulangi password baru"
+                      className="w-full pl-10 pr-4 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 mt-2 cursor-pointer"
+                >
+                  <span>{loading ? 'Menyimpan Password...' : 'Simpan Password Baru'}</span>
+                  {!loading && <ArrowRight className="w-4 h-4" />}
+                </button>
+
+                <div className="flex items-center justify-between pt-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotStep('request')
+                      setForgotOtp('')
+                    }}
+                    className="text-slate-500 hover:text-emerald-700 inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Ganti Email/NIM</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={forgotTimer > 0 || loading}
+                    onClick={handleForgotResendOtp}
+                    className={`font-semibold cursor-pointer ${
+                      forgotTimer > 0 
+                        ? 'text-slate-400 cursor-not-allowed' 
+                        : 'text-emerald-600 hover:text-emerald-700 underline'
+                    }`}
+                  >
+                    {forgotTimer > 0 ? `Kirim ulang (${forgotTimer}s)` : 'Kirim Ulang OTP'}
+                  </button>
+                </div>
+              </form>
+            )
           )}
 
           {/* ======================================================= */}
