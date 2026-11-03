@@ -51,8 +51,7 @@ export const PRASMUL_PRODI_MAP = {
   '1319': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Accounting', code: 'Accounting' },
 
   // SLIS (School of Law and International Studies)
-  '3310': { school: 'School of Law and International Studies', shortSchool: 'SLIS', name: 'International Business Law', code: 'Law' },
-  '3311': { school: 'School of Law and International Studies', shortSchool: 'SLIS', name: 'International Business Law', code: 'Law' },
+  '3310': { school: 'School of Law and International Studies', shortSchool: 'SLIS', name: 'International Business Law (Buslaw)', code: 'Buslaw' },
 }
 
 export const validateNimStructure = (nimStr) => {
