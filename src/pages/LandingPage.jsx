@@ -227,84 +227,88 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Circular Score Feature Deep Dive */}
+      {/* Circular Score Feature Deep Dive (Cozy Soft Renewable Card) */}
       <section id="circular-score" className="py-20 px-6 bg-white border-y border-emerald-100/70">
-        <div className="max-w-6xl mx-auto bg-gradient-to-br from-emerald-900 via-teal-950 to-slate-900 text-white rounded-3xl p-8 sm:p-12 border border-emerald-800/40 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 -mr-24 -mt-24 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="max-w-6xl mx-auto bg-gradient-to-br from-emerald-50/95 via-green-50/75 to-teal-50/80 border border-emerald-200/70 rounded-3xl p-8 sm:p-12 shadow-xs relative overflow-hidden">
+          <div className="absolute right-0 top-0 -mr-16 -mt-16 w-80 h-80 bg-emerald-200/25 rounded-full blur-3xl pointer-events-none" />
           
           <div className="grid lg:grid-cols-2 gap-10 items-center relative z-10">
             <div>
-              <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 text-emerald-300 text-xs font-bold px-3 py-1.5 rounded-full mb-5">
-                <Zap className="w-3.5 h-3.5" />
+              <div className="inline-flex items-center gap-2 bg-white/90 border border-emerald-200/70 text-emerald-800 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-4 shadow-2xs">
+                <Zap className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Fitur Unggulan Green Tech</span>
               </div>
-              <h3 className="text-2xl sm:text-4xl font-extrabold tracking-tight mb-4">
+              <h3 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mb-3">
                 Circular Score System (0 – 100)
               </h3>
-              <p className="text-emerald-100/90 text-xs sm:text-sm leading-relaxed mb-6">
-                Bukan sekadar meminjam, EventLoop secara cerdas memberi bobot circular score untuk setiap barang berdasarkan 4 indikator keberlanjutan:
+              <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-6">
+                Bukan sekadar meminjam, EventLoop secara cerdas memberi bobot circular score untuk setiap perlengkapan berdasarkan 4 indikator keberlanjutan:
               </p>
               <div className="grid sm:grid-cols-2 gap-3">
-                <div className="bg-white/5 border border-white/10 p-3.5 rounded-2xl">
-                  <div className="font-bold text-white text-xs mb-0.5">🔁 Reuse Frequency</div>
-                  <div className="text-[11px] text-emerald-200">Frekuensi pemakaian ulang perlengkapan.</div>
+                <div className="bg-white/90 border border-emerald-100/90 p-3.5 rounded-2xl shadow-2xs">
+                  <div className="font-bold text-slate-900 text-xs mb-0.5">🔁 Reuse Frequency</div>
+                  <div className="text-[11px] text-slate-500">Frekuensi pemakaian ulang perlengkapan di berbagai event.</div>
                 </div>
-                <div className="bg-white/5 border border-white/10 p-3.5 rounded-2xl">
-                  <div className="font-bold text-white text-xs mb-0.5">🌿 Eco Material</div>
-                  <div className="text-[11px] text-emerald-200">Aluminium & kain polyester vs plastik PVC.</div>
+                <div className="bg-white/90 border border-emerald-100/90 p-3.5 rounded-2xl shadow-2xs">
+                  <div className="font-bold text-slate-900 text-xs mb-0.5">🌿 Eco Material</div>
+                  <div className="text-[11px] text-slate-500">Aluminium & kain polyester vs plastik PVC sekali pakai.</div>
                 </div>
-                <div className="bg-white/5 border border-white/10 p-3.5 rounded-2xl">
-                  <div className="font-bold text-white text-xs mb-0.5">🔧 Repairability</div>
-                  <div className="text-[11px] text-emerald-200">Kemudahan komponen diperbaiki & dirawat.</div>
+                <div className="bg-white/90 border border-emerald-100/90 p-3.5 rounded-2xl shadow-2xs">
+                  <div className="font-bold text-slate-900 text-xs mb-0.5">🔧 Repairability</div>
+                  <div className="text-[11px] text-slate-500">Kemudahan komponen modular dirawat & diganti.</div>
                 </div>
-                <div className="bg-white/5 border border-white/10 p-3.5 rounded-2xl">
-                  <div className="font-bold text-white text-xs mb-0.5">♻️ Recyclability</div>
-                  <div className="text-[11px] text-emerald-200">Nilai daur ulang di akhir masa pakai barang.</div>
+                <div className="bg-white/90 border border-emerald-100/90 p-3.5 rounded-2xl shadow-2xs">
+                  <div className="font-bold text-slate-900 text-xs mb-0.5">♻️ Recyclability</div>
+                  <div className="text-[11px] text-slate-500">Nilai daur ulang sirkular di akhir masa pakai barang.</div>
                 </div>
               </div>
             </div>
 
             {/* Live Comparison Card */}
             <div className="space-y-3.5">
-              <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-start justify-between mb-3">
+              <div className="bg-white border-2 border-emerald-300 rounded-2xl p-5 shadow-sm space-y-3">
+                <div className="flex items-start justify-between">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300">Pilihan Sirkular Unggulan</span>
-                    <h5 className="text-base font-bold text-white mt-0.5">Reusable Fabric Banner + Stand Frame</h5>
-                    <p className="text-[11px] text-emerald-200">Material polyester cuci ulang · Target 40+ event</p>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/60 inline-block">
+                      Pilihan Sirkular Unggulan
+                    </span>
+                    <h5 className="text-base font-bold text-slate-900 mt-1.5">Reusable Fabric Banner + Stand Frame</h5>
+                    <p className="text-[11px] text-slate-500">Material polyester cuci ulang · Target 40+ event</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-3xl font-black text-emerald-400">87</div>
-                    <div className="text-[9px] text-emerald-200 uppercase font-semibold">Circular Score</div>
+                    <div className="text-3xl font-black text-emerald-600">87</div>
+                    <div className="text-[9px] text-emerald-700 uppercase font-semibold">Circular Score</div>
                   </div>
                 </div>
-                <div className="w-full bg-white/20 h-2 rounded-full overflow-hidden">
-                  <div className="bg-gradient-to-r from-emerald-400 to-teal-300 h-full rounded-full" style={{ width: '87%' }} />
+                <div className="w-full bg-emerald-100/80 h-2.5 rounded-full overflow-hidden">
+                  <div className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full" style={{ width: '87%' }} />
                 </div>
-                <div className="mt-3 flex items-center justify-between text-[11px] text-emerald-200">
-                  <span className="flex items-center gap-1 font-semibold text-white">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Direkomendasikan Sistem
+                <div className="pt-1 flex items-center justify-between text-[11px] text-emerald-800">
+                  <span className="flex items-center gap-1 font-semibold">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Direkomendasikan Sistem
                   </span>
-                  <span>Hemat 92% Limbah Material</span>
+                  <span className="font-medium text-emerald-700">Hemat 92% Limbah Material</span>
                 </div>
               </div>
 
-              <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-5 opacity-80">
-                <div className="flex items-start justify-between mb-3">
+              <div className="bg-rose-50/50 border border-rose-200/80 rounded-2xl p-5 space-y-3">
+                <div className="flex items-start justify-between">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-rose-300">Pola Konvensional Sekali Pakai</span>
-                    <h5 className="text-base font-bold text-white mt-0.5">Single-use Vinyl PVC Flexi Banner</h5>
-                    <p className="text-[11px] text-slate-300">Bahan plastik PVC sintetis · Sulit terurai</p>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-100/70 px-2.5 py-0.5 rounded-full border border-rose-200 inline-block">
+                      Pola Konvensional Sekali Pakai
+                    </span>
+                    <h5 className="text-base font-bold text-slate-900 mt-1.5">Single-use Vinyl PVC Flexi Banner</h5>
+                    <p className="text-[11px] text-slate-500">Bahan plastik PVC sintetis · Sulit terurai ratusan tahun</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-3xl font-black text-rose-400">42</div>
-                    <div className="text-[9px] text-rose-200 uppercase font-semibold">Circular Score</div>
+                    <div className="text-3xl font-black text-rose-600">42</div>
+                    <div className="text-[9px] text-rose-700 uppercase font-semibold">Circular Score</div>
                   </div>
                 </div>
-                <div className="w-full bg-white/20 h-2 rounded-full overflow-hidden">
-                  <div className="bg-gradient-to-r from-rose-500 to-orange-400 h-full rounded-full" style={{ width: '42%' }} />
+                <div className="w-full bg-rose-100 h-2.5 rounded-full overflow-hidden">
+                  <div className="bg-gradient-to-r from-rose-400 to-orange-400 h-full rounded-full" style={{ width: '42%' }} />
                 </div>
-                <div className="mt-3 text-[11px] text-rose-300 flex items-center gap-1 font-semibold">
+                <div className="pt-1 text-[11px] text-rose-700 flex items-center gap-1 font-medium">
                   ⚠️ Menghasilkan limbah padat tidak terurai di TPA
                 </div>
               </div>
@@ -402,46 +406,52 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* CTA Section (Cozy Soft Renewable Card - No Harsh Dark Block) */}
       <section className="py-20 px-6 bg-[#F6FBF8]">
-        <div className="max-w-4xl mx-auto bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white text-center rounded-3xl p-10 sm:p-14 shadow-md relative overflow-hidden">
-          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="max-w-4xl mx-auto bg-gradient-to-br from-emerald-50/95 via-green-50/80 to-teal-50/85 border border-emerald-200/80 rounded-3xl p-10 sm:p-14 shadow-xs text-center relative overflow-hidden">
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-emerald-200/30 rounded-full blur-3xl pointer-events-none" />
           <div className="relative z-10 max-w-2xl mx-auto space-y-4">
-            <h3 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
+            <div className="inline-flex items-center gap-1.5 bg-white/90 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full border border-emerald-200/60 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Mulai Gerakan Sirkular Kampus</span>
+            </div>
+            <h3 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
               Siap Mengubah Event Kampus Jadi Zero-Waste?
             </h3>
-            <p className="text-emerald-100 text-xs sm:text-sm leading-relaxed">
-              Mulai dari satu kegiatan, hemat anggaran dan kurangi limbah perlengkapan acara kampusmu sekarang juga.
+            <p className="text-slate-600 text-xs sm:text-sm leading-relaxed max-w-xl mx-auto">
+              Mulai dari satu kegiatan, hemat anggaran dan kurangi limbah perlengkapan acara kampusmu sekarang juga bersama EventLoop.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
               <Link 
                 to={sessionUser ? targetDashboard : "/login"} 
-                className="bg-white text-emerald-800 font-bold px-7 py-3 rounded-xl hover:bg-emerald-50 transition-colors shadow-sm text-xs sm:text-sm"
+                className="btn-primary text-xs sm:text-sm !py-3 !px-7 flex items-center justify-center gap-2 shadow-sm shadow-emerald-600/15"
               >
-                {sessionUser ? 'Buka Dashboard' : 'Mulai Sekarang / Buat Akun'}
+                <span>{sessionUser ? 'Buka Dashboard' : 'Mulai Sekarang / Buat Akun'}</span>
+                <ArrowRight className="w-4 h-4" />
               </Link>
               <Link 
                 to={sessionUser ? "/marketplace" : "/login"} 
-                className="bg-emerald-800/80 hover:bg-emerald-800 text-white font-semibold px-7 py-3 rounded-xl border border-emerald-400/40 transition-colors text-xs sm:text-sm"
+                className="btn-secondary text-xs sm:text-sm !py-3 !px-7 flex items-center justify-center gap-2"
               >
-                Jelajahi Katalog Perlengkapan
+                <span>Jelajahi Katalog Perlengkapan</span>
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Bottom Bar */}
-      <footer className="bg-slate-900 text-slate-400 py-10 px-6 text-xs border-t border-slate-800">
+      {/* Bottom Bar (Clean, Soft Renewable Footer) */}
+      <footer className="bg-white border-t border-emerald-100/90 text-slate-500 py-8 px-6 text-xs">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-emerald-600 flex items-center justify-center text-white">
-              <Recycle className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white shadow-2xs">
+              <Recycle className="w-4 h-4" />
             </div>
-            <span className="font-bold text-white">EventLoop</span>
-            <span>— Circular Event Management Platform for Campus</span>
+            <span className="font-bold text-slate-900 text-sm">Event<span className="text-emerald-600">Loop</span></span>
+            <span className="text-slate-300 hidden sm:inline">•</span>
+            <span className="text-slate-500">Circular Campus Platform</span>
           </div>
-          <div>
+          <div className="text-slate-400 text-center sm:text-right">
             Proyek UAS CTI • Inovasi Circular Economy & Green Tech Kampus
           </div>
         </div>
