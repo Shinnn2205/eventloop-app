@@ -126,14 +126,14 @@ export default function Layout() {
         <div className="p-4 border-t border-gray-100">
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100">
             <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm ${currentUserRole === 'admin' ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : 'bg-gradient-to-br from-green-500 to-emerald-600'}`}>
-              {currentUserRole === 'admin' ? 'AD' : (currentUserName ? currentUserName.slice(0, 2).toUpperCase() : 'PR')}
+              {currentUserName ? currentUserName.slice(0, 2).toUpperCase() : (currentUserRole === 'admin' ? 'AD' : 'PR')}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900 truncate">
-                {currentUserRole === 'admin' ? 'Admin Sarpras' : (currentUserName || 'Prasmulyan')}
+                {currentUserName || (currentUserRole === 'admin' ? 'Admin Sarpras' : 'Prasmulyan')}
               </p>
               <p className="text-xs text-gray-500 truncate">
-                {currentUserRole === 'admin' ? 'Pengelola Terpusat' : 'Student Organization'}
+                {currentUserRole === 'admin' ? 'Admin Sarpras' : 'Student Organization'}
               </p>
             </div>
             <button onClick={logout} title="Logout" className="text-gray-400 hover:text-red-500 transition-colors p-1">
@@ -157,7 +157,7 @@ export default function Layout() {
             <span className="font-bold text-gray-900 text-lg">EventLoop</span>
           </div>
           <button onClick={logout} className={`text-xs font-semibold px-3 py-1.5 rounded-lg border ${currentUserRole === 'admin' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-green-600 bg-green-50 border-green-200'}`}>
-            {currentUserRole === 'admin' ? 'Admin' : (currentUserName || 'Prasmulyan')}
+            {currentUserName || (currentUserRole === 'admin' ? 'Admin' : 'Prasmulyan')}
           </button>
         </header>
 

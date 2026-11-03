@@ -17,7 +17,7 @@ import {
   UserPlus
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
-import { useApp, isAdminEmail, isCampusEmail, validateNimStructure } from '../context/AppContext'
+import { useApp, isAdminEmail, isCampusEmail, validateNimStructure, getAdminDisplayName } from '../context/AppContext'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -122,8 +122,9 @@ export default function LoginPage() {
         }
 
         if (role === 'sarpras' || isAdminEmail(loginEmail)) {
+          const adminName = getAdminDisplayName(loginEmail) || 'Admin Sarpras'
           setCurrentUserRole('admin')
-          setCurrentUserName('Admin Sarpras')
+          setCurrentUserName(adminName)
           navigate('/admin', { replace: true })
         } else {
           setCurrentUserRole('user')

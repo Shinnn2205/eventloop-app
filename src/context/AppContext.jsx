@@ -3,17 +3,26 @@ import { supabase } from '../lib/supabaseClient'
 
 const AppContext = createContext()
 
-export const ADMIN_EMAILS = [
-  'gabrieljason47@gmail.com',
-  'sherren1999@gmail.com',
-  'ac523634@gmail.com',
-  'jasonlimsurya@gmail.com',
-  'admin@gmail.com'
-]
+export const ADMIN_DISPLAY_NAMES = {
+  'ac523634@gmail.com': 'Atmin Choirul',
+  'sherren1999@gmail.com': 'Xyliarenn',
+  'sharren1999@gmail.com': 'Xyliarenn',
+  'gabrieljason47@gmail.com': 'Prottt',
+  'jasonlimsurya@gmail.com': 'Jason',
+  'admin@gmail.com': 'Admin Sarpras'
+}
+
+export const ADMIN_EMAILS = Object.keys(ADMIN_DISPLAY_NAMES)
+
+export const getAdminDisplayName = (emailStr) => {
+  const lower = (emailStr || '').toLowerCase().trim()
+  return ADMIN_DISPLAY_NAMES[lower] || null
+}
 
 export const isAdminEmail = (emailStr) => {
   const lower = (emailStr || '').toLowerCase().trim()
   return (
+    !!ADMIN_DISPLAY_NAMES[lower] ||
     ADMIN_EMAILS.includes(lower) ||
     lower.includes('admin') ||
     lower.includes('sarpras')
@@ -189,20 +198,23 @@ export function AppProvider({ children }) {
       if (currentSession) {
         setSession(currentSession)
         const userEmail = currentSession.user?.email || ''
-        const metaName = currentSession.user?.user_metadata?.full_name
-        if (metaName) setCurrentUserName(metaName)
+        const adminName = getAdminDisplayName(userEmail)
 
         if (isAdminEmail(userEmail)) {
           setCurrentUserRole('admin')
-        }
+          setCurrentUserName(adminName || 'Admin Sarpras')
+        } else {
+          const metaName = currentSession.user?.user_metadata?.full_name
+          if (metaName) setCurrentUserName(metaName)
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name, nim')
-          .eq('id', currentSession.user.id)
-          .single()
-        if (profile?.full_name) {
-          setCurrentUserName(profile.full_name)
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, nim')
+            .eq('id', currentSession.user.id)
+            .single()
+          if (profile?.full_name) {
+            setCurrentUserName(profile.full_name)
+          }
         }
       }
 
@@ -363,9 +375,10 @@ export function AppProvider({ children }) {
       setSession(newSession)
       if (newSession?.user) {
         const meta = newSession.user.user_metadata || {}
-        const name = meta.full_name || 'Prasmulyan'
-        const nim = meta.nim || ''
         const userEmail = newSession.user.email || ''
+        const adminName = getAdminDisplayName(userEmail)
+        const name = adminName || meta.full_name || 'Prasmulyan'
+        const nim = meta.nim || ''
 
         setCurrentUserName(name)
         if (isAdminEmail(userEmail)) {
