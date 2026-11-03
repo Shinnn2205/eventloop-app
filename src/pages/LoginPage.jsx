@@ -21,13 +21,13 @@ import { useApp, isAdminEmail, isCampusEmail, validateNimStructure } from '../co
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { setCurrentUserRole, setCurrentUserName, setSsoUser } = useApp()
+  const { setCurrentUserRole, setCurrentUserName } = useApp()
   
   // Tab Mode: 'login' (Masuk) atau 'signup' (Buat Akun Baru)
   const [activeTab, setActiveTab] = useState('login')
   
-  // State verifikasi OTP (hanya untuk Buat Akun)
-  const [signUpStep, setSignUpStep] = useState('form') // 'form' | 'otp'
+  // State verifikasi email: 'form' (isi data) atau 'sent' (link terkirim ke Outlook)
+  const [signUpStep, setSignUpStep] = useState('form')
   
   // Field form
   const [email, setEmail] = useState('')
@@ -35,7 +35,6 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState('')
   const [nim, setNim] = useState('')
   const [role, setRole] = useState('student_org') // 'student_org' | 'sarpras'
-  const [otpCode, setOtpCode] = useState('')
 
   // State status
   const [loading, setLoading] = useState(false)
@@ -43,30 +42,7 @@ export default function LoginPage() {
   const [successMsg, setSuccessMsg] = useState('')
   const [resendTimer, setResendTimer] = useState(0)
 
-  // State Modal SSO Microsoft 365 Kampus
-  const [showSsoModal, setShowSsoModal] = useState(false)
-  const [ssoNim, setSsoNim] = useState('23302410001')
-  const [ssoName, setSsoName] = useState('Choirul Arifin')
-  const [ssoPassword, setSsoPassword] = useState('')
-  const [isEditingSsoAccount, setIsEditingSsoAccount] = useState(false)
-
-  // Otomatis deteksi nama mahasiswa dari NIM jika sudah terdaftar
-  useEffect(() => {
-    if (ssoNim && ssoNim.length === 11) {
-      supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('nim', ssoNim)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data?.full_name) {
-            setSsoName(data.full_name)
-          }
-        })
-    }
-  }, [ssoNim])
-
-  // Timer cooldown untuk kirim ulang OTP
+  // Timer cooldown untuk kirim ulang link
   useEffect(() => {
     let interval = null
     if (resendTimer > 0) {
@@ -94,7 +70,6 @@ export default function LoginPage() {
     setSignUpStep('form')
     setErrorMsg('')
     setSuccessMsg('')
-    setOtpCode('')
   }
 
   // ============================================================
@@ -162,9 +137,9 @@ export default function LoginPage() {
   }
 
   // ============================================================
-  // 2. ALUR DAFTAR AKUN MAHASISWA - STEP 1: KIRIM OTP KE EMAIL OUTLOOK
+  // 2. ALUR DAFTAR AKUN MAHASISWA (KIRIM LINK VERIFIKASI KE OUTLOOK)
   // ============================================================
-  const handleSignUpRequestOtp = async (e) => {
+  const handleSignUpRequestLink = async (e) => {
     if (e && e.preventDefault) e.preventDefault()
     setErrorMsg('')
     setSuccessMsg('')
@@ -198,12 +173,12 @@ export default function LoginPage() {
         .maybeSingle()
 
       if (existingUser) {
-        setErrorMsg(`NIM ${nim.trim()} sudah terdaftar dalam sistem. Silakan langsung login pada tab 'Masuk Akun'.`)
+        setErrorMsg(`NIM ${nim.trim()} sudah terdaftar dalam sistem. Silakan langsung login pada tab 'Masuk (Login)'.`)
         setLoading(false)
         return
       }
 
-      // 2. Kirim kode OTP via Gmail SMTP Supabase ke Outlook mahasiswa
+      // 2. Kirim link verifikasi otomatis via Gmail SMTP ke Outlook mahasiswa
       const { error } = await supabase.auth.signInWithOtp({
         email: studentEmail,
         options: {
@@ -218,229 +193,14 @@ export default function LoginPage() {
       })
 
       if (error) {
-        setErrorMsg('Gagal mengirim kode verifikasi: ' + error.message)
+        setErrorMsg('Gagal mengirim link verifikasi: ' + error.message)
       } else {
-        setSignUpStep('otp')
+        setSignUpStep('sent')
         setResendTimer(60)
-        setSuccessMsg(`Kode OTP 6-digit berhasil dikirim ke ${studentEmail}. Silakan periksa inbox Outlook kampus Anda!`)
+        setSuccessMsg(`Link verifikasi berhasil dikirim ke ${studentEmail}!`)
       }
     } catch (err) {
-      setErrorMsg('Terjadi kesalahan koneksi saat mengirim kode verifikasi.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ============================================================
-  // 2. ALUR DAFTAR AKUN MAHASISWA - STEP 2: VERIFIKASI KODE OTP
-  // ============================================================
-  const handleSignUpVerifyOtp = async (e) => {
-    if (e && e.preventDefault) e.preventDefault()
-    setErrorMsg('')
-    setSuccessMsg('')
-
-    if (!otpCode || otpCode.trim().length < 6) {
-      setErrorMsg('Silakan masukkan 6 digit kode OTP yang diterima di email Outlook.')
-      return
-    }
-
-    setLoading(true)
-    const nimValidation = validateNimStructure(nim)
-    const studentEmail = nimValidation.generatedEmail
-
-    try {
-      // 1. Verifikasi kode OTP
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: studentEmail,
-        token: otpCode.trim(),
-        type: 'email'
-      })
-
-      if (error) {
-        setErrorMsg('Kode verifikasi salah atau sudah kadaluarsa. Silakan periksa kembali email Anda.')
-        setLoading(false)
-        return
-      }
-
-      if (data?.session) {
-        // 2. Set password akun yang dipilih user agar selanjutnya bisa login langsung
-        if (password) {
-          try {
-            await supabase.auth.updateUser({ password })
-          } catch (pwdErr) {
-            console.warn('Set password err:', pwdErr)
-          }
-        }
-
-        // 3. Simpan data lengkap ke tabel 'profiles'
-        if (data.session.user?.id) {
-          try {
-            await supabase.from('profiles').upsert({
-              id: data.session.user.id,
-              email: studentEmail,
-              full_name: fullName.trim(),
-              nim: nim.trim(),
-              updated_at: new Date().toISOString()
-            })
-          } catch (pErr) {
-            console.warn('Profile upsert err:', pErr)
-          }
-        }
-
-        setCurrentUserRole('user')
-        setCurrentUserName(fullName.trim())
-        navigate('/dashboard', { replace: true })
-      }
-    } catch (err) {
-      setErrorMsg('Gagal memverifikasi pendaftaran. Silakan coba lagi.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ============================================================
-  // 3. 1-CLICK INSTANT SSO LOGIN (MICROSOFT 365 / OUTLOOK)
-  // ============================================================
-  const handleDirectSsoClick = async (targetNim = '23302410001', targetName = 'Choirul Arifin') => {
-    setErrorMsg('')
-    setSuccessMsg('⚡ Mengotentikasi akun SSO Microsoft 365 Prasetiya Mulya...')
-    setLoading(true)
-
-    const cleanNim = (targetNim || '23302410001').replace(/\D/g, '').slice(0, 11)
-    const ssoEmail = `${cleanNim}@student.prasetiyamulya.ac.id`
-
-    try {
-      // Pastikan data profil ada di database Supabase
-      try {
-        await supabase.from('profiles').upsert({
-          id: '658040bb-a7fe-4d6f-a89a-4f1847c6b099',
-          email: ssoEmail,
-          full_name: targetName,
-          nim: cleanNim,
-          updated_at: new Date().toISOString()
-        })
-      } catch (pErr) {
-        console.warn('SSO profile upsert notice:', pErr)
-      }
-
-      // Set user session langsung tanpa hambatan
-      if (setSsoUser) {
-        setSsoUser({
-          id: '658040bb-a7fe-4d6f-a89a-4f1847c6b099',
-          email: ssoEmail,
-          user_metadata: {
-            full_name: targetName,
-            nim: cleanNim,
-            role: 'student_org'
-          }
-        })
-      }
-
-      setCurrentUserRole('user')
-      setCurrentUserName(targetName)
-      setShowSsoModal(false)
-
-      setTimeout(() => {
-        navigate('/dashboard', { replace: true })
-      }, 400)
-    } catch (err) {
-      setErrorMsg('Gagal menghubungkan ke SSO Kampus. Silakan coba lagi.')
-      setLoading(false)
-    }
-  }
-
-  // ============================================================
-  // 4. ALUR LOGIN CEPAT SSO KAMPUS (MICROSOFT 365 / OUTLOOK)
-  // ============================================================
-  const handleSsoLogin = async (e) => {
-    if (e && e.preventDefault) e.preventDefault()
-    setErrorMsg('')
-    setLoading(true)
-
-    const cleanNim = (ssoNim || '').replace(/\D/g, '').slice(0, 11)
-    if (cleanNim.length !== 11) {
-      setErrorMsg('NIM mahasiswa pada SSO harus tepat 11 digit angka.')
-      setLoading(false)
-      return
-    }
-
-    const ssoEmail = `${cleanNim}@student.prasetiyamulya.ac.id`
-    const pwToUse = ssoPassword || `PrasMul${cleanNim}!`
-
-    try {
-      // 1. Coba login terlebih dahulu dengan password yang dimasukkan
-      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-        email: ssoEmail,
-        password: pwToUse
-      })
-
-      if (loginData?.session) {
-        let displayName = ssoName
-        try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name, nim')
-            .eq('id', loginData.session.user.id)
-            .single()
-          if (profile?.full_name) displayName = profile.full_name
-        } catch (e) {}
-
-        setCurrentUserRole('user')
-        setCurrentUserName(displayName)
-        setShowSsoModal(false)
-        navigate('/dashboard', { replace: true })
-        return
-      }
-
-      // Jika login gagal dan error adalah password salah
-      if (loginError && loginError.message.toLowerCase().includes('invalid login credentials')) {
-        // Cek apakah akun memang sudah terdaftar
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('id, full_name, nim')
-          .eq('email', ssoEmail)
-          .maybeSingle()
-
-        if (existingProfile) {
-          setErrorMsg('Password akun Anda salah. Silakan masukkan password yang benar yang Anda buat saat mendaftar.')
-          setLoading(false)
-          return
-        }
-      }
-
-      // 2. Jika akun belum terdaftar sama sekali di Supabase, buat akun baru secara otomatis
-      const { data: signupData, error: signupError } = await supabase.auth.signUp({
-        email: ssoEmail,
-        password: pwToUse,
-        options: {
-          data: {
-            full_name: ssoName.trim() || 'Choirul Arifin',
-            nim: cleanNim,
-            role: 'student_org'
-          }
-        }
-      })
-
-      if (signupData?.user) {
-        try {
-          await supabase.from('profiles').upsert({
-            id: signupData.user.id,
-            email: ssoEmail,
-            full_name: ssoName.trim() || 'Choirul Arifin',
-            nim: cleanNim,
-            updated_at: new Date().toISOString()
-          })
-        } catch (pErr) {}
-
-        setCurrentUserRole('user')
-        setCurrentUserName(ssoName.trim() || 'Choirul Arifin')
-        setShowSsoModal(false)
-        navigate('/dashboard', { replace: true })
-      } else {
-        setErrorMsg('Gagal otentikasi SSO: ' + (signupError?.message || loginError?.message || 'Periksa kembali data Anda.'))
-      }
-    } catch (err) {
-      setErrorMsg('Terjadi kendala koneksi ke server SSO.')
+      setErrorMsg('Terjadi kesalahan koneksi saat mengirim email verifikasi.')
     } finally {
       setLoading(false)
     }
@@ -513,7 +273,7 @@ export default function LoginPage() {
               }`}
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span>Buat Akun (OTP)</span>
+              <span>Daftar Akun Mahasiswa</span>
             </button>
           </div>
 
@@ -522,15 +282,15 @@ export default function LoginPage() {
             <h3 className="text-2xl font-bold text-gray-900">
               {activeTab === 'login' 
                 ? 'Selamat Datang Kembali 👋' 
-                : (signUpStep === 'otp' ? 'Verifikasi Kode Email' : 'Daftar Akun Baru')
+                : (signUpStep === 'sent' ? 'Periksa Inbox Outlook Kampus' : 'Daftar Akun Mahasiswa Resmi')
               }
             </h3>
             <p className="text-xs text-gray-500 mt-1">
               {activeTab === 'login'
-                ? 'Masukkan email dan password akun Anda untuk masuk'
-                : (signUpStep === 'otp'
-                    ? `Masukkan 6-digit kode yang dikirim ke ${email}`
-                    : 'Lengkapi identitas Anda. Sistem akan memverifikasi email dengan kode OTP.')
+                ? 'Masukkan NIM/email dan password akun Anda untuk masuk'
+                : (signUpStep === 'sent'
+                    ? `Link verifikasi telah dikirim ke ${nim}@student.prasetiyamulya.ac.id`
+                    : 'Pendaftaran diverifikasi langsung melalui link resmi ke Outlook kampus.')
               }
             </p>
           </div>
@@ -554,53 +314,7 @@ export default function LoginPage() {
           {/* TAB 1: FORM MASUK (LOGIN) -> EMAIL & PASSWORD           */}
           {/* ======================================================= */}
           {activeTab === 'login' && (
-            <div className="space-y-4">
-              {/* Tombol Cepat Masuk SSO Mahasiswa (Microsoft 365 / Outlook) */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-3 rounded-2xl shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>⚡ Single Sign-On (SSO) Kampus</span>
-                  </span>
-                  <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full border border-blue-200">
-                    Microsoft 365
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleDirectSsoClick('23302410001', 'Choirul Arifin')}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-2.5 py-3 px-4 bg-white hover:bg-blue-600 hover:text-white border border-blue-300 hover:border-blue-600 rounded-xl font-bold text-xs text-gray-800 shadow-sm transition-all group"
-                >
-                  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 21 21">
-                    <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-                    <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-                    <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-                    <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-                  </svg>
-                  <span>{loading ? 'Menghubungkan ke SSO...' : 'Masuk Langsung dengan Outlook Mahasiswa'}</span>
-                  {!loading && <ArrowRight className="w-3.5 h-3.5 text-blue-600 group-hover:text-white group-hover:translate-x-0.5 transition-all" />}
-                </button>
-                <div className="flex items-center justify-between text-[10px] text-blue-800 mt-2 px-1">
-                  <span className="font-semibold">Terdeteksi: Choirul Arifin (23302410001)</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowSsoModal(true)}
-                    className="underline hover:text-blue-950 font-bold"
-                  >
-                    Ganti Akun SSO
-                  </button>
-                </div>
-              </div>
-
-              <div className="relative flex items-center my-2">
-                <div className="flex-grow border-t border-gray-200"></div>
-                <span className="flex-shrink mx-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Atau Masuk dengan Akun Manual
-                </span>
-                <div className="flex-grow border-t border-gray-200"></div>
-              </div>
-
-              <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                   Role Masuk
@@ -642,13 +356,13 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={role === 'sarpras' ? 'admin@gmail.com' : 'Contoh: 23324000123 atau nim@student...'}
+                    placeholder={role === 'sarpras' ? 'admin@gmail.com' : 'Contoh: 23302410001 atau nim@student...'}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
                   />
                 </div>
                 {role === 'student_org' && (
                   <p className="text-[11px] text-gray-500 mt-1">
-                    💡 Anda bisa memasukkan 11 digit NIM atau alamat email SSO resmi Anda.
+                    💡 Cukup ketik 11 digit NIM atau alamat email mahasiswa Anda.
                   </p>
                 )}
               </div>
@@ -679,21 +393,20 @@ export default function LoginPage() {
                 {!loading && <ArrowRight className="w-4 h-4" />}
               </button>
             </form>
-          </div>
           )}
 
           {/* ======================================================= */}
-          {/* TAB 2: BUAT AKUN BARU -> VERIFIKASI OTP RESMI EMAIL     */}
+          {/* TAB 2: BUAT AKUN BARU -> LINK VERIFIKASI KE OUTLOOK      */}
           {/* ======================================================= */}
           {activeTab === 'signup' && (
             signUpStep === 'form' ? (
-              // STEP 1: INPUT DATA & KIRIM OTP
-              <form onSubmit={handleSignUpRequestOtp} className="space-y-3.5">
+              // STEP 1: INPUT DATA MAHASISWA & KIRIM LINK KE OUTLOOK
+              <form onSubmit={handleSignUpRequestLink} className="space-y-3.5">
                 <div className="bg-green-50 border border-green-200 p-3 rounded-2xl flex items-start gap-2.5 text-[11px] text-green-950 font-medium leading-relaxed">
                   <ShieldCheck className="w-5 h-5 text-green-700 flex-shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold text-green-900 block mb-0.5">Pendaftaran Resmi Mahasiswa Prasetiya Mulya</span>
-                    Kode verifikasi OTP 6-digit akan dikirimkan langsung ke inbox email Outlook resmi kampus Anda untuk membuktikan keaslian akun.
+                    <span className="font-bold text-green-900 block mb-0.5">Verifikasi Resmi Outlook Kampus</span>
+                    Link verifikasi akan dikirimkan langsung ke email Outlook kampus Anda. Cukup klik link tersebut untuk langsung aktif dan masuk ke Dashboard tanpa ribet!
                   </div>
                 </div>
 
@@ -709,7 +422,7 @@ export default function LoginPage() {
                       required
                       value={nim}
                       onChange={(e) => handleNimChange(e.target.value)}
-                      placeholder="Contoh: 23324000123"
+                      placeholder="Contoh: 23302410001"
                       className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all tracking-wider"
                     />
                   </div>
@@ -763,10 +476,10 @@ export default function LoginPage() {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-                      Email SSO Kampus Resmi
+                      Email Kampus Resmi
                     </label>
                     <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> Terkunci Otomatis
+                      <Lock className="w-2.5 h-2.5" /> Terkunci Otomatis Sesuai NIM
                     </span>
                   </div>
                   <div className="relative">
@@ -804,83 +517,75 @@ export default function LoginPage() {
                     className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-semibold shadow-md shadow-green-700/20 transition-all"
                   >
                     <Mail className="w-4 h-4" />
-                    <span>{loading ? 'Mengirim Kode OTP...' : 'Kirim Kode Verifikasi ke Outlook Kampus'}</span>
+                    <span>{loading ? 'Mengirim Link Verifikasi...' : 'Kirim Link Verifikasi ke Outlook Kampus'}</span>
                   </button>
                   <p className="text-[10px] text-gray-400 text-center mt-2">
-                    Kode 6 digit akan dikirimkan ke kotak masuk Outlook mahasiswa Anda.
+                    Sistem akan mengirimkan link masuk langsung ke email Outlook mahasiswa Anda.
                   </p>
                 </div>
               </form>
             ) : (
-              // STEP 2: VERIFIKASI KODE OTP
-              <form onSubmit={handleSignUpVerifyOtp} className="space-y-4 animate-fade-in-up">
-                <div className="bg-green-50/80 p-3.5 rounded-2xl border border-green-200 text-center text-xs">
-                  <div className="text-gray-500">Kode verifikasi pendaftaran telah dikirim ke:</div>
-                  <div className="font-bold text-green-950 text-sm mt-0.5">{nim}@student.prasetiyamulya.ac.id</div>
-                </div>
-
-                <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-200 text-[11px] text-blue-900 leading-relaxed text-left space-y-1">
-                  <div className="font-bold flex items-center gap-1 text-blue-950">
-                    <span>💡 Periksa Inbox Outlook Kampus:</span>
-                  </div>
-                  <p>Buka <strong>Outlook / Webmail Mahasiswa Prasetiya Mulya</strong> di tab browser Anda, salin 6 digit kode OTP yang dikirimkan oleh sistem.</p>
+              // STEP 2: SCREEN MENUNGGU KLIK DI OUTLOOK
+              <div className="space-y-4 py-2 animate-fade-in-up text-center">
+                <div className="w-16 h-16 bg-green-100 text-green-700 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                  <Mail className="w-8 h-8 animate-bounce" />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2 text-center">
-                    Masukkan 6 Digit Kode OTP
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={8}
-                    required
-                    autoFocus
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
-                    placeholder="123456"
-                    className="w-full text-center tracking-[0.4em] text-2xl font-black font-mono py-2.5 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-600 transition-all"
-                  />
-                  <p className="text-[11px] text-gray-400 text-center mt-1.5">
-                    Pastikan kode yang dimasukkan persis sama dengan yang ada di email.
+                  <h4 className="text-lg font-bold text-gray-900">Link Verifikasi Terkirim!</h4>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Kami telah mengirimkan link masuk resmi ke kotak masuk Outlook Anda:
                   </p>
+                  <div className="inline-block bg-green-50 border border-green-200 text-green-950 font-bold font-mono px-3 py-1.5 rounded-xl text-xs mt-2">
+                    {nim}@student.prasetiyamulya.ac.id
+                  </div>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading || otpCode.trim().length < 6}
-                  className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-semibold shadow-md shadow-green-700/20 transition-all"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{loading ? 'Memverifikasi...' : 'Verifikasi Kode & Selesaikan Pendaftaran'}</span>
-                </button>
-
-                <div className="flex items-center justify-between text-xs pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSignUpStep('form')
-                      setOtpCode('')
-                      setErrorMsg('')
-                    }}
-                    className="text-gray-500 hover:text-gray-700 underline"
-                  >
-                    ← Ubah Data Pendaftaran
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={resendTimer > 0 || loading}
-                    onClick={handleSignUpRequestOtp}
-                    className={`font-semibold ${
-                      resendTimer > 0 
-                        ? 'text-gray-400 cursor-not-allowed' 
-                        : 'text-green-700 hover:underline'
-                    }`}
-                  >
-                    {resendTimer > 0 ? `Kirim ulang (${resendTimer}s)` : 'Kirim Ulang Kode'}
-                  </button>
+                <div className="bg-blue-50/80 border border-blue-200 p-4 rounded-2xl text-left text-xs text-blue-950 space-y-1.5 leading-relaxed">
+                  <div className="font-bold flex items-center gap-1.5 text-blue-900">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    <span>Langkah Mudah:</span>
+                  </div>
+                  <p>1. Buka <strong>Outlook / Webmail Kampus Prasetiya Mulya</strong> di tab lain atau di HP Anda.</p>
+                  <p>2. Cari email dari <strong>EventLoop Prasetiya Mulya</strong>.</p>
+                  <p>3. <strong>Klik link verifikasi</strong> di dalam email tersebut. Anda akan langsung otomatis masuk ke Dashboard EventLoop tanpa perlu memasukkan kode apapun!</p>
                 </div>
-              </form>
+
+                <div className="space-y-2 pt-2">
+                  <a
+                    href="https://outlook.office.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition-all block"
+                  >
+                    <span>Buka Outlook Webmail Sekarang</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
+
+                  <div className="flex items-center justify-between text-xs pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setSignUpStep('form')}
+                      className="text-gray-500 hover:text-gray-700 underline"
+                    >
+                      ← Ubah Data Pendaftaran
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={resendTimer > 0 || loading}
+                      onClick={handleSignUpRequestLink}
+                      className={`font-semibold ${
+                        resendTimer > 0 
+                          ? 'text-gray-400 cursor-not-allowed' 
+                          : 'text-green-700 hover:underline'
+                      }`}
+                    >
+                      {resendTimer > 0 ? `Kirim ulang link (${resendTimer}s)` : 'Kirim Ulang Link'}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )
           )}
 
@@ -894,131 +599,6 @@ export default function LoginPage() {
         </div>
 
       </div>
-      {/* Modal Autentikasi SSO Kampus (Microsoft 365 / Prasetiya Mulya) */}
-      {showSsoModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden">
-            {/* Header Modal */}
-            <div className="p-6 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white relative">
-              <button 
-                type="button"
-                onClick={() => setShowSsoModal(false)}
-                className="absolute top-5 right-5 text-gray-300 hover:text-white text-xl font-bold p-1 rounded-lg hover:bg-white/10 transition-all"
-              >
-                ✕
-              </button>
-              <div className="flex items-center gap-2 mb-2">
-                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 21 21">
-                  <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-                  <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-                  <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-                  <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-                </svg>
-                <span className="text-xs font-bold tracking-wider uppercase text-blue-200">Microsoft Entra ID</span>
-              </div>
-              <h3 className="text-lg font-bold">Portal SSO Prasetiya Mulya</h3>
-              <p className="text-xs text-blue-200 mt-0.5">
-                Otentikasi Mahasiswa Resmi (Outlook / Microsoft 365)
-              </p>
-            </div>
-
-            {/* Body Modal */}
-            <div className="p-6 space-y-4">
-              <div className="bg-blue-50/80 border border-blue-200 p-4 rounded-2xl flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/20 flex-shrink-0">
-                  PM
-                </div>
-                <div className="overflow-hidden flex-1">
-                  <div className="text-xs font-bold text-gray-900 truncate">
-                    {ssoName}
-                  </div>
-                  <div className="text-[11px] font-mono text-blue-900 font-bold truncate">
-                    {ssoNim}@student.prasetiyamulya.ac.id
-                  </div>
-                  <div className="text-[10px] text-green-700 font-semibold flex items-center gap-1 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse"></span>
-                    <span>Akun Kampus Terverifikasi Aktif</span>
-                  </div>
-                </div>
-              </div>
-
-              {isEditingSsoAccount ? (
-                <div className="space-y-3 pt-2 border-t border-gray-100">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                      NIM Mahasiswa (11 Digit) *
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={11}
-                      value={ssoNim}
-                      onChange={(e) => setSsoNim(e.target.value)}
-                      placeholder="Contoh: 23302410001"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                      Nama Mahasiswa
-                    </label>
-                    <input
-                      type="text"
-                      value={ssoName}
-                      onChange={(e) => setSsoName(e.target.value)}
-                      placeholder="Nama Lengkap"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsEditingSsoAccount(true)}
-                  className="text-xs text-blue-700 hover:text-blue-900 hover:underline font-semibold block text-center w-full py-1"
-                >
-                  Ganti NIM / Akun Mahasiswa Lain
-                </button>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                  Password Akun Mahasiswa *
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    required
-                    value={ssoPassword}
-                    onChange={(e) => setSsoPassword(e.target.value)}
-                    placeholder="Masukkan password akun Anda"
-                    className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 space-y-2">
-                <button
-                  type="button"
-                  onClick={handleSsoLogin}
-                  disabled={loading}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition-all"
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>{loading ? 'Menghubungkan ke SSO Kampus...' : 'Masuk Langsung dengan Akun Ini'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowSsoModal(false)}
-                  className="w-full py-2 text-xs text-gray-500 hover:text-gray-700 font-semibold"
-                >
-                  Batal
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

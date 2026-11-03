@@ -325,11 +325,29 @@ export function AppProvider({ children }) {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession)
       if (newSession?.user) {
-        const name = newSession.user.user_metadata?.full_name || 'Prasmulyan'
-        setCurrentUserName(name)
+        const meta = newSession.user.user_metadata || {}
+        const name = meta.full_name || 'Prasmulyan'
+        const nim = meta.nim || ''
         const userEmail = newSession.user.email || ''
+
+        setCurrentUserName(name)
         if (isAdminEmail(userEmail)) {
           setCurrentUserRole('admin')
+        } else {
+          setCurrentUserRole('user')
+        }
+
+        // Sinkronisasi data profil mahasiswa secara otomatis
+        try {
+          await supabase.from('profiles').upsert({
+            id: newSession.user.id,
+            email: userEmail,
+            full_name: name,
+            nim: nim,
+            updated_at: new Date().toISOString()
+          })
+        } catch (e) {
+          console.warn('Profile sync notice:', e)
         }
       }
     })
