@@ -1,392 +1,323 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import Spinner from '../components/Spinner'
 import { 
   Search, 
   Plus, 
   Check, 
-  Info, 
-  Settings2,
-  Trash2,
-  Package,
-  MapPin,
+  Sparkles, 
+  PlusCircle,
   Lock,
+  MapPin,
+  ShoppingBag,
   ArrowRight,
-  ShoppingBag
+  Clock
 } from 'lucide-react'
+
+const categories = ['All', 'Booth', 'Signage', 'Furniture', 'Electronics', 'Decoration', 'Others']
 
 export default function Marketplace() {
   const { 
-    currentUserRole, 
     equipments, 
-    updateEquipmentPriceAndStock, 
-    deleteEquipment, 
     cartItems, 
     addToCart, 
     removeFromCart, 
-    activeReservation,
-    userPaymentStatus 
+    loadingDb, 
+    userPaymentStatus, 
+    currentUserRole,
+    activeReservation
   } = useApp()
 
   const [selectedCategory, setSelectedCategory] = useState('All')
+  const [selectedListingType, setSelectedListingType] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
-  const [listingFilter, setListingFilter] = useState('all') 
-  const [editingItem, setEditingItem] = useState(null)
-  const [editPrice, setEditPrice] = useState('')
-  const [editStock, setEditStock] = useState('')
 
   const isLockedByActivePayment = currentUserRole === 'user' && userPaymentStatus !== 'idle'
-  const durationDays = Math.max(1, parseInt(activeReservation?.durationDays) || 1)
+  const durationDays = Math.max(1, Number(activeReservation?.durationDays) || 1)
 
-  const dynamicCategories = useMemo(() => {
-    const uniqueCats = Array.from(new Set(equipments.map(e => e.category).filter(Boolean)))
-    return [
-      { name: 'All', label: 'Semua', count: equipments.length },
-      ...uniqueCats.map(catName => ({
-        name: catName,
-        label: catName,
-        count: equipments.filter(e => e.category === catName).length
-      }))
-    ]
-  }, [equipments])
-
-  const filteredEquipment = equipments.filter(item => {
-    const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (item.material && item.material.toLowerCase().includes(searchQuery.toLowerCase()))
-    const matchesType = listingFilter === 'all' || 
-                        (listingFilter === 'sale' && item.listingType === 'sale') ||
-                        (listingFilter === 'rental' && item.listingType !== 'sale')
-    return matchesCategory && matchesSearch && matchesType
+  const filteredItems = equipments.filter((item) => {
+    const matchCategory = selectedCategory === 'All' || item.category === selectedCategory
+    const matchType = 
+      selectedListingType === 'All' || 
+      (selectedListingType === 'rental' && item.listingType !== 'sale') ||
+      (selectedListingType === 'sale' && item.listingType === 'sale')
+    const matchSearch = 
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.material.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchCategory && matchType && matchSearch
   })
 
-  const handleSaveEdit = (e) => {
+  const isInCart = (id) => cartItems.some((i) => i.id === id)
+
+  const toggleCart = (e, item) => {
     e.preventDefault()
-    if (editingItem && currentUserRole === 'admin') {
-      updateEquipmentPriceAndStock(editingItem.id, editPrice, editStock)
-      setEditingItem(null)
-    }
-  }
-
-  const handleDelete = () => {
-    if (editingItem && currentUserRole === 'admin' && window.confirm(`Hapus barang "${editingItem.name}" dari katalog?`)) {
-      deleteEquipment(editingItem.id)
-      setEditingItem(null)
-    }
-  }
-
-  const toggleReserve = (item) => {
+    e.stopPropagation()
     if (isLockedByActivePayment) return
-    const isReserved = cartItems.some(cartItem => cartItem.id === item.id)
-    if (isReserved) {
+    if (isInCart(item.id)) {
       removeFromCart(item.id)
     } else {
       addToCart(item, 1)
     }
   }
 
-  const estimatedCartTotal = cartItems.reduce((sum, item) => {
-    const unitPrice = item.listingType === 'sale' ? (item.salePrice || item.price) : item.price
-    return sum + (item.listingType === 'sale' ? unitPrice * item.qty : unitPrice * item.qty * durationDays)
+  const cartTotalEstimate = cartItems.reduce((sum, item) => {
+    const unitPrice = item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price
+    const multiplier = item.listingType === 'sale' ? 1 : durationDays
+    return sum + unitPrice * item.qty * multiplier
   }, 0)
+
+  if (loadingDb) return <Spinner />
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-24">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <span className="text-xs font-medium text-[#3A6351]">Katalog Sirkular Kampus</span>
-          <h2 className="text-2xl font-bold text-[#232925] mt-0.5">
-            Perlengkapan Kegiatan
+          <span className="badge-sage mb-2">
+            <Sparkles className="w-3.5 h-3.5" /> Katalog Perlengkapan Sirkular
+          </span>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Marketplace Perlengkapan Event
           </h2>
-          <p className="text-sm text-[#5C645E] mt-0.5">
-            {currentUserRole === 'admin' 
-              ? 'Kelola ketersediaan stok dan tarif sewa harian peralatan.' 
-              : 'Pilih peralatan yang dibutuhkan beserta informasi lokasi pengambilannya.'}
+          <p className="text-sm text-slate-500 mt-0.5">
+            Pinjam perlengkapan lintas organisasi dengan sistem pengembalian ke lokasi asal barang.
           </p>
         </div>
 
         {currentUserRole === 'user' && (
-          <div className="flex flex-wrap items-center gap-2.5">
-            {activeReservation?.eventName && !isLockedByActivePayment && (
-              <span className="badge-sage py-2 px-3">
-                Event: {activeReservation.eventName} ({durationDays} Hari)
-              </span>
-            )}
-            <Link to="/upload-equipment" className="btn-secondary text-xs !py-2 !px-3.5">
-              + Pinjamkan Barang
+          <div className="flex items-center gap-2.5">
+            <Link 
+              to="/my-equipment" 
+              className="btn-secondary text-xs !py-2.5 !px-4"
+            >
+              Barang Saya
             </Link>
-            <Link to="/reservation" className="btn-primary text-xs !py-2 !px-4">
-              Reservasi ({isLockedByActivePayment ? (activeReservation?.items?.length || 0) : cartItems.length})
+            <Link 
+              to="/upload-equipment" 
+              className="btn-primary text-xs !py-2.5 !px-4 flex items-center gap-1.5"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Upload Barang</span>
             </Link>
           </div>
         )}
       </div>
 
-      {/* Info halus jika sudah ada reservasi aktif yang mengunci */}
-      {isLockedByActivePayment && (
-        <div className="p-4 bg-[#F7F1E3] border border-[#E5D8BD] rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-[#6E4D1F]">
-          <div className="flex items-center gap-2.5">
-            <Lock className="w-4 h-4 flex-shrink-0 text-[#855D27]" />
+      {/* Info Banner: Event Aktif atau Terkunci */}
+      {isLockedByActivePayment ? (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-900">
+          <div className="flex items-center gap-3">
+            <Lock className="w-4 h-4 text-amber-700 flex-shrink-0" />
             <span>
-              Akun Anda sedang memiliki reservasi aktif untuk event <strong>{activeReservation?.eventName}</strong>. Selesaikan event saat ini sebelum membuat reservasi baru.
+              <strong>Pemesanan Terkunci:</strong> Anda memiliki reservasi aktif untuk event <strong>{activeReservation?.eventName}</strong>. Selesaikan pengembalian barang terlebih dahulu untuk memesan kembali.
             </span>
           </div>
-          <Link to="/reservation" className="font-semibold underline whitespace-nowrap">
-            Lihat Reservasi →
+          <Link to="/reservation" className="btn-secondary !py-1.5 !px-3 text-xs flex-shrink-0">
+            Lihat Reservasi
           </Link>
         </div>
-      )}
+      ) : currentUserRole === 'user' && activeReservation?.eventName ? (
+        <div className="p-4 bg-emerald-50/80 border border-emerald-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-emerald-950">
+          <div className="flex items-center gap-2.5">
+            <Clock className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span>
+              Memilih perlengkapan untuk kegiatan <strong>{activeReservation.eventName}</strong> · Durasi sewa: <strong>{durationDays} Hari</strong>
+            </span>
+          </div>
+          <Link to="/reservation" className="font-semibold text-emerald-700 hover:underline flex items-center gap-1">
+            <span>Ke Halaman Reservasi ({cartItems.length})</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      ) : null}
 
-      {/* Bar Pencarian & Filter Sederhana */}
-      <div className="card p-4 space-y-3.5">
-        <div className="flex flex-col sm:flex-row gap-3 justify-between">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-[#8A928C] absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Cari perlengkapan (mis. Banner, Booth, Sound System)..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="cozy-input !pl-10 !py-2"
-            />
+      {/* Filter & Search Bar */}
+      <div className="card p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row justify-between gap-3 pb-3 border-b border-emerald-100/70">
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            {[
+              { id: 'All', label: 'Semua Barang' },
+              { id: 'rental', label: 'Sewa Harian' },
+              { id: 'sale', label: 'Beli Preloved' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setSelectedListingType(tab.id)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  selectedListingType === tab.id
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:bg-emerald-50'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          <div className="flex items-center bg-[#F3F1EA] p-1 rounded-xl text-xs font-medium self-start sm:self-auto">
-            <button
-              onClick={() => setListingFilter('all')}
-              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${listingFilter === 'all' ? 'bg-white text-[#232925] shadow-2xs font-semibold' : 'text-[#5C645E]'}`}
-            >
-              Semua
-            </button>
-            <button
-              onClick={() => setListingFilter('rental')}
-              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${listingFilter === 'rental' ? 'bg-white text-[#232925] shadow-2xs font-semibold' : 'text-[#5C645E]'}`}
-            >
-              Sewa Harian
-            </button>
-            <button
-              onClick={() => setListingFilter('sale')}
-              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${listingFilter === 'sale' ? 'bg-white text-[#232925] shadow-2xs font-semibold' : 'text-[#5C645E]'}`}
-            >
-              Beli Preloved
-            </button>
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Cari nama alat, bahan..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="cozy-input !pl-9 !py-1.5 !text-xs"
+            />
           </div>
         </div>
 
-        {/* Kategori */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {dynamicCategories.map((cat) => (
+        {/* Category Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+          {categories.map((cat) => (
             <button
-              key={cat.name}
-              onClick={() => setSelectedCategory(cat.name)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                selectedCategory === cat.name
-                  ? 'bg-[#3A6351] text-white'
-                  : 'bg-[#F3F1EA] text-[#5C645E] hover:bg-[#E8E5DC]'
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
+                selectedCategory === cat
+                  ? 'bg-emerald-50 text-emerald-800 font-semibold border border-emerald-200'
+                  : 'text-slate-500 hover:bg-emerald-50/40'
               }`}
             >
-              {cat.label} ({cat.count})
+              {cat}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Grid Barang */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        {filteredEquipment.map((item) => {
-          const isReserved = cartItems.some(cartItem => cartItem.id === item.id)
+      {/* Equipment Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {filteredItems.map((item) => {
+          const reserved = isInCart(item.id)
+          const itemLocation = item.lastLocation || item.initialLocation || 'Warehouse Kampus Gedung C'
           return (
-            <div 
+            <Link 
+              to={`/equipment/${item.id}`}
               key={item.id} 
-              className="card overflow-hidden flex flex-col justify-between hover:border-[#C8C5B9]"
+              className="card flex flex-col justify-between overflow-hidden group hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer"
             >
               <div>
-                <Link to={`/equipment/${item.id}`} className="bg-[#F3F1EA] h-44 flex items-center justify-center relative overflow-hidden block">
+                {/* Image Area */}
+                <div className="bg-gradient-to-br from-emerald-50/50 via-white to-teal-50/40 h-44 flex items-center justify-center relative border-b border-emerald-100/70 overflow-hidden">
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   ) : (
-                    <span className="text-5xl opacity-85">{item.image || '📦'}</span>
+                    <span className="text-6xl opacity-85 group-hover:scale-105 transition-transform duration-300">{item.image}</span>
                   )}
-                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-xs px-2 py-0.5 rounded-lg text-[11px] font-semibold text-[#3A6351] border border-[#E2E0D8]">
-                    Score {item.circularScore || 85}
-                  </div>
-                  <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-2 py-0.5 rounded-lg text-[10px] font-medium text-[#5C645E] border border-[#E2E0D8] max-w-[60%] truncate">
-                    {item.owner || 'Kampus'}
-                  </div>
-                </Link>
 
-                <div className="p-4 space-y-2.5">
-                  <div className="flex items-center justify-between text-[11px] text-[#7A827C]">
+                  {/* Top Left Type Tag */}
+                  <div className="absolute top-3 left-3">
+                    <span className={item.listingType === 'sale' ? 'badge-warm' : 'badge-sage'}>
+                      {item.listingType === 'sale' ? 'Preloved' : 'Sewa / Hari'}
+                    </span>
+                  </div>
+
+                  {/* Top Right Circular Score */}
+                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-xs text-emerald-800 px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-emerald-100 shadow-2xs">
+                    ♻️ Score {item.circularScore}
+                  </div>
+                </div>
+
+                {/* Details */}
+                <div className="p-5 space-y-3">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
                     <span>{item.category}</span>
-                    <span>Tersedia <strong className="text-[#232925]">{item.available}</strong>/{item.total}</span>
+                    <span>Stok: <strong className="text-slate-700">{item.available}/{item.total}</strong></span>
                   </div>
 
-                  <h3 className="font-semibold text-[#232925] text-sm line-clamp-1">
-                    <Link to={`/equipment/${item.id}`} className="hover:text-[#3A6351]">{item.name}</Link>
+                  <h3 className="font-bold text-slate-900 text-base leading-snug group-hover:text-emerald-700 transition-colors">
+                    {item.name}
                   </h3>
 
-                  <div className="flex items-center gap-1.5 text-[11px] text-[#5C645E] bg-[#FAF9F5] px-2.5 py-1.5 rounded-lg border border-[#ECEAE2] truncate">
-                    <MapPin className="w-3 h-3 text-[#3A6351] flex-shrink-0" />
-                    <span className="truncate" title={item.lastLocation}>{item.lastLocation || 'Warehouse Kampus Gedung C'}</span>
+                  {/* Origin / Return Location */}
+                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 bg-emerald-50/60 px-2.5 py-1.5 rounded-lg border border-emerald-100/80">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                    <span className="truncate">{itemLocation}</span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1">
+                    <span className="truncate max-w-[160px]">{item.owner}</span>
+                    <span>{item.reuseCount}x dipakai</span>
                   </div>
                 </div>
               </div>
 
-              <div className="px-4 pb-4 pt-3 border-t border-[#F3F1EA] flex items-center justify-between gap-2">
+              {/* Price & Action Footer */}
+              <div className="px-5 py-3.5 bg-emerald-50/25 border-t border-emerald-100/70 flex items-center justify-between gap-2">
                 <div>
-                  <div className="text-[10px] text-[#8A928C]">
-                    {item.listingType === 'sale' ? 'Harga Beli' : 'Sewa Harian'}
-                  </div>
-                  <div className="text-sm font-bold text-[#232925]">
-                    Rp{(item.listingType === 'sale' ? (item.salePrice || item.price) : item.price).toLocaleString('id-ID')}
-                    {item.listingType !== 'sale' && <span className="text-[11px] font-normal text-[#7A827C]"> /hari</span>}
-                  </div>
+                  <span className="text-[10px] text-slate-400 block">
+                    {item.listingType === 'sale' ? 'Harga Beli' : 'Tarif Sewa'}
+                  </span>
+                  <span className="text-sm font-bold text-emerald-700">
+                    Rp{(item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price).toLocaleString('id-ID')}
+                  </span>
+                  {item.listingType !== 'sale' && (
+                    <span className="text-[11px] text-slate-400"> / hari</span>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-1">
-                  {currentUserRole === 'admin' && (
-                    <button
-                      onClick={() => {
-                        setEditingItem(item)
-                        setEditPrice(item.listingType === 'sale' ? (item.salePrice || item.price) : item.price)
-                        setEditStock(item.available)
-                      }}
-                      className="p-2 text-[#7A827C] hover:text-[#232925] hover:bg-[#F3F1EA] rounded-lg transition-colors cursor-pointer"
-                      title="Edit Stok / Harga"
-                    >
-                      <Settings2 className="w-4 h-4" />
-                    </button>
-                  )}
-
-                  <Link
-                    to={`/equipment/${item.id}`}
-                    className="p-2 text-[#7A827C] hover:text-[#232925] hover:bg-[#F3F1EA] rounded-lg transition-colors"
-                    title="Detail Barang"
+                {currentUserRole === 'user' && (
+                  <button
+                    disabled={isLockedByActivePayment}
+                    onClick={(e) => toggleCart(e, item)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      isLockedByActivePayment
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                        : reserved
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs'
+                    }`}
                   >
-                    <Info className="w-4 h-4" />
-                  </Link>
-
-                  {currentUserRole === 'user' && (
-                    <button
-                      disabled={isLockedByActivePayment || (item.available <= 0 && !isReserved)}
-                      onClick={() => toggleReserve(item)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer ${
-                        isLockedByActivePayment
-                          ? 'bg-[#EFECE6] text-[#9A9890] cursor-not-allowed'
-                          : isReserved
-                          ? 'bg-[#3A6351] text-white'
-                          : item.available <= 0 
-                          ? 'bg-[#EFECE6] text-[#9A9890] cursor-not-allowed'
-                          : 'bg-[#EAF0EC] text-[#264738] hover:bg-[#DCE7E0]'
-                      }`}
-                    >
-                      {isLockedByActivePayment ? (
+                    {isLockedByActivePayment ? (
+                      <>
+                        <Lock className="w-3.5 h-3.5" />
                         <span>Terkunci</span>
-                      ) : isReserved ? (
-                        <><Check className="w-3.5 h-3.5" /><span>Dipilih</span></>
-                      ) : item.available <= 0 ? (
-                        <span>Habis</span>
-                      ) : (
-                        <><Plus className="w-3.5 h-3.5" /><span>Pilih</span></>
-                      )}
-                    </button>
-                  )}
-                </div>
+                      </>
+                    ) : reserved ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Terpilih</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Pilih</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
-            </div>
+            </Link>
           )
         })}
       </div>
 
-      {filteredEquipment.length === 0 && (
-        <div className="card p-12 text-center space-y-2">
-          <Package className="w-10 h-10 mx-auto text-[#B8B4A8]" />
-          <h4 className="font-semibold text-[#232925] text-sm">Barang tidak ditemukan</h4>
-          <p className="text-xs text-[#7A827C]">Silakan gunakan kata kunci lain atau ubah kategori filter.</p>
-        </div>
-      )}
-
-      {/* Floating Checkout Bar yang Lembut */}
-      {currentUserRole === 'user' && !isLockedByActivePayment && cartItems.length > 0 && (
-        <div className="fixed bottom-5 left-4 right-4 lg:left-72 lg:right-10 z-40 max-w-4xl mx-auto">
-          <div className="bg-[#26302B] text-white px-5 py-3.5 rounded-2xl shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#3A6351] flex items-center justify-center text-white">
-                <ShoppingBag className="w-4 h-4" />
+      {/* Floating Bottom Cart Bar */}
+      {currentUserRole === 'user' && cartItems.length > 0 && !isLockedByActivePayment && (
+        <div className="fixed bottom-5 left-4 right-4 lg:left-72 lg:right-8 z-40 max-w-4xl mx-auto">
+          <div className="bg-emerald-900 text-white p-4 rounded-2xl shadow-lg shadow-emerald-950/20 border border-emerald-700 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-700 text-emerald-100 flex items-center justify-center flex-shrink-0">
+                <ShoppingBag className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-xs font-medium text-[#DCE7E0]">
-                  {cartItems.length} barang dipilih · Durasi {durationDays} hari
+                <div className="text-xs font-semibold text-white">
+                  {cartItems.length} Jenis Barang Dipilih · Durasi {durationDays} Hari
                 </div>
-                <div className="text-sm font-bold text-white">
-                  Total Estimasi: Rp{estimatedCartTotal.toLocaleString('id-ID')}
+                <div className="text-xs text-emerald-200 mt-0.5">
+                  Estimasi Total: <strong className="text-white">Rp{cartTotalEstimate.toLocaleString('id-ID')}</strong>
                 </div>
               </div>
             </div>
 
             <Link
               to="/reservation"
-              className="w-full sm:w-auto bg-[#EAF0EC] hover:bg-white text-[#232925] text-xs font-semibold py-2.5 px-5 rounded-xl flex items-center justify-center gap-2 transition-colors"
+              className="w-full sm:w-auto bg-white hover:bg-emerald-50 text-emerald-900 px-5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors"
             >
-              <span>Lanjut ke Reservasi</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span>Lanjut ke Reservasi & Bayar</span>
+              <ArrowRight className="w-4 h-4" />
             </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Edit Admin */}
-      {editingItem && currentUserRole === 'admin' && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 border border-[#E8E6DF] shadow-xl">
-            <div className="flex items-center justify-between pb-3 border-b border-[#EFECE6]">
-              <h4 className="font-semibold text-[#232925] text-sm">
-                Edit: {editingItem.name}
-              </h4>
-              <button onClick={() => setEditingItem(null)} className="text-[#8A928C] hover:text-[#232925] text-xs">✕</button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-medium text-[#5C645E] mb-1">
-                  {editingItem.listingType === 'sale' ? 'Harga Jual (Rp)' : 'Tarif Sewa / Hari (Rp)'}
-                </label>
-                <input
-                  type="number"
-                  required
-                  value={editPrice}
-                  onChange={(e) => setEditPrice(e.target.value)}
-                  className="cozy-input"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium text-[#5C645E] mb-1">
-                  Stok Tersedia (Unit)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  value={editStock}
-                  onChange={(e) => setEditStock(e.target.value)}
-                  className="cozy-input"
-                />
-              </div>
-
-              <div className="pt-2 flex flex-col gap-2">
-                <button type="submit" className="w-full btn-primary text-xs cursor-pointer">Simpan Perubahan</button>
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  className="w-full py-2.5 rounded-xl border border-[#ECC8C3] text-[#9E4738] hover:bg-[#FDF3F2] text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Hapus Barang</span>
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

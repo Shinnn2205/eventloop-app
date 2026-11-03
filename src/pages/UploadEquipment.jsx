@@ -14,7 +14,6 @@ import {
   X
 } from 'lucide-react'
 
-// Fungsi Kompresi Foto
 const compressImage = (file, callback) => {
   const reader = new FileReader()
   reader.onload = (e) => {
@@ -38,14 +37,13 @@ export default function UploadEquipment() {
   const appContext = useApp() || {}
   const uploadEquipmentByUser = appContext.uploadEquipmentByUser || (() => `APV-${Math.floor(Math.random() * 9999)}`)
   
-  // Form State
   const [name, setName] = useState('Standing Banner Frame Aluminium')
   const [category, setCategory] = useState('Signage')
   const [qty, setQty] = useState('3')
   const [size, setSize] = useState('60 × 160 cm')
   const [material, setMaterial] = useState('Aluminium')
   const [maxReuse, setMaxReuse] = useState('50')
-  const [pricingType, setPricingType] = useState('rental') // rental | sale | free
+  const [pricingType, setPricingType] = useState('rental')
   const [price, setPrice] = useState('15000')
   const [salePrice, setSalePrice] = useState('120000')
   const [bankAccount, setBankAccount] = useState('BCA 8012345678 a.n BEM Prasmul')
@@ -54,7 +52,6 @@ export default function UploadEquipment() {
   const [imagePreview, setImagePreview] = useState(null)
   const [imageFileName, setImageFileName] = useState('')
   
-  // State Lokasi & Foto Tempat (Rak)
   const [initialLocation, setInitialLocation] = useState('Warehouse Kampus Gedung C (Rak A-01)')
   const [storagePhotoPreview, setStoragePhotoPreview] = useState(null)
   const [storageFileName, setStorageFileName] = useState('')
@@ -118,16 +115,15 @@ export default function UploadEquipment() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="badge-sage mb-2">
             <Package className="w-3.5 h-3.5" /> Berbagi Inventaris Kampus
           </span>
-          <h2 className="text-2xl font-bold text-[#2C332E] tracking-tight">
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
             Upload Perlengkapan Organisasi
           </h2>
-          <p className="text-sm text-[#6E7871] max-w-2xl mt-1">
+          <p className="text-sm text-slate-500 max-w-2xl mt-1">
             Daftarkan perlengkapan beserta lokasi penyimpanannya agar dapat disewa atau dibeli oleh kepanitiaan lain.
           </p>
         </div>
@@ -139,12 +135,10 @@ export default function UploadEquipment() {
 
       {!submitted ? (
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Form Section */}
           <div className="lg:col-span-2 card p-6 sm:p-7">
             <form onSubmit={handleSubmit} className="space-y-5">
-              
               <div>
-                <label className="block text-xs font-semibold text-[#5C645E] mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Nama Perlengkapan
                 </label>
                 <input
@@ -158,31 +152,31 @@ export default function UploadEquipment() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#5C645E] mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Foto Fisik Perlengkapan
                 </label>
                 {!imagePreview ? (
-                  <label className="flex flex-col items-center justify-center border border-dashed border-[#D5D1C8] hover:border-[#3A6351] rounded-xl p-6 bg-[#F6F5F0] transition-colors cursor-pointer">
-                    <Camera className="w-6 h-6 text-[#8A938C] mb-1.5" />
-                    <span className="text-xs font-medium text-[#2C332E]">Pilih Foto Barang</span>
-                    <span className="text-[11px] text-[#8A938C] mt-0.5">Format PNG, JPG, JPEG</span>
+                  <label className="flex flex-col items-center justify-center border border-dashed border-emerald-300 hover:border-emerald-500 rounded-xl p-6 bg-emerald-50/30 transition-colors cursor-pointer">
+                    <Camera className="w-6 h-6 text-emerald-600 mb-1.5" />
+                    <span className="text-xs font-semibold text-slate-700">Pilih Foto Barang</span>
+                    <span className="text-[11px] text-slate-400 mt-0.5">Format PNG, JPG, JPEG</span>
                     <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
                   </label>
                 ) : (
-                  <div className="rounded-xl border border-[#E8E6DF] bg-[#F6F5F0] p-2.5 flex items-center gap-3">
-                    <img src={imagePreview} alt="Item" className="w-16 h-16 object-cover rounded-lg border border-[#E8E6DF]" />
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-2.5 flex items-center gap-3">
+                    <img src={imagePreview} alt="Item" className="w-16 h-16 object-cover rounded-lg border border-emerald-100" />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-[#3A6351]"><CheckCircle className="w-3.5 h-3.5" /> Foto Terpilih</div>
-                      <p className="text-[11px] text-[#6E7871] truncate mt-0.5">{imageFileName}</p>
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700"><CheckCircle className="w-3.5 h-3.5" /> Foto Terpilih</div>
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5">{imageFileName}</p>
                     </div>
-                    <button type="button" onClick={() => setImagePreview(null)} className="p-1.5 text-[#8A938C] hover:text-[#2C332E] rounded-lg bg-[#FAF9F5]"><X className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => setImagePreview(null)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg bg-white"><X className="w-4 h-4" /></button>
                   </div>
                 )}
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#5C645E] mb-1.5">Kategori</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Kategori</label>
                   <select value={category} onChange={(e) => setCategory(e.target.value)} className="cozy-input">
                     <option value="Booth">Booth & Display</option>
                     <option value="Signage">Signage & Banner Frame</option>
@@ -193,7 +187,7 @@ export default function UploadEquipment() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#5C645E] mb-1.5">Kondisi Fisik</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Kondisi Fisik</label>
                   <select value={condition} onChange={(e) => setCondition(e.target.value)} className="cozy-input">
                     <option value="Excellent">Sangat Bagus / Seperti Baru</option>
                     <option value="Good">Bagus & Berfungsi Normal</option>
@@ -204,24 +198,24 @@ export default function UploadEquipment() {
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#5C645E] mb-1.5">Jumlah Unit (Qty)</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Jumlah Unit (Qty)</label>
                   <input type="number" min="1" required value={qty} onChange={(e) => setQty(e.target.value)} className="cozy-input" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#5C645E] mb-1.5">Dimensi / Ukuran</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Dimensi / Ukuran</label>
                   <input type="text" required value={size} onChange={(e) => setSize(e.target.value)} className="cozy-input" />
                 </div>
               </div>
 
-              <div className="p-4 bg-[#EAF0EC]/60 rounded-xl border border-[#DCE5DF] space-y-3.5">
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#264738]">
-                  <Star className="w-3.5 h-3.5 text-[#3A6351]" />
+              <div className="p-4 bg-emerald-50/60 rounded-xl border border-emerald-100 space-y-3.5">
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-900">
+                  <Star className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Karakteristik Sirkular</span>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-[11px] font-medium text-[#5C645E] mb-1">Material Utama</label>
-                    <select value={material} onChange={(e) => setMaterial(e.target.value)} className="cozy-input !bg-[#FAF9F5] !py-2 !text-xs">
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Material Utama</label>
+                    <select value={material} onChange={(e) => setMaterial(e.target.value)} className="cozy-input !bg-white !py-2 !text-xs">
                       <option value="Aluminium">Aluminium</option>
                       <option value="Steel Frame">Steel Frame</option>
                       <option value="Fabric / Polyester">Kain / Fabric Reusable</option>
@@ -230,8 +224,8 @@ export default function UploadEquipment() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-[#5C645E] mb-1">Estimasi Daya Tahan</label>
-                    <select value={maxReuse} onChange={(e) => setMaxReuse(e.target.value)} className="cozy-input !bg-[#FAF9F5] !py-2 !text-xs">
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Estimasi Daya Tahan</label>
+                    <select value={maxReuse} onChange={(e) => setMaxReuse(e.target.value)} className="cozy-input !bg-white !py-2 !text-xs">
                       <option value="100">100+ Kali Pakai</option>
                       <option value="50">50+ Kali Pakai</option>
                       <option value="30">30+ Kali Pakai</option>
@@ -241,39 +235,39 @@ export default function UploadEquipment() {
                 </div>
               </div>
 
-              <div className="p-4 bg-[#F6F5F0] rounded-xl border border-[#E8E6DF] space-y-3.5">
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#2C332E]">
-                  <MapPin className="w-3.5 h-3.5 text-[#3A6351]" />
+              <div className="p-4 bg-emerald-50/30 rounded-xl border border-emerald-100 space-y-3.5">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Lokasi Pengambilan & Pengembalian Asal</span>
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-[#5C645E] mb-1">Detail Lokasi Simpan (Gudang / Rak)</label>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Detail Lokasi Simpan (Gudang / Rak)</label>
                     <input 
                       type="text" 
                       required 
                       value={initialLocation} 
                       onChange={(e) => setInitialLocation(e.target.value)} 
                       placeholder="cth. Warehouse Kampus Gedung C (Rak A-01)"
-                      className="cozy-input !bg-[#FAF9F5]" 
+                      className="cozy-input !bg-white" 
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-[#5C645E] mb-1">Foto Lokasi / Rak Penyimpanan</label>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Foto Lokasi / Rak Penyimpanan</label>
                     {!storagePhotoPreview ? (
-                      <label className="flex items-center justify-center gap-2 border border-dashed border-[#D5D1C8] hover:border-[#3A6351] rounded-xl p-3.5 bg-[#FAF9F5] cursor-pointer transition-colors">
-                        <MapPin className="w-4 h-4 text-[#8A938C]" />
-                        <span className="text-xs font-medium text-[#5C645E]">Upload Foto Rak / Tempat Simpan</span>
+                      <label className="flex items-center justify-center gap-2 border border-dashed border-emerald-300 hover:border-emerald-500 rounded-xl p-3.5 bg-white cursor-pointer transition-colors">
+                        <MapPin className="w-4 h-4 text-emerald-600" />
+                        <span className="text-xs font-semibold text-slate-700">Upload Foto Rak / Tempat Simpan</span>
                         <input type="file" accept="image/*" onChange={handleStoragePhotoChange} className="hidden" />
                       </label>
                     ) : (
-                      <div className="rounded-xl border border-[#E8E6DF] bg-[#FAF9F5] p-2 flex items-center gap-3">
-                        <img src={storagePhotoPreview} alt="Rak" className="w-14 h-14 object-cover rounded-lg border border-[#E8E6DF]" />
+                      <div className="rounded-xl border border-emerald-200 bg-white p-2 flex items-center gap-3">
+                        <img src={storagePhotoPreview} alt="Rak" className="w-14 h-14 object-cover rounded-lg border border-emerald-100" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-[#3A6351]">✓ Foto Lokasi Tersimpan</p>
-                          <p className="text-[11px] text-[#8A938C] truncate">{storageFileName}</p>
+                          <p className="text-xs font-bold text-emerald-700">✓ Foto Lokasi Tersimpan</p>
+                          <p className="text-[11px] text-slate-400 truncate">{storageFileName}</p>
                         </div>
-                        <button type="button" onClick={() => setStoragePhotoPreview(null)} className="p-1.5 text-[#8A938C] hover:text-[#2C332E]"><X className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => setStoragePhotoPreview(null)} className="p-1.5 text-slate-400 hover:text-red-500"><X className="w-4 h-4" /></button>
                       </div>
                     )}
                   </div>
@@ -281,7 +275,7 @@ export default function UploadEquipment() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#5C645E] mb-2">Skema Transaksi</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-2">Skema Transaksi</label>
                 <div className="grid sm:grid-cols-3 gap-2.5">
                   {[
                     { id: 'rental', label: 'Disewakan Harian' },
@@ -294,44 +288,44 @@ export default function UploadEquipment() {
                       onClick={() => setPricingType(t.id)}
                       className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                         pricingType === t.id
-                          ? 'border-[#3A6351] bg-[#EAF0EC] text-[#264738] font-semibold'
-                          : 'border-[#E8E6DF] bg-[#FAF9F5] hover:bg-[#F6F5F0] text-[#5C645E]'
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold'
+                          : 'border-slate-200 bg-white hover:bg-emerald-50/40 text-slate-600'
                       }`}
                     >
                       <div className="text-xs flex items-center justify-between">
                         <span>{t.label}</span>
-                        {pricingType === t.id && <CheckCircle className="w-3.5 h-3.5 text-[#3A6351]" />}
+                        {pricingType === t.id && <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />}
                       </div>
                     </button>
                   ))}
                 </div>
 
                 {pricingType === 'rental' && (
-                  <div className="mt-3 p-4 bg-[#F6F5F0] rounded-xl border border-[#E8E6DF] space-y-2">
-                    <label className="block text-xs font-medium text-[#5C645E]">Tarif Sewa per Hari (Rp)</label>
-                    <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="cozy-input !bg-[#FAF9F5] max-w-xs" />
+                  <div className="mt-3 p-4 bg-emerald-50/30 rounded-xl border border-emerald-100 space-y-2">
+                    <label className="block text-xs font-semibold text-slate-700">Tarif Sewa per Hari (Rp)</label>
+                    <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="cozy-input !bg-white max-w-xs" />
                   </div>
                 )}
                 {pricingType === 'sale' && (
-                  <div className="mt-3 p-4 bg-[#F6F5F0] rounded-xl border border-[#E8E6DF] space-y-2">
-                    <label className="block text-xs font-medium text-[#5C645E]">Harga Jual Preloved (Rp)</label>
-                    <input type="number" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} className="cozy-input !bg-[#FAF9F5] max-w-xs" />
+                  <div className="mt-3 p-4 bg-emerald-50/30 rounded-xl border border-emerald-100 space-y-2">
+                    <label className="block text-xs font-semibold text-slate-700">Harga Jual Preloved (Rp)</label>
+                    <input type="number" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} className="cozy-input !bg-white max-w-xs" />
                   </div>
                 )}
 
                 {(pricingType === 'rental' || pricingType === 'sale') && (
-                  <div className="mt-3 p-4 bg-[#EAF0EC]/60 rounded-xl border border-[#DCE5DF] space-y-2">
-                    <label className="block text-xs font-medium text-[#264738] flex items-center gap-1.5">
-                      <Building className="w-3.5 h-3.5 text-[#3A6351]" />
+                  <div className="mt-3 p-4 bg-emerald-50/60 rounded-xl border border-emerald-200/80 space-y-2">
+                    <label className="block text-xs font-semibold text-emerald-900 flex items-center gap-1.5">
+                      <Building className="w-3.5 h-3.5 text-emerald-600" />
                       Rekening / E-Wallet Tujuan Payout
                     </label>
-                    <input type="text" required value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} className="cozy-input !bg-[#FAF9F5]" />
+                    <input type="text" required value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} className="cozy-input !bg-white" />
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#5C645E] mb-1.5">Deskripsi & Catatan</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Deskripsi & Catatan</label>
                 <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="cozy-input resize-none" />
               </div>
 
@@ -342,37 +336,36 @@ export default function UploadEquipment() {
             </form>
           </div>
 
-          {/* Right Preview Card */}
           <div className="hidden lg:block">
             <div className="card p-5 space-y-4 sticky top-6">
-              <div className="flex items-center justify-between pb-3 border-b border-[#ECEAE3]">
-                <span className="text-xs font-medium text-[#8A938C]">Pratinjau Katalog</span>
+              <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
+                <span className="text-xs font-semibold text-slate-400">Pratinjau Katalog</span>
                 <span className="badge-sage">Circular Score {circularScore}</span>
               </div>
 
-              <div className="bg-[#F3F1EA] rounded-xl border border-[#E8E6DF] h-44 flex items-center justify-center overflow-hidden">
+              <div className="bg-gradient-to-br from-emerald-50/60 via-white to-teal-50/40 rounded-xl border border-emerald-100 h-44 flex items-center justify-center overflow-hidden">
                 {imagePreview ? (
                   <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-6xl opacity-75">📦</span>
+                  <span className="text-6xl opacity-80">📦</span>
                 )}
               </div>
 
               <div>
-                <div className="text-[11px] font-medium text-[#6E7871]">{category} · {qty} unit</div>
-                <h4 className="font-semibold text-[#2C332E] text-sm mt-0.5 leading-snug">{name}</h4>
+                <div className="text-[11px] font-medium text-emerald-700">{category} · {qty} unit</div>
+                <h4 className="font-bold text-slate-900 text-sm mt-0.5 leading-snug">{name}</h4>
               </div>
 
-              <div className="pt-3 border-t border-[#ECEAE3] flex items-center justify-between">
+              <div className="pt-3 border-t border-emerald-100 flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] text-[#8A938C] block">
+                  <span className="text-[10px] text-slate-400 block">
                     {pricingType === 'rental' ? 'Tarif Sewa / Hari' : pricingType === 'sale' ? 'Harga Preloved' : 'Pinjam'}
                   </span>
-                  <span className="text-base font-bold text-[#3A6351]">
+                  <span className="text-base font-bold text-emerald-700">
                     {pricingType === 'rental' ? `Rp${parseInt(price || 0).toLocaleString('id-ID')}` : pricingType === 'sale' ? `Rp${parseInt(salePrice || 0).toLocaleString('id-ID')}` : 'Gratis'}
                   </span>
                 </div>
-                <span className="badge-stone">
+                <span className="badge-sage">
                   <RefreshCw className="w-3 h-3" /> {maxReuse}x pakai
                 </span>
               </div>
@@ -380,26 +373,25 @@ export default function UploadEquipment() {
           </div>
         </div>
       ) : (
-        /* Success State */
         <div className="card p-8 sm:p-10 text-center max-w-xl mx-auto space-y-4">
-          <div className="w-14 h-14 bg-[#EAF0EC] text-[#3A6351] rounded-2xl flex items-center justify-center mx-auto border border-[#DCE5DF]">
+          <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto border border-emerald-200">
             <CheckCircle className="w-7 h-7" />
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-xl font-bold text-[#2C332E]">Pengajuan Berhasil Dikirim</h3>
-            <p className="text-xs text-[#6E7871]">Menunggu Verifikasi Admin</p>
+            <h3 className="text-xl font-bold text-slate-900">Pengajuan Berhasil Dikirim 🌿</h3>
+            <p className="text-xs text-slate-500">Menunggu Verifikasi Admin</p>
           </div>
 
-          <p className="text-xs text-[#5C645E] leading-relaxed max-w-md mx-auto">
+          <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto">
             Perlengkapan <strong>{name}</strong> telah masuk antrean verifikasi Admin sebelum ditayangkan di Marketplace.
           </p>
 
-          <div className="p-4 bg-[#F6F5F0] rounded-xl border border-[#E8E6DF] text-xs text-left max-w-md mx-auto space-y-2">
-            <div className="flex justify-between"><span className="text-[#6E7871]">ID Pengajuan:</span> <strong className="text-[#2C332E]">#{submittedUnitId || 'APV-01'}</strong></div>
-            <div className="flex justify-between"><span className="text-[#6E7871]">Lokasi Simpan:</span> <strong className="text-[#2C332E]">{initialLocation}</strong></div>
+          <div className="p-4 bg-emerald-50/40 rounded-xl border border-emerald-100 text-xs text-left max-w-md mx-auto space-y-2">
+            <div className="flex justify-between"><span className="text-slate-500">ID Pengajuan:</span> <strong className="text-slate-900">#{submittedUnitId || 'APV-01'}</strong></div>
+            <div className="flex justify-between"><span className="text-slate-500">Lokasi Simpan:</span> <strong className="text-slate-900">{initialLocation}</strong></div>
             <div className="flex justify-between items-center pt-1">
-              <span className="text-[#6E7871]">Status:</span> 
+              <span className="text-slate-500">Status:</span> 
               <span className="badge-warm">Pending Review</span>
             </div>
           </div>

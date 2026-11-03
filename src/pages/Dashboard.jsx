@@ -12,8 +12,8 @@ import {
   Clock, 
   PackagePlus, 
   CheckCircle2,
-  MapPin,
-  ClipboardList
+  ClipboardList,
+  Sparkles
 } from 'lucide-react'
 
 export default function Dashboard() {
@@ -31,103 +31,140 @@ export default function Dashboard() {
   const displayItems = (cartItems && cartItems.length > 0) ? cartItems : (activeReservation?.items || [])
   const hasItems = displayItems.length > 0
 
+  // Sapaan waktu
   const hour = new Date().getHours()
-  const greeting = hour < 11 ? 'Selamat pagi' : hour < 15 ? 'Selamat siang' : hour < 19 ? 'Selamat sore' : 'Selamat malam'
+  const greeting = hour < 11 ? 'Selamat Pagi' : hour < 15 ? 'Selamat Siang' : hour < 19 ? 'Selamat Sore' : 'Selamat Malam'
 
-  const currentStep = !hasActiveEvent ? 1 : !hasItems ? 2 : userPaymentStatus === 'idle' ? 3 : 4
+  // Tahap alur saat ini
+  const currentStep = !hasActiveEvent 
+    ? 1 
+    : !hasItems 
+    ? 2 
+    : userPaymentStatus === 'idle' 
+    ? 3 
+    : 4
 
+  // Live impact calculations
   const totalItemsReused = campusImpact?.itemsReused ?? 0
   const totalWasteAvoidedKg = campusImpact?.wasteAvoidedKg ?? 0
   const totalCostAvoided = campusImpact?.costAvoided ?? 0
   const avgCircularScore = campusImpact?.circularScore ?? 0
 
+  const campusReady = equipments?.filter(e => {
+    const o = (e.owner || '').toLowerCase()
+    return o.includes('pengelola') || o.includes('kampus') || o.includes('campus') || o.includes('universitas') || o.includes('rektorat')
+  }).reduce((sum, e) => sum + (e.available || 0), 0) ?? 0
+
+  const orgReady = equipments?.filter(e => {
+    const o = (e.owner || '').toLowerCase()
+    return !o.includes('pengelola') && !o.includes('kampus') && !o.includes('campus') && !o.includes('universitas') && !o.includes('rektorat') && !o.includes('partner') && !o.includes('vendor')
+  }).reduce((sum, e) => sum + (e.available || 0), 0) ?? 0
+
+  const partnerReady = equipments?.filter(e => {
+    const o = (e.owner || '').toLowerCase()
+    return o.includes('partner') || o.includes('vendor')
+  }).reduce((sum, e) => sum + (e.available || 0), 0) ?? 0
+
   const steps = [
-    { num: 1, title: 'Buat Event', desc: hasActiveEvent ? activeReservation.eventName : 'Atur jadwal & durasi hari', path: '/create-event', done: hasActiveEvent },
-    { num: 2, title: 'Pilih Barang', desc: hasItems ? `${displayItems.length} barang dipilih` : 'Cari di katalog', path: '/marketplace', done: hasItems },
-    { num: 3, title: 'Reservasi & Bayar', desc: userPaymentStatus === 'approved_success' ? 'Pembayaran Lunas' : userPaymentStatus === 'pending_admin_approval' ? 'Menunggu verifikasi' : 'QRIS & bukti transfer', path: '/reservation', done: userPaymentStatus !== 'idle' },
-    { num: 4, title: 'Pengembalian', desc: 'Kembalikan ke lokasi asal', path: '/return', done: false }
+    { num: 1, title: 'Buat Event', desc: 'Tentukan jadwal & durasi', link: '/create-event' },
+    { num: 2, title: 'Pilih Equipment', desc: 'Cari di Marketplace', link: '/marketplace' },
+    { num: 3, title: 'Reservasi & QRIS', desc: 'Upload bukti pembayaran', link: '/reservation' },
+    { num: 4, title: 'Kembalikan', desc: 'Pulangkan ke lokasi asal', link: '/return' },
   ]
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
-      {/* Header Cozy & Tenang */}
-      <div className="bg-[#EAEFE9] border border-[#D8E2DC] rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-1.5">
-          <span className="text-xs font-medium text-[#3A6351] tracking-wide">
-            Beranda Kepanitiaan
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-bold text-[#232925]">
-            {greeting}, {currentUserName || 'Prasmulyan'}
-          </h2>
-          <p className="text-[#5C645E] text-sm max-w-xl leading-relaxed">
-            Pinjam, gunakan, dan kembalikan perlengkapan acara kampus dengan tenang dan terorganisir.
-          </p>
-        </div>
+    <div className="space-y-6 max-w-6xl mx-auto">
+      {/* Renewable Sustainability Welcome Card */}
+      <div className="bg-gradient-to-r from-emerald-700 via-green-700 to-teal-700 rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden shadow-md shadow-emerald-900/10">
+        <div className="absolute right-0 top-0 -mr-12 -mt-12 w-64 h-64 bg-emerald-400/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <div className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-xs text-emerald-100 text-xs font-medium px-3 py-1 rounded-full mb-3 border border-white/15">
+              <Sparkles className="w-3.5 h-3.5" /> Circular Campus Dashboard
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              {greeting}, {currentUserName || 'Prasmulyan'} 🌿
+            </h2>
+            <p className="text-emerald-50/90 text-sm mt-1.5 max-w-xl leading-relaxed">
+              Wujudkan kegiatan kampus yang ramah lingkungan dan bebas limbah sekali pakai melalui peminjaman perlengkapan sirkular.
+            </p>
+          </div>
 
-        <div className="flex flex-wrap gap-3">
-          {!hasActiveEvent ? (
-            <Link to="/create-event" className="btn-primary text-sm flex items-center gap-2">
-              <PlusCircle className="w-4 h-4" />
-              <span>Buat Event Baru</span>
+          <div className="flex flex-wrap gap-2.5">
+            {!hasActiveEvent ? (
+              <Link 
+                to="/create-event" 
+                className="bg-white text-emerald-800 hover:bg-emerald-50 font-semibold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all"
+              >
+                <PlusCircle className="w-4 h-4 text-emerald-600" />
+                <span>Mulai Buat Event</span>
+              </Link>
+            ) : userPaymentStatus === 'idle' ? (
+              <Link 
+                to={hasItems ? "/reservation" : "/marketplace"} 
+                className="bg-white text-emerald-800 hover:bg-emerald-50 font-semibold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all"
+              >
+                <ClipboardList className="w-4 h-4 text-emerald-600" />
+                <span>{hasItems ? `Lanjut Pembayaran (${displayItems.length})` : 'Pilih Equipment'}</span>
+              </Link>
+            ) : (
+              <Link 
+                to="/reservation" 
+                className="bg-white text-emerald-800 hover:bg-emerald-50 font-semibold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all"
+              >
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Lihat Detail Reservasi</span>
+              </Link>
+            )}
+            <Link 
+              to="/marketplace" 
+              className="bg-emerald-800/50 hover:bg-emerald-800/70 text-white font-medium px-4 py-2.5 rounded-xl border border-emerald-400/30 text-xs flex items-center gap-2 transition-all"
+            >
+              <Package className="w-4 h-4" />
+              <span>Katalog</span>
             </Link>
-          ) : userPaymentStatus === 'idle' ? (
-            <Link to={hasItems ? "/reservation" : "/marketplace"} className="btn-primary text-sm flex items-center gap-2">
-              <ClipboardList className="w-4 h-4" />
-              <span>{hasItems ? `Lanjut Reservasi (${displayItems.length})` : 'Pilih Perlengkapan'}</span>
-            </Link>
-          ) : (
-            <Link to="/reservation" className="btn-primary text-sm flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Lihat Tiket Reservasi</span>
-            </Link>
-          )}
-          <Link to="/marketplace" className="btn-secondary text-sm flex items-center gap-2">
-            <Package className="w-4 h-4 text-[#5C645E]" />
-            <span>Lihat Katalog</span>
-          </Link>
+          </div>
         </div>
       </div>
 
-      {/* Stepper Alur Minimalis */}
-      <div className="card p-5 sm:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-xs font-semibold text-[#5C645E]">
-            Tahapan Peminjaman Event (1 Akun = 1 Event Aktif)
+      {/* Stepper Alur Peminjaman yang Bersih & Lembut */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-3.5">
+          <span className="text-xs font-semibold text-emerald-800">
+            Alur Peminjaman Event Sirkular
           </span>
-          {hasActiveEvent && (
-            <span className="badge-sage">
-              {activeReservation.eventName} · {activeReservation.durationDays || 1} Hari
-            </span>
-          )}
+          <span className="text-[11px] text-slate-400">
+            1 Akun · 1 Event Aktif
+          </span>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           {steps.map((s) => {
-            const isActive = currentStep === s.num
+            const isDone = currentStep > s.num || (s.num === 4 && userPaymentStatus === 'approved' && !hasItems)
+            const isCurrent = currentStep === s.num
             return (
               <Link
                 key={s.num}
-                to={s.path}
-                className={`p-3.5 rounded-xl border transition-colors flex items-center gap-3 ${
-                  isActive
-                    ? 'bg-[#F3F7F4] border-[#3A6351]/40'
-                    : s.done
-                    ? 'bg-[#FAF9F5] border-[#E2E0D8]'
-                    : 'bg-[#FAF9F5]/60 border-[#ECEAE2]'
+                to={s.link}
+                className={`p-3.5 rounded-xl border transition-all flex items-center gap-3 ${
+                  isCurrent
+                    ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950 shadow-2xs'
+                    : isDone
+                    ? 'bg-emerald-50/30 border-emerald-100 text-slate-700'
+                    : 'bg-slate-50/60 border-slate-100 text-slate-400 hover:bg-emerald-50/30'
                 }`}
               >
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-semibold flex-shrink-0 ${
-                  s.done
-                    ? 'bg-[#3A6351] text-white'
-                    : isActive
-                    ? 'bg-[#D8E5DD] text-[#264738]'
-                    : 'bg-[#ECEAE2] text-[#7A827C]'
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                  isDone
+                    ? 'bg-emerald-600 text-white'
+                    : isCurrent
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-200 text-slate-500'
                 }`}>
-                  {s.done ? '✓' : s.num}
+                  {isDone ? '✓' : s.num}
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs font-semibold text-[#232925] truncate">{s.title}</div>
-                  <div className="text-[11px] text-[#7A827C] truncate">{s.desc}</div>
+                  <div className="text-xs font-semibold truncate">{s.title}</div>
+                  <div className="text-[11px] opacity-75 truncate">{s.desc}</div>
                 </div>
               </Link>
             )
@@ -135,213 +172,228 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Konten Utama: Status Event & Pintasan */}
+      {/* Main Two Columns */}
       <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <div className="card p-6 h-full flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between pb-4 border-b border-[#EFECE6] mb-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-[#EAF0EC] text-[#3A6351] rounded-xl flex items-center justify-center">
-                    <Calendar className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-[#232925] text-base">Event & Pinjaman Aktif</h3>
-                    <p className="text-xs text-[#7A827C]">Rincian kegiatan dan lokasi barang yang dipinjam</p>
-                  </div>
-                </div>
-                <span className={
-                  userPaymentStatus === 'approved_success' ? 'badge-sage' :
-                  userPaymentStatus === 'pending_admin_approval' ? 'badge-warm' :
-                  'badge-stone'
-                }>
-                  {userPaymentStatus === 'approved_success' ? 'Lunas & Aktif' :
-                   userPaymentStatus === 'pending_admin_approval' ? 'Menunggu Verifikasi' :
-                   hasActiveEvent ? 'Draft Event' : 'Belum Ada Event'}
-                </span>
+        {/* Left 2 Columns: Active Event Status */}
+        <div className="lg:col-span-2 card p-6 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-4 mb-5 border-b border-emerald-100/80">
+              <div className="flex items-center gap-2.5">
+                <Calendar className="w-4 h-4 text-emerald-600" />
+                <h3 className="font-bold text-slate-900 text-sm">
+                  Kegiatan & Peminjaman Aktif
+                </h3>
               </div>
-
-              {hasActiveEvent || hasItems ? (
-                <div className="space-y-5">
-                  <div className="p-5 bg-[#FAF9F5] rounded-2xl border border-[#E8E6DF] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <div className="text-xs text-[#7A827C]">Nama Kegiatan</div>
-                      <h4 className="text-lg font-bold text-[#232925] mt-0.5">
-                        {activeReservation?.eventName || 'Draft Pemesanan Event'}
-                      </h4>
-                      <div className="flex flex-wrap items-center gap-4 text-xs text-[#5C645E] mt-2">
-                        <span className="flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-[#3A6351]" />
-                          Durasi: <strong>{activeReservation?.durationDays || 1} Hari</strong>
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-[#3A6351]" />
-                          Lokasi Acara: {activeReservation?.location || 'Kampus Prasmul'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="sm:text-right">
-                      <div className="text-xs text-[#7A827C]">Perlengkapan</div>
-                      <div className="text-2xl font-bold text-[#3A6351]">{displayItems.length} Jenis</div>
-                    </div>
-                  </div>
-
-                  {displayItems.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-xs font-medium text-[#5C645E]">Daftar Barang & Lokasi Pengambilan/Pengembalian:</div>
-                      <div className="divide-y divide-[#EFECE6] border border-[#E8E6DF] rounded-xl bg-white overflow-hidden">
-                        {displayItems.map((item, idx) => (
-                          <div key={idx} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
-                            <div className="font-medium text-[#232925]">
-                              {item.qty} unit · {item.name}
-                            </div>
-                            <div className="text-[#5C645E] flex items-center gap-1">
-                              <MapPin className="w-3.5 h-3.5 text-[#3A6351]" />
-                              <span>{item.lastLocation || item.initialLocation || 'Warehouse Kampus Gedung C'}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-12 bg-[#FAF9F5] rounded-2xl border border-dashed border-[#DFDDD4]">
-                  <Package className="w-9 h-9 text-[#B8B4A8] mx-auto mb-2.5" />
-                  <h4 className="text-sm font-semibold text-[#232925]">Belum ada event aktif</h4>
-                  <p className="text-xs text-[#7A827C] mt-1 mb-4 max-w-xs mx-auto">
-                    Buat event terlebih dahulu untuk mengatur tanggal kegiatan dan mulai meminjam peralatan.
-                  </p>
-                  <Link to="/create-event" className="btn-primary text-xs inline-flex items-center gap-1.5">
-                    <PlusCircle className="w-3.5 h-3.5" />
-                    <span>Buat Event Sekarang</span>
-                  </Link>
-                </div>
+              {hasActiveEvent && (
+                <span className={
+                  userPaymentStatus === 'approved' 
+                    ? 'badge-sage' 
+                    : userPaymentStatus === 'pending_admin_approval'
+                    ? 'badge-warm'
+                    : 'badge-stone'
+                }>
+                  {userPaymentStatus === 'approved' 
+                    ? 'Pembayaran Terverifikasi' 
+                    : userPaymentStatus === 'pending_admin_approval'
+                    ? 'Menunggu Verifikasi Admin'
+                    : 'Belum Dibayar'}
+                </span>
               )}
             </div>
 
-            {(hasActiveEvent || hasItems) && (
-              <div className="pt-5 mt-5 border-t border-[#EFECE6] flex flex-wrap gap-3">
-                {!hasItems ? (
-                  <Link to="/marketplace" className="btn-primary text-xs flex items-center gap-1.5">
-                    <Package className="w-3.5 h-3.5" /> Pilih Barang di Katalog
-                  </Link>
-                ) : userPaymentStatus === 'idle' ? (
-                  <Link to="/reservation" className="btn-primary text-xs flex items-center gap-1.5">
-                    <ClipboardList className="w-3.5 h-3.5" /> Lanjut ke Pembayaran
-                  </Link>
+            {hasActiveEvent ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs text-emerald-700 font-medium">
+                      {activeReservation.org} · {activeReservation.type || 'Kegiatan Kampus'}
+                    </div>
+                    <h4 className="text-base font-bold text-slate-900 mt-0.5">
+                      {activeReservation.eventName}
+                    </h4>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 mt-1.5">
+                      <span>📅 {activeReservation.eventDate}</span>
+                      <span>·</span>
+                      <span className="font-semibold text-emerald-700">⏱️ Durasi {activeReservation.durationDays || 1} Hari</span>
+                      {activeReservation.location && (
+                        <>
+                          <span>·</span>
+                          <span>📍 {activeReservation.location}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {hasItems ? (
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-slate-600">
+                      Perlengkapan Dipesan ({displayItems.length} jenis)
+                    </div>
+                    <div className="divide-y divide-emerald-100/60 border border-emerald-100 rounded-xl bg-white">
+                      {displayItems.map((item) => (
+                        <div key={item.id} className="p-3 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-lg">{item.image || '📦'}</span>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-800 truncate">{item.name}</div>
+                              <div className="text-[11px] text-slate-500 truncate">
+                                Lokasi asal: {item.lastLocation || item.initialLocation || 'Warehouse Kampus'}
+                              </div>
+                            </div>
+                          </div>
+                          <span className="badge-sage flex-shrink-0">
+                            {item.qty} unit
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 ) : (
-                  <>
-                    <Link to="/reservation" className="btn-secondary text-xs flex items-center gap-1.5">
-                      <ClipboardList className="w-3.5 h-3.5" /> Detail Reservasi
+                  <div className="p-6 rounded-xl bg-emerald-50/30 border border-dashed border-emerald-200 text-center space-y-2">
+                    <p className="text-xs text-slate-600">
+                      Belum ada perlengkapan yang dipilih untuk kegiatan ini.
+                    </p>
+                    <Link to="/marketplace" className="btn-primary text-xs !py-2 !px-4 inline-flex items-center gap-1.5">
+                      <Package className="w-3.5 h-3.5" />
+                      <span>Pilih Barang di Marketplace</span>
                     </Link>
-                    {userPaymentStatus === 'approved_success' && (
-                      <Link to="/return" className="btn-primary text-xs flex items-center gap-1.5">
-                        <RotateCcw className="w-3.5 h-3.5" /> Kembalikan Barang
-                      </Link>
-                    )}
-                  </>
+                  </div>
                 )}
+
+                <div className="pt-2 flex flex-wrap gap-2.5">
+                  <Link to="/reservation" className="btn-primary text-xs !py-2.5 !px-4 flex items-center gap-1.5">
+                    <ClipboardList className="w-3.5 h-3.5" />
+                    <span>{userPaymentStatus === 'idle' ? 'Lanjutkan Pembayaran' : 'Lihat Detail Reservasi'}</span>
+                  </Link>
+                  {userPaymentStatus === 'approved' && (
+                    <Link to="/return" className="btn-secondary text-xs !py-2.5 !px-4 flex items-center gap-1.5">
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Kembalikan Barang</span>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-10 px-4 bg-emerald-50/30 rounded-2xl border border-dashed border-emerald-200 space-y-3">
+                <Calendar className="w-8 h-8 text-emerald-600 mx-auto" />
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800">Belum Ada Kegiatan Aktif</h4>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                    Daftarkan kegiatan Anda terlebih dahulu untuk menentukan durasi hari peminjaman perlengkapan.
+                  </p>
+                </div>
+                <Link to="/create-event" className="btn-primary text-xs !py-2.5 !px-5 inline-flex items-center gap-1.5">
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Buat Event Baru</span>
+                </Link>
               </div>
             )}
           </div>
         </div>
 
-        {/* Kolom Kanan: Menu Pintasan */}
-        <div className="card p-6 flex flex-col justify-between space-y-6">
-          <div>
-            <h3 className="font-semibold text-[#232925] text-base mb-4">Menu Pintasan</h3>
-            <div className="space-y-2.5">
+        {/* Right Column: Quick Links & Inventory Summary */}
+        <div className="space-y-6">
+          <div className="card p-5">
+            <h3 className="font-bold text-slate-900 text-sm mb-3">Akses Cepat</h3>
+            <div className="space-y-2">
               <Link 
                 to="/upload-equipment" 
-                className="flex items-center justify-between p-3.5 rounded-xl bg-[#F3F7F4] hover:bg-[#E6EFE9] transition-colors text-xs font-medium text-[#264738]"
+                className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-100 transition-colors text-xs font-semibold text-emerald-900"
               >
                 <span className="flex items-center gap-2.5">
-                  <PackagePlus className="w-4 h-4 text-[#3A6351]" />
-                  Pinjamkan / Jual Barang Organisasi
+                  <PackagePlus className="w-4 h-4 text-emerald-600" />
+                  Upload Barang Organisasi
                 </span>
-                <ArrowRight className="w-3.5 h-3.5 text-[#3A6351]" />
+                <ArrowRight className="w-3.5 h-3.5 text-emerald-600" />
               </Link>
               <Link 
                 to="/my-equipment" 
-                className="flex items-center justify-between p-3.5 rounded-xl bg-[#FAF9F5] hover:bg-[#EFECE6] border border-[#E8E6DF] transition-colors text-xs font-medium text-[#3D4540]"
+                className="flex items-center justify-between p-3 rounded-xl bg-slate-50/80 hover:bg-emerald-50/50 border border-slate-100 transition-colors text-xs font-medium text-slate-700"
               >
                 <span className="flex items-center gap-2.5">
-                  <DollarSign className="w-4 h-4 text-[#3A6351]" />
-                  Barang Saya & Bukti Payout Admin
+                  <DollarSign className="w-4 h-4 text-emerald-600" />
+                  Cek Payout & Bukti Transfer
                 </span>
-                <ArrowRight className="w-3.5 h-3.5 text-[#8A928C]" />
-              </Link>
-              <Link 
-                to="/reservation" 
-                className="flex items-center justify-between p-3.5 rounded-xl bg-[#FAF9F5] hover:bg-[#EFECE6] border border-[#E8E6DF] transition-colors text-xs font-medium text-[#3D4540]"
-              >
-                <span className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-[#3A6351]" />
-                  Tiket Reservasi & Bukti Transfer
-                </span>
-                <ArrowRight className="w-3.5 h-3.5 text-[#8A928C]" />
+                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
               </Link>
               <Link 
                 to="/return" 
-                className="flex items-center justify-between p-3.5 rounded-xl bg-[#FAF9F5] hover:bg-[#EFECE6] border border-[#E8E6DF] transition-colors text-xs font-medium text-[#3D4540]"
+                className="flex items-center justify-between p-3 rounded-xl bg-slate-50/80 hover:bg-emerald-50/50 border border-slate-100 transition-colors text-xs font-medium text-slate-700"
               >
                 <span className="flex items-center gap-2.5">
-                  <RotateCcw className="w-4 h-4 text-[#3A6351]" />
-                  Form Pengembalian Barang
+                  <RotateCcw className="w-4 h-4 text-emerald-600" />
+                  Pengembalian ke Lokasi Asal
                 </span>
-                <ArrowRight className="w-3.5 h-3.5 text-[#8A928C]" />
+                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
               </Link>
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-[#FAF9F5] border border-[#E8E6DF] text-xs space-y-1.5">
-            <div className="font-semibold text-[#232925]">Katalog Tersedia</div>
-            <p className="text-[#7A827C] leading-relaxed">
-              Terdapat <strong>{equipments?.reduce((s, e) => s + (e.available || 0), 0) || 0} unit</strong> peralatan siap pakai di dalam ekosistem kampus.
-            </p>
+          <div className="card p-5">
+            <h3 className="font-bold text-slate-900 text-sm mb-3">Ketersediaan Inventaris</h3>
+            <div className="space-y-2.5 text-xs">
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-500">Inventaris Kampus</span>
+                <span className="font-semibold text-slate-800">{loadingDb ? '...' : `${campusReady} unit`}</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-500">Sharing Organisasi</span>
+                <span className="font-semibold text-emerald-700">{loadingDb ? '...' : `${orgReady} unit`}</span>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-slate-500">Mitra Eksternal</span>
+                <span className="font-semibold text-slate-800">{loadingDb ? '...' : `${partnerReady} unit`}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Ringkasan Dampak Sirkular (Lembut & Bersih) */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-[#5C645E]">Ringkasan Dampak Sirkular Kampus</h3>
-          <Link to="/impact" className="text-xs font-medium text-[#3A6351] hover:underline flex items-center gap-1">
-            Lihat detail <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+      {/* Sustainability Metrics Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="card p-5 border-l-4 border-l-emerald-500">
+          <div className="flex items-center justify-between text-slate-500 text-xs mb-1.5 font-medium">
+            <span>Barang Dipakai Ulang</span>
+            <Recycle className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="text-2xl font-bold text-slate-900">
+            {loadingDb ? '...' : totalItemsReused.toLocaleString('id-ID')}
+          </div>
+          <div className="text-[11px] text-emerald-700 mt-1">Sirkulasi pemakaian ulang</div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="card p-5">
-            <div className="text-xs text-[#7A827C] mb-1">Peralatan Dipakai Ulang</div>
-            <div className="text-2xl font-bold text-[#232925]">
-              {loadingDb ? '...' : `${totalItemsReused.toLocaleString('id-ID')} unit`}
-            </div>
+        <div className="card p-5 border-l-4 border-l-green-500">
+          <div className="flex items-center justify-between text-slate-500 text-xs mb-1.5 font-medium">
+            <span>Penghematan Biaya</span>
+            <DollarSign className="w-4 h-4 text-green-600" />
           </div>
+          <div className="text-2xl font-bold text-slate-900">
+            {loadingDb ? '...' : (totalCostAvoided >= 1000000 ? `Rp${(totalCostAvoided / 1000000).toFixed(1)} Jt` : `Rp${totalCostAvoided.toLocaleString('id-ID')}`)}
+          </div>
+          <div className="text-[11px] text-green-700 mt-1">Hemat anggaran kepanitiaan</div>
+        </div>
 
-          <div className="card p-5">
-            <div className="text-xs text-[#7A827C] mb-1">Penghematan Biaya</div>
-            <div className="text-2xl font-bold text-[#3A6351]">
-              {loadingDb ? '...' : (totalCostAvoided >= 1000000 ? `Rp${(totalCostAvoided / 1000000).toFixed(1)} Jt` : `Rp${totalCostAvoided.toLocaleString('id-ID')}`)}
-            </div>
+        <div className="card p-5 border-l-4 border-l-teal-500">
+          <div className="flex items-center justify-between text-slate-500 text-xs mb-1.5 font-medium">
+            <span>Limbah Dicegah</span>
+            <Leaf className="w-4 h-4 text-teal-600" />
           </div>
+          <div className="text-2xl font-bold text-slate-900">
+            {loadingDb ? '...' : `${totalWasteAvoidedKg} kg`}
+          </div>
+          <div className="text-[11px] text-teal-700 mt-1">Mengurangi sampah dekorasi</div>
+        </div>
 
-          <div className="card p-5">
-            <div className="text-xs text-[#7A827C] mb-1">Limbah Dicegah</div>
-            <div className="text-2xl font-bold text-[#232925]">
-              {loadingDb ? '...' : `${totalWasteAvoidedKg} kg`}
-            </div>
+        <div className="card p-5 border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50/50 to-white">
+          <div className="flex items-center justify-between text-slate-500 text-xs mb-1.5 font-medium">
+            <span>Skor Sirkularitas</span>
+            <span className="badge-sage !py-0.5 !px-2 !text-[10px]">Eco-Friendly</span>
           </div>
-
-          <div className="card p-5">
-            <div className="text-xs text-[#7A827C] mb-1">Skor Sirkularitas</div>
-            <div className="text-2xl font-bold text-[#3A6351]">
-              {loadingDb ? '...' : `${avgCircularScore} / 100`}
-            </div>
+          <div className="text-2xl font-bold text-emerald-700">
+            {loadingDb ? '...' : avgCircularScore}<span className="text-xs font-normal text-slate-400"> / 100</span>
           </div>
+          <div className="text-[11px] text-emerald-700 mt-1">Indeks keberlanjutan kampus</div>
         </div>
       </div>
     </div>

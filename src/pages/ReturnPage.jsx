@@ -45,20 +45,17 @@ export default function ReturnPage() {
     clearActiveEvent
   } = useApp()
   
-  // Mengambil daftar barang rental dari reservasi aktif (yang belum dikembalikan)
   const rentedItems = activeReservation?.items?.filter(item => item.listingType !== 'sale') || []
   const hasActiveEvent = Boolean(activeReservation?.eventName)
   
   const [selectedItemId, setSelectedItemId] = useState(rentedItems[0]?.id || '')
   
-  // Update pilihan pertama otomatis jika barang sebelumnya sudah dihapus/dikembalikan
   useEffect(() => {
     if (rentedItems.length > 0 && !rentedItems.find(i => i.id === selectedItemId)) {
       setSelectedItemId(rentedItems[0].id)
     }
   }, [rentedItems, selectedItemId])
 
-  // Dapatkan data spesifik berdasarkan item yang dipilih
   const currentItem = rentedItems.find(i => i.id === selectedItemId) || rentedItems[0]
   const currentOriginLocation = currentItem?.lastLocation || currentItem?.initialLocation || 'Warehouse Kampus Gedung C (Rak B-04)'
 
@@ -83,7 +80,6 @@ export default function ReturnPage() {
     }
   }
 
-  // HAPUS FOTO LAMA KETIKA ID BARANG BERUBAH
   useEffect(() => {
     setConditionPhoto(null)
     setConditionTime('')
@@ -140,10 +136,10 @@ export default function ReturnPage() {
         <span className="badge-sage mb-2">
           <RotateCcw className="w-3.5 h-3.5" /> Tahap 3 · Pengembalian Perlengkapan
         </span>
-        <h2 className="text-2xl font-bold text-[#2C332E] tracking-tight">
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
           Pengembalian ke Lokasi Asal
         </h2>
-        <p className="text-sm text-[#6E7871] mt-1">
+        <p className="text-sm text-slate-500 mt-1">
           Kembalikan setiap perlengkapan ke tempat pengambilan asalnya dan lampirkan dua foto dokumentasi ber-timestamp.
         </p>
       </div>
@@ -151,11 +147,11 @@ export default function ReturnPage() {
       {/* KONDISI 1: PEMBAYARAN MASIH MENUNGGU VERIFIKASI ADMIN */}
       {userPaymentStatus === 'pending_admin_approval' ? (
         <div className="card p-10 text-center space-y-4">
-          <div className="w-12 h-12 bg-[#F7F1E3] text-[#8A6116] rounded-2xl flex items-center justify-center mx-auto border border-[#EBE2CC]">
+          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto border border-amber-200">
             <Clock className="w-6 h-6" />
           </div>
-          <h3 className="text-lg font-bold text-[#2C332E]">Pembayaran Sedang Diverifikasi Admin</h3>
-          <p className="text-xs text-[#6E7871] max-w-md mx-auto leading-relaxed">
+          <h3 className="text-lg font-bold text-slate-900">Pembayaran Sedang Diverifikasi Admin</h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
             Anda telah memesan <strong>{rentedItems.length} jenis barang sewa</strong> untuk event <strong>{activeReservation?.eventName}</strong>. Formulir pengembalian akan terbuka otomatis setelah pembayaran QRIS disetujui Admin.
           </p>
           <div className="pt-2">
@@ -168,13 +164,13 @@ export default function ReturnPage() {
       ) : rentedItems.length === 0 ? (
         /* KONDISI 2: TIDAK ADA TANGGUNGAN BARANG / SEMUA SUDAH DIKEMBALIKAN */
         <div className="card p-10 text-center space-y-4">
-          <div className="w-12 h-12 bg-[#EAF0EC] text-[#3A6351] rounded-2xl flex items-center justify-center mx-auto border border-[#DCE5DF]">
+          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto border border-emerald-200">
             <CheckCircle2 className="w-6 h-6" />
           </div>
-          <h3 className="text-lg font-bold text-[#2C332E]">
-            {hasActiveEvent ? 'Seluruh Perlengkapan Event Telah Dikembalikan' : 'Tidak Ada Tanggungan Pengembalian'}
+          <h3 className="text-lg font-bold text-slate-900">
+            {hasActiveEvent ? 'Seluruh Perlengkapan Event Telah Dikembalikan 🌿' : 'Tidak Ada Tanggungan Pengembalian'}
           </h3>
-          <p className="text-xs text-[#6E7871] max-w-md mx-auto leading-relaxed">
+          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
             {hasActiveEvent 
               ? `Terima kasih! Seluruh perlengkapan sewa untuk event "${activeReservation.eventName}" telah dikembalikan ke lokasi asalnya. Anda dapat menutup siklus kegiatan ini untuk membuat event baru.`
               : 'Anda belum memiliki pinjaman perlengkapan aktif saat ini. Silakan daftarkan kegiatan dan pilih perlengkapan di Marketplace.'}
@@ -209,12 +205,11 @@ export default function ReturnPage() {
           <div className="space-y-5">
             <div className="card p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-semibold text-[#5C645E]">
+                <label className="block text-xs font-bold text-slate-700">
                   Perlengkapan Disewa ({rentedItems.length} tersisa)
                 </label>
               </div>
 
-              {/* Pilihan Cepat Kartu Barang */}
               <div className="space-y-2">
                 {rentedItems.map(item => {
                   const isPending = pendingReturns?.some(r => r.equipmentId === item.id)
@@ -226,18 +221,18 @@ export default function ReturnPage() {
                       onClick={() => selectItem(item.id)}
                       className={`w-full text-left p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
                         isSelected
-                          ? 'bg-[#EAF0EC] border-[#A5C0B2]'
-                          : 'bg-[#F6F5F0] border-[#E8E6DF] hover:bg-[#EFECE6]'
+                          ? 'bg-emerald-50 border-emerald-400 text-emerald-950'
+                          : 'bg-slate-50/70 border-slate-200/80 hover:bg-emerald-50/40'
                       }`}
                     >
                       <div className="min-w-0">
-                        <div className="font-semibold text-[#2C332E] text-xs truncate">{item.name}</div>
-                        <div className="text-[11px] text-[#6E7871] truncate mt-0.5">
+                        <div className="font-semibold text-slate-900 text-xs truncate">{item.name}</div>
+                        <div className="text-[11px] text-slate-500 truncate mt-0.5">
                           {item.qty} unit · {item.lastLocation || item.initialLocation || 'Warehouse Kampus'}
                         </div>
                       </div>
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-lg flex-shrink-0 ${
-                        isPending ? 'bg-[#F7F1E3] text-[#8A6116]' : 'bg-[#FAF9F5] text-[#5C645E] border border-[#E8E6DF]'
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                        isPending ? 'bg-amber-100 text-amber-800' : 'bg-white text-emerald-700 border border-emerald-200'
                       }`}>
                         {isPending ? 'Dicek Admin' : 'Pilih'}
                       </span>
@@ -247,31 +242,30 @@ export default function ReturnPage() {
               </div>
 
               {currentItem && (
-                <div className="pt-4 border-t border-[#ECEAE3] space-y-3.5">
+                <div className="pt-4 border-t border-emerald-100/80 space-y-3.5">
                   <div>
-                    <span className="badge-stone">ITEM-{currentItem.id}</span>
-                    <h4 className="font-semibold text-[#2C332E] text-sm mt-1.5">{currentItem.name}</h4>
-                    <p className="text-xs text-[#6E7871] mt-1">Peminjam: <strong className="text-[#2C332E]">{currentUserName || 'Prasmulyan'}</strong></p>
-                    <p className="text-xs text-[#6E7871] mt-0.5">Jumlah: <strong className="text-[#2C332E]">{currentItem.qty} unit</strong></p>
+                    <span className="badge-sage">ITEM-{currentItem.id}</span>
+                    <h4 className="font-bold text-slate-900 text-sm mt-1.5">{currentItem.name}</h4>
+                    <p className="text-xs text-slate-500 mt-1">Peminjam: <strong className="text-slate-800">{currentUserName || 'Prasmulyan'}</strong></p>
+                    <p className="text-xs text-slate-500 mt-0.5">Jumlah: <strong className="text-slate-800">{currentItem.qty} unit</strong></p>
                   </div>
 
-                  {/* Highlight Lokasi Pengembalian Asal */}
-                  <div className="p-3.5 bg-[#EAF0EC] rounded-xl border border-[#DCE5DF] text-xs space-y-1">
+                  <div className="p-3.5 bg-emerald-50/80 rounded-xl border border-emerald-200 text-xs space-y-1">
                     <div className="flex items-start gap-2">
-                      <MapPin className="w-4 h-4 text-[#3A6351] flex-shrink-0 mt-0.5" />
+                      <MapPin className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <span className="text-[#4B6B5C] text-[11px] font-medium block">
+                        <span className="text-emerald-700 text-[11px] font-medium block">
                           Wajib Dikembalikan ke Lokasi Asal:
                         </span>
-                        <span className="font-semibold text-[#264738] text-xs block mt-0.5">
+                        <span className="font-bold text-emerald-950 text-xs block mt-0.5">
                           {currentOriginLocation}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-3 bg-[#F6F5F0] rounded-xl border border-[#E8E6DF] text-[11px] text-[#6E7871] leading-relaxed flex items-start gap-2">
-                    <AlertCircle className="w-3.5 h-3.5 text-[#8A938C] flex-shrink-0 mt-0.5" />
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-500 leading-relaxed flex items-start gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />
                     <span>Lampirkan foto kondisi fisik dan foto penempatan di lokasi asal untuk diverifikasi Admin.</span>
                   </div>
                 </div>
@@ -285,25 +279,23 @@ export default function ReturnPage() {
 
               {returnStatus === 'idle' ? (
                 <form onSubmit={handleReturn} className="space-y-5">
-                  
-                  {/* 2 PHOTO UPLOAD SECTIONS WITH TIMESTAMPS */}
                   <div className="space-y-3.5">
-                    <h4 className="font-semibold text-[#2C332E] text-sm flex items-center gap-2">
-                      <Camera className="w-4 h-4 text-[#3A6351]" />
+                    <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                      <Camera className="w-4 h-4 text-emerald-600" />
                       Dokumentasi Foto Pengembalian ({currentItem?.name})
                     </h4>
 
                     <div className="grid sm:grid-cols-2 gap-4">
-                      {/* BUKTI FOTO 1: KONDISI FISIK BARANG */}
-                      <div className="border border-[#E8E6DF] rounded-xl p-4 bg-[#F6F5F0] space-y-2.5">
-                        <div className="text-xs font-semibold text-[#2C332E]">
+                      {/* BUKTI FOTO 1 */}
+                      <div className="border border-emerald-100 rounded-xl p-4 bg-emerald-50/20 space-y-2.5">
+                        <div className="text-xs font-bold text-slate-800">
                           1. Foto Kondisi Fisik Barang
                         </div>
-                        <p className="text-[11px] text-[#6E7871]">
+                        <p className="text-[11px] text-slate-500">
                           Pastikan barang utuh, bersih, dan berfungsi baik.
                         </p>
 
-                        <div className="relative border border-dashed border-[#D5D1C8] rounded-xl p-3 text-center hover:border-[#3A6351] transition-colors bg-[#FAF9F5]">
+                        <div className="relative border border-dashed border-emerald-300 rounded-xl p-3 text-center hover:border-emerald-500 transition-colors bg-white">
                           <input 
                             type="file" 
                             accept="image/*" 
@@ -312,31 +304,31 @@ export default function ReturnPage() {
                           />
                           {conditionPhoto ? (
                             <div className="space-y-2">
-                              <img src={conditionPhoto} alt="Kondisi Fisik" className="w-full h-32 object-cover rounded-lg mx-auto border border-[#E8E6DF]" />
-                              <span className="text-[10px] text-[#264738] font-medium block bg-[#EAF0EC] py-1 px-2 rounded-md">
+                              <img src={conditionPhoto} alt="Kondisi Fisik" className="w-full h-32 object-cover rounded-lg mx-auto border border-emerald-100" />
+                              <span className="text-[10px] text-emerald-800 font-semibold block bg-emerald-50 py-1 px-2 rounded-md">
                                 {conditionTime}
                               </span>
                             </div>
                           ) : (
                             <div className="py-6 flex flex-col items-center">
-                              <Camera className="w-5 h-5 text-[#8A938C] mb-1.5" />
-                              <span className="text-xs font-medium text-[#2C332E]">Pilih Foto Fisik</span>
-                              <span className="text-[10px] text-[#8A938C] mt-0.5">Otomatis mencatat waktu</span>
+                              <Camera className="w-5 h-5 text-emerald-600 mb-1.5" />
+                              <span className="text-xs font-semibold text-slate-700">Pilih Foto Fisik</span>
+                              <span className="text-[10px] text-slate-400 mt-0.5">Otomatis mencatat waktu</span>
                             </div>
                           )}
                         </div>
                       </div>
 
-                      {/* BUKTI FOTO 2: BUKTI DILETAKKAN KEMBALI DI TEMPAT SEMULA */}
-                      <div className="border border-[#E8E6DF] rounded-xl p-4 bg-[#F6F5F0] space-y-2.5">
-                        <div className="text-xs font-semibold text-[#2C332E]">
+                      {/* BUKTI FOTO 2 */}
+                      <div className="border border-emerald-100 rounded-xl p-4 bg-emerald-50/20 space-y-2.5">
+                        <div className="text-xs font-bold text-slate-800">
                           2. Foto di Lokasi Asal
                         </div>
-                        <p className="text-[11px] text-[#6E7871] truncate" title={currentOriginLocation}>
+                        <p className="text-[11px] text-slate-500 truncate" title={currentOriginLocation}>
                           Lokasi: {currentOriginLocation}
                         </p>
 
-                        <div className="relative border border-dashed border-[#D5D1C8] rounded-xl p-3 text-center hover:border-[#3A6351] transition-colors bg-[#FAF9F5]">
+                        <div className="relative border border-dashed border-emerald-300 rounded-xl p-3 text-center hover:border-emerald-500 transition-colors bg-white">
                           <input 
                             type="file" 
                             accept="image/*" 
@@ -345,16 +337,16 @@ export default function ReturnPage() {
                           />
                           {storagePhoto ? (
                             <div className="space-y-2">
-                              <img src={storagePhoto} alt="Lokasi Asal" className="w-full h-32 object-cover rounded-lg mx-auto border border-[#E8E6DF]" />
-                              <span className="text-[10px] text-[#264738] font-medium block bg-[#EAF0EC] py-1 px-2 rounded-md">
+                              <img src={storagePhoto} alt="Lokasi Asal" className="w-full h-32 object-cover rounded-lg mx-auto border border-emerald-100" />
+                              <span className="text-[10px] text-emerald-800 font-semibold block bg-emerald-50 py-1 px-2 rounded-md">
                                 {storageTime}
                               </span>
                             </div>
                           ) : (
                             <div className="py-6 flex flex-col items-center">
-                              <MapPin className="w-5 h-5 text-[#8A938C] mb-1.5" />
-                              <span className="text-xs font-medium text-[#2C332E]">Pilih Foto Lokasi Simpan</span>
-                              <span className="text-[10px] text-[#8A938C] mt-0.5">Perlihatkan posisi rak/gudang</span>
+                              <MapPin className="w-5 h-5 text-emerald-600 mb-1.5" />
+                              <span className="text-xs font-semibold text-slate-700">Pilih Foto Lokasi Simpan</span>
+                              <span className="text-[10px] text-slate-400 mt-0.5">Perlihatkan posisi rak/gudang</span>
                             </div>
                           )}
                         </div>
@@ -362,37 +354,36 @@ export default function ReturnPage() {
                     </div>
                   </div>
 
-                  {/* CHECKLIST PENGECEKAN FISIK */}
-                  <div className="p-4 bg-[#F6F5F0] rounded-xl border border-[#E8E6DF] space-y-2.5">
-                    <h5 className="font-semibold text-[#2C332E] text-xs">Konfirmasi Pengembalian:</h5>
+                  <div className="p-4 bg-emerald-50/40 rounded-xl border border-emerald-100 space-y-2.5">
+                    <h5 className="font-bold text-slate-800 text-xs">Konfirmasi Pengembalian:</h5>
                     <div className="space-y-2 text-xs">
-                      <label className="flex items-center gap-2.5 cursor-pointer text-[#5C645E]">
+                      <label className="flex items-center gap-2.5 cursor-pointer text-slate-600">
                         <input 
                           type="checkbox" 
                           checked={checklist.goodCondition} 
                           onChange={(e) => setChecklist(prev => ({ ...prev, goodCondition: e.target.checked }))}
-                          className="rounded accent-[#3A6351]" 
+                          className="rounded accent-emerald-600" 
                         />
                         <span>Barang berfungsi baik dan bersih seperti semula</span>
                       </label>
-                      <label className="flex items-center gap-2.5 cursor-pointer text-[#5C645E]">
+                      <label className="flex items-center gap-2.5 cursor-pointer text-slate-600">
                         <input 
                           type="checkbox" 
                           checked={checklist.complete} 
                           onChange={(e) => setChecklist(prev => ({ ...prev, complete: e.target.checked }))}
-                          className="rounded accent-[#3A6351]" 
+                          className="rounded accent-emerald-600" 
                         />
                         <span>Kelengkapan komponen pendukung lengkap</span>
                       </label>
-                      <label className="flex items-center gap-2.5 cursor-pointer text-[#5C645E]">
+                      <label className="flex items-center gap-2.5 cursor-pointer text-slate-600">
                         <input 
                           type="checkbox" 
                           checked={checklist.returnedToOriginalPlace} 
                           onChange={(e) => setChecklist(prev => ({ ...prev, returnedToOriginalPlace: e.target.checked }))}
-                          className="rounded accent-[#3A6351]" 
+                          className="rounded accent-emerald-600" 
                         />
                         <span>
-                          Dikembalikan ke tempat asalnya (<strong className="text-[#2C332E]">{currentOriginLocation}</strong>)
+                          Dikembalikan ke tempat asalnya (<strong className="text-emerald-800">{currentOriginLocation}</strong>)
                         </span>
                       </label>
                     </div>
@@ -408,22 +399,22 @@ export default function ReturnPage() {
                       <span>Kirim Bukti Pengembalian</span>
                     </button>
                     {!canSubmit && (
-                      <p className="text-center text-[11px] text-[#8A938C] mt-2">
+                      <p className="text-center text-[11px] text-slate-400 mt-2">
                         Lengkapi kedua foto bukti di atas untuk mengirim pengembalian.
                       </p>
                     )}
                   </div>
                 </form>
               ) : returnStatus === 'pending_admin_approval' ? (
-                <div className="bg-[#F7F1E3] border border-[#EBE2CC] rounded-2xl p-6 text-center space-y-4">
-                  <div className="w-12 h-12 bg-[#FAF9F5] text-[#8A6116] rounded-2xl flex items-center justify-center mx-auto border border-[#EBE2CC]">
+                <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-6 text-center space-y-4">
+                  <div className="w-12 h-12 bg-white text-amber-600 rounded-2xl flex items-center justify-center mx-auto border border-amber-200">
                     <RotateCcw className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-[#2C332E]">
+                    <h3 className="text-base font-bold text-slate-900">
                       Menunggu Verifikasi Admin
                     </h3>
-                    <p className="text-xs text-[#6E5626] max-w-md mx-auto mt-1.5 leading-relaxed">
+                    <p className="text-xs text-slate-600 max-w-md mx-auto mt-1.5 leading-relaxed">
                       Bukti pengembalian <strong>{currentItem?.name}</strong> ke lokasi <strong>{currentOriginLocation}</strong> sedang diperiksa oleh Admin.
                     </p>
                   </div>
@@ -439,18 +430,17 @@ export default function ReturnPage() {
                   )}
                 </div>
               ) : (
-                /* Success State */
-                <div className="bg-[#EAF0EC] border border-[#DCE5DF] rounded-2xl p-6 text-center space-y-4">
-                  <div className="w-12 h-12 bg-[#3A6351] text-white rounded-2xl flex items-center justify-center mx-auto">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center space-y-4">
+                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center mx-auto">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
 
                   <div>
                     <span className="badge-sage mb-2">Pengembalian Terverifikasi</span>
-                    <h3 className="text-lg font-bold text-[#264738]">
-                      Barang Selesai Dikembalikan
+                    <h3 className="text-lg font-bold text-emerald-950">
+                      Barang Selesai Dikembalikan ♻️
                     </h3>
-                    <p className="text-xs text-[#4B6B5C] max-w-md mx-auto mt-1 leading-relaxed">
+                    <p className="text-xs text-emerald-800 max-w-md mx-auto mt-1 leading-relaxed">
                       Pengembalian barang telah disetujui Admin dan stok telah dipulihkan ke Marketplace.
                     </p>
                   </div>
