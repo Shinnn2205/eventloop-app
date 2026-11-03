@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
@@ -15,14 +15,13 @@ import AdminPanel from './pages/AdminPanel'
 import Layout from './components/Layout'
 import { AppProvider, useApp } from './context/AppContext'
 
-// Komponen penangkap sesi untuk otomatis melempar ke dashboard jika user sudah login
+// Komponen penangkap sesi untuk otomatis melempar ke dashboard jika user SUDAH login saat membuka halaman /login
 function AuthHandler() {
   const { sessionUser, currentUserRole } = useApp()
   const navigate = useNavigate()
   const location = useLocation()
 
   useEffect(() => {
-    // Jika user sudah login dan sengaja membuka /login lagi
     if (sessionUser && location.pathname === '/login') {
       if (currentUserRole === 'admin') {
         navigate('/admin', { replace: true })
@@ -35,15 +34,49 @@ function AuthHandler() {
   return null
 }
 
+// Protected Route: Mengharuskan pengguna untuk Login / Buat Akun terlebih dahulu sebelum membuka halaman dalam aplikasi
+function ProtectedRoute({ children, adminOnly = false }) {
+  const { sessionUser, currentUserRole, loadingDb } = useApp()
+  const location = useLocation()
+
+  if (loadingDb) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600"></div>
+        <p className="text-xs text-gray-500 font-medium">Memverifikasi sesi EventLoop...</p>
+      </div>
+    )
+  }
+
+  // Jika belum login, lempar ke halaman login
+  if (!sessionUser) {
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  // Jika halaman khusus admin tapi yang login bukan admin
+  if (adminOnly && currentUserRole !== 'admin') {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return children
+}
+
 function App() {
   return (
     <AppProvider>
       <Router>
         <AuthHandler />
         <Routes>
+          {/* Rute Publik */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route element={<Layout />}>
+
+          {/* Rute Aplikasi yang Diproteksi (Wajib Login) */}
+          <Route element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/equipment/:id" element={<EquipmentDetail />} />
@@ -53,7 +86,11 @@ function App() {
             <Route path="/reservation" element={<Reservation />} />
             <Route path="/return" element={<ReturnPage />} />
             <Route path="/impact" element={<ImpactDashboard />} />
-            <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/admin" element={
+              <ProtectedRoute adminOnly={true}>
+                <AdminPanel />
+              </ProtectedRoute>
+            } />
           </Route>
         </Routes>
       </Router>

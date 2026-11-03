@@ -1,7 +1,12 @@
 import { Link } from 'react-router-dom'
-import { Recycle, ArrowRight, Package, BarChart3, Shield, Zap, Sparkles, CheckCircle2, ChevronRight, Layers } from 'lucide-react'
+import { Recycle, ArrowRight, Package, BarChart3, Shield, Zap, Sparkles, CheckCircle2 } from 'lucide-react'
+import { useApp } from '../context/AppContext'
 
 export default function LandingPage() {
+  const { sessionUser, currentUserRole, currentUserName } = useApp()
+
+  const targetDashboard = currentUserRole === 'admin' ? '/admin' : '/dashboard'
+
   return (
     <div className="min-h-screen bg-white text-gray-900 selection:bg-green-100 selection:text-green-800">
       {/* Navbar */}
@@ -21,18 +26,27 @@ export default function LandingPage() {
             <a href="#flow" className="text-sm text-gray-600 hover:text-green-600 transition-colors font-medium">Flow Aplikasi</a>
             <a href="#circular-score" className="text-sm text-gray-600 hover:text-green-600 transition-colors font-medium">Circular Score</a>
             <a href="#business-model" className="text-sm text-gray-600 hover:text-green-600 transition-colors font-medium">Model Bisnis</a>
-            <Link to="/marketplace" className="text-sm text-green-700 font-semibold hover:text-green-800 transition-colors">
+            <Link to={sessionUser ? "/marketplace" : "/login"} className="text-sm text-green-700 font-semibold hover:text-green-800 transition-colors">
               Marketplace
             </Link>
           </div>
           <div className="flex items-center gap-3">
-            <Link to="/login" className="hidden sm:inline-block text-sm font-semibold text-gray-700 hover:text-green-600 px-4 py-2">
-              Masuk
-            </Link>
-            <Link to="/dashboard" className="btn-primary text-sm !py-2.5 !px-5 flex items-center gap-2">
-              Buka App
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            {sessionUser ? (
+              <Link to={targetDashboard} className="btn-primary text-sm !py-2.5 !px-5 flex items-center gap-2">
+                <span>Buka Dashboard ({currentUserName || 'Prasmulyan'})</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            ) : (
+              <>
+                <Link to="/login" className="text-sm font-semibold text-gray-700 hover:text-green-600 px-3 py-2">
+                  Masuk
+                </Link>
+                <Link to="/login" className="btn-primary text-sm !py-2.5 !px-5 flex items-center gap-2">
+                  <span>Buka App / Buat Akun</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -60,12 +74,18 @@ export default function LandingPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link to="/marketplace" className="btn-primary text-base !py-3.5 !px-8 flex items-center justify-center gap-2 w-full sm:w-auto shadow-green-600/25">
+            <Link 
+              to={sessionUser ? "/marketplace" : "/login"} 
+              className="btn-primary text-base !py-3.5 !px-8 flex items-center justify-center gap-2 w-full sm:w-auto shadow-green-600/25"
+            >
               <Package className="w-5 h-5" />
-              Explore Equipment
+              <span>Explore Equipment</span>
             </Link>
-            <Link to="/create-event" className="btn-secondary text-base !py-3.5 !px-8 flex items-center justify-center gap-2 w-full sm:w-auto">
-              Buat Event & Kebutuhan
+            <Link 
+              to={sessionUser ? "/create-event" : "/login"} 
+              className="btn-secondary text-base !py-3.5 !px-8 flex items-center justify-center gap-2 w-full sm:w-auto"
+            >
+              <span>{sessionUser ? 'Buat Event & Kebutuhan' : 'Daftar Akun Baru'}</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -374,10 +394,16 @@ export default function LandingPage() {
             Mulai dari satu event, hemat jutaan rupiah dan kurangi ratusan kilogram sampah perlengkapan acara kampusmu sekarang.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/dashboard" className="bg-white text-green-800 font-bold px-8 py-3.5 rounded-xl hover:bg-green-50 transition-colors shadow-lg shadow-black/10">
-              Masuk Dashboard Demo
+            <Link 
+              to={sessionUser ? targetDashboard : "/login"} 
+              className="bg-white text-green-800 font-bold px-8 py-3.5 rounded-xl hover:bg-green-50 transition-colors shadow-lg shadow-black/10"
+            >
+              {sessionUser ? 'Buka Dashboard' : 'Mulai Sekarang / Buat Akun'}
             </Link>
-            <Link to="/marketplace" className="bg-green-800/80 hover:bg-green-800 text-white font-semibold px-8 py-3.5 rounded-xl border border-green-400/40 transition-colors">
+            <Link 
+              to={sessionUser ? "/marketplace" : "/login"} 
+              className="bg-green-800/80 hover:bg-green-800 text-white font-semibold px-8 py-3.5 rounded-xl border border-green-400/40 transition-colors"
+            >
               Lihat Marketplace Barang
             </Link>
           </div>
