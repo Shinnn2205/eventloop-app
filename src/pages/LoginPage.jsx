@@ -26,7 +26,7 @@ export default function LoginPage() {
   // Tab Mode: 'login' (Masuk) atau 'signup' (Buat Akun Baru)
   const [activeTab, setActiveTab] = useState('login')
   
-  // State verifikasi email: 'form' (isi data) atau 'sent' (link terkirim ke Outlook)
+  // State verifikasi: 'form' (isi data akun) atau 'otp' (input 6-digit kode OTP)
   const [signUpStep, setSignUpStep] = useState('form')
   
   // Field form
@@ -35,6 +35,7 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState('')
   const [nim, setNim] = useState('')
   const [role, setRole] = useState('student_org') // 'student_org' | 'sarpras'
+  const [otpCode, setOtpCode] = useState('')
 
   // State status
   const [loading, setLoading] = useState(false)
@@ -42,7 +43,7 @@ export default function LoginPage() {
   const [successMsg, setSuccessMsg] = useState('')
   const [resendTimer, setResendTimer] = useState(0)
 
-  // Timer cooldown untuk kirim ulang link
+  // Timer cooldown untuk kirim ulang kode OTP
   useEffect(() => {
     let interval = null
     if (resendTimer > 0) {
@@ -70,6 +71,7 @@ export default function LoginPage() {
     setSignUpStep('form')
     setErrorMsg('')
     setSuccessMsg('')
+    setOtpCode('')
   }
 
   // ============================================================
@@ -137,9 +139,9 @@ export default function LoginPage() {
   }
 
   // ============================================================
-  // 2. ALUR DAFTAR AKUN MAHASISWA (KIRIM LINK VERIFIKASI KE OUTLOOK)
+  // 2. ALUR DAFTAR AKUN MAHASISWA - STEP 1: KIRIM KODE OTP KE OUTLOOK
   // ============================================================
-  const handleSignUpRequestLink = async (e) => {
+  const handleSignUpRequestOtp = async (e) => {
     if (e && e.preventDefault) e.preventDefault()
     setErrorMsg('')
     setSuccessMsg('')
@@ -149,7 +151,6 @@ export default function LoginPage() {
       return
     }
 
-    // Validasi struktur 11 digit NIM: 3 digit prodi, 2 digit angkatan, 6 digit nomor
     const nimValidation = validateNimStructure(nim)
     if (!nimValidation.isValid) {
       setErrorMsg(nimValidation.message)
@@ -178,7 +179,7 @@ export default function LoginPage() {
         return
       }
 
-      // 2. Kirim link verifikasi otomatis via Gmail SMTP ke Outlook mahasiswa
+      // 2. Kirim kode OTP 6-digit via Gmail SMTP ke Outlook mahasiswa
       const { error } = await supabase.auth.signInWithOtp({
         email: studentEmail,
         options: {
@@ -196,14 +197,86 @@ export default function LoginPage() {
       })
 
       if (error) {
-        setErrorMsg('Gagal mengirim link verifikasi: ' + error.message)
+        setErrorMsg('Gagal mengirim kode verifikasi: ' + error.message)
       } else {
-        setSignUpStep('sent')
+        setSignUpStep('otp')
         setResendTimer(60)
-        setSuccessMsg(`Link verifikasi berhasil dikirim ke ${studentEmail}!`)
+        setSuccessMsg(`Kode verifikasi OTP 6-digit berhasil dikirim ke ${studentEmail}. Silakan periksa inbox Outlook Anda!`)
       }
     } catch (err) {
-      setErrorMsg('Terjadi kesalahan koneksi saat mengirim email verifikasi.')
+      setErrorMsg('Terjadi kesalahan koneksi saat mengirim kode verifikasi.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ============================================================
+  // 2. ALUR DAFTAR AKUN MAHASISWA - STEP 2: VERIFIKASI KODE OTP
+  // ============================================================
+  const handleSignUpVerifyOtp = async (e) => {
+    if (e && e.preventDefault) e.preventDefault()
+    setErrorMsg('')
+    setSuccessMsg('')
+
+    const cleanOtp = (otpCode || '').replace(/\D/g, '').trim()
+    if (cleanOtp.length < 6) {
+      setErrorMsg('Silakan masukkan 6 digit kode OTP yang diterima di email Outlook.')
+      return
+    }
+
+    setLoading(true)
+    const nimValidation = validateNimStructure(nim)
+    const studentEmail = nimValidation.generatedEmail
+
+    try {
+      // 1. Verifikasi kode OTP langsung ke Supabase Auth
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: studentEmail,
+        token: cleanOtp,
+        type: 'email'
+      })
+
+      if (error) {
+        setErrorMsg('Kode verifikasi salah atau sudah kadaluarsa: ' + error.message)
+        setLoading(false)
+        return
+      }
+
+      if (data?.session) {
+        // 2. Simpan password akun agar mahasiswa bisa login langsung dengan password ke depannya
+        if (password) {
+          try {
+            await supabase.auth.updateUser({ password })
+          } catch (pwdErr) {
+            console.warn('Set password err:', pwdErr)
+          }
+        }
+
+        // 3. Simpan data lengkap mahasiswa ke tabel profiles
+        if (data.session.user?.id) {
+          try {
+            await supabase.from('profiles').upsert({
+              id: data.session.user.id,
+              email: studentEmail,
+              full_name: fullName.trim(),
+              nim: nim.trim(),
+              prodi: nimValidation.prodiName,
+              school: nimValidation.schoolName,
+              updated_at: new Date().toISOString()
+            })
+          } catch (profileErr) {
+            console.warn('Gagal simpan profil:', profileErr)
+          }
+        }
+
+        setCurrentUserName(fullName.trim())
+        setCurrentUserRole('user')
+        navigate('/dashboard')
+      } else {
+        setErrorMsg('Sesi tidak dapat dibuat. Silakan coba lagi.')
+      }
+    } catch (err) {
+      setErrorMsg('Terjadi kesalahan saat memverifikasi kode OTP.')
     } finally {
       setLoading(false)
     }
@@ -399,17 +472,17 @@ export default function LoginPage() {
           )}
 
           {/* ======================================================= */}
-          {/* TAB 2: BUAT AKUN BARU -> LINK VERIFIKASI KE OUTLOOK      */}
+          {/* TAB 2: BUAT AKUN BARU -> KODE VERIFIKASI OTP OUTLOOK     */}
           {/* ======================================================= */}
           {activeTab === 'signup' && (
             signUpStep === 'form' ? (
-              // STEP 1: INPUT DATA MAHASISWA & KIRIM LINK KE OUTLOOK
-              <form onSubmit={handleSignUpRequestLink} className="space-y-3.5">
+              // STEP 1: INPUT DATA MAHASISWA & KIRIM KODE OTP
+              <form onSubmit={handleSignUpRequestOtp} className="space-y-3.5">
                 <div className="bg-green-50 border border-green-200 p-3 rounded-2xl flex items-start gap-2.5 text-[11px] text-green-950 font-medium leading-relaxed">
                   <ShieldCheck className="w-5 h-5 text-green-700 flex-shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold text-green-900 block mb-0.5">Verifikasi Resmi Outlook Kampus</span>
-                    Link verifikasi akan dikirimkan langsung ke email Outlook kampus Anda. Cukup klik link tersebut untuk langsung aktif dan masuk ke Dashboard tanpa ribet!
+                    <span className="font-bold text-green-900 block mb-0.5">Verifikasi Kode OTP Outlook Kampus</span>
+                    Sistem akan mengirimkan 6-digit kode verifikasi ke email Outlook mahasiswa resmi Anda.
                   </div>
                 </div>
 
@@ -527,55 +600,77 @@ export default function LoginPage() {
                     className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-semibold shadow-md shadow-green-700/20 transition-all"
                   >
                     <Mail className="w-4 h-4" />
-                    <span>{loading ? 'Mengirim Link Verifikasi...' : 'Kirim Link Verifikasi ke Outlook Kampus'}</span>
+                    <span>{loading ? 'Mengirim Kode OTP...' : 'Kirim Kode OTP ke Outlook Kampus'}</span>
                   </button>
                   <p className="text-[10px] text-gray-400 text-center mt-2">
-                    Sistem akan mengirimkan link masuk langsung ke email Outlook mahasiswa Anda.
+                    Kode verifikasi 6 digit akan dikirimkan langsung ke email resmi Outlook Anda.
                   </p>
                 </div>
               </form>
             ) : (
-              // STEP 2: SCREEN MENUNGGU KLIK DI OUTLOOK
-              <div className="space-y-4 py-2 animate-fade-in-up text-center">
-                <div className="w-16 h-16 bg-green-100 text-green-700 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                  <Mail className="w-8 h-8 animate-bounce" />
+              // STEP 2: FORM INPUT 6-DIGIT KODE OTP DARI EMAIL OUTLOOK
+              <form onSubmit={handleSignUpVerifyOtp} className="space-y-4 py-1 animate-fade-in text-center">
+                <div className="w-14 h-14 bg-green-100 text-green-700 rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+                  <KeyRound className="w-7 h-7" />
                 </div>
 
                 <div>
-                  <h4 className="text-lg font-bold text-gray-900">Link Verifikasi Terkirim!</h4>
+                  <h4 className="text-base font-bold text-gray-900">Verifikasi Kode OTP</h4>
                   <p className="text-xs text-gray-500 mt-1">
-                    Kami telah mengirimkan link masuk resmi ke kotak masuk Outlook Anda:
+                    Masukkan 6-digit kode verifikasi yang kami kirimkan ke email Outlook:
                   </p>
-                  <div className="inline-block bg-green-50 border border-green-200 text-green-950 font-bold font-mono px-3 py-1.5 rounded-xl text-xs mt-2">
+                  <div className="inline-block bg-green-50 border border-green-200 text-green-950 font-bold font-mono px-3 py-1 rounded-xl text-xs mt-1.5">
                     {nim}@student.prasetiyamulya.ac.id
                   </div>
                 </div>
 
-                <div className="bg-blue-50/80 border border-blue-200 p-4 rounded-2xl text-left text-xs text-blue-950 space-y-1.5 leading-relaxed">
+                <div className="bg-blue-50/80 border border-blue-200 p-3 rounded-2xl text-left text-[11px] text-blue-950 space-y-1">
                   <div className="font-bold flex items-center gap-1.5 text-blue-900">
-                    <Sparkles className="w-4 h-4 text-blue-600" />
-                    <span>Langkah Mudah:</span>
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Buka Tab Outlook Mahasiswa Anda:</span>
                   </div>
-                  <p>1. Buka <strong>Outlook / Webmail Kampus Prasetiya Mulya</strong> di tab lain atau di HP Anda.</p>
-                  <p>2. Cari email dari <strong>EventLoop Prasetiya Mulya</strong>.</p>
-                  <p>3. <strong>Klik link verifikasi</strong> di dalam email tersebut. Anda akan langsung otomatis masuk ke Dashboard EventLoop tanpa perlu memasukkan kode apapun!</p>
+                  <p>Salin 6 digit kode angka dari email masuk <strong>EventLoop Prasetiya Mulya</strong>, lalu ketik di kotak bawah ini:</p>
                 </div>
 
-                <div className="space-y-2 pt-2">
-                  <a
-                    href="https://outlook.office.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition-all block"
-                  >
-                    <span>Buka Outlook Webmail Sekarang</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </a>
+                <div className="space-y-1 text-left">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider text-center">
+                    Kode OTP (6 Digit Angka)
+                  </label>
+                  <div className="relative max-w-xs mx-auto">
+                    <input
+                      type="text"
+                      maxLength={6}
+                      required
+                      autoFocus
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="123456"
+                      className="w-full text-center tracking-[0.4em] text-2xl font-black font-mono py-2.5 bg-gray-50 border-2 border-green-500/50 rounded-2xl focus:outline-none focus:ring-4 focus:ring-green-500/20 focus:border-green-600 transition-all text-green-950"
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-400 text-center mt-1">
+                    {otpCode.length}/6 digit angka
+                  </p>
+                </div>
 
-                  <div className="flex items-center justify-between text-xs pt-2">
+                <div className="pt-2 space-y-2">
+                  <button
+                    type="submit"
+                    disabled={loading || otpCode.trim().length !== 6}
+                    className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-semibold shadow-md shadow-green-700/20 transition-all"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{loading ? 'Memverifikasi...' : 'Verifikasi Kode & Selesaikan Pendaftaran'}</span>
+                  </button>
+
+                  <div className="flex items-center justify-between text-xs pt-1">
                     <button
                       type="button"
-                      onClick={() => setSignUpStep('form')}
+                      onClick={() => {
+                        setSignUpStep('form')
+                        setOtpCode('')
+                        setErrorMsg('')
+                      }}
                       className="text-gray-500 hover:text-gray-700 underline"
                     >
                       ← Ubah Data Pendaftaran
@@ -584,18 +679,18 @@ export default function LoginPage() {
                     <button
                       type="button"
                       disabled={resendTimer > 0 || loading}
-                      onClick={handleSignUpRequestLink}
+                      onClick={handleSignUpRequestOtp}
                       className={`font-semibold ${
                         resendTimer > 0 
                           ? 'text-gray-400 cursor-not-allowed' 
                           : 'text-green-700 hover:underline'
                       }`}
                     >
-                      {resendTimer > 0 ? `Kirim ulang link (${resendTimer}s)` : 'Kirim Ulang Link'}
+                      {resendTimer > 0 ? `Kirim ulang (${resendTimer}s)` : 'Kirim Ulang Kode'}
                     </button>
                   </div>
                 </div>
-              </div>
+              </form>
             )
           )}
 
