@@ -31,6 +31,19 @@ export const isCampusEmail = (emailStr) => {
 }
 
 export const PRASMUL_PRODI_MAP = {
+  // SBE (School of Business and Economics)
+  '1311': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'S1 Business (Bisnis)', code: 'Business' },
+  '1313': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Finance & Banking', code: 'Finance' },
+  '1314': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'International Marketing', code: 'Marketing' },
+  '13142': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Branding', code: 'Branding' },
+  '1315': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Branding', code: 'Branding' },
+  '1312': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Branding', code: 'Branding' },
+  '1316': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Financial Technology (Fintech)', code: 'Fintech' },
+  '1320': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Accounting (Akuntansi)', code: 'Accounting' },
+  '1330': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Business Economics', code: 'Economics' },
+  '1341': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Hospitality Business', code: 'Hospitality' },
+  '1342': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Event Management', code: 'Event' },
+
   // STEM (School of Applied STEM)
   '2310': { school: 'School of Applied STEM', shortSchool: 'STEM', name: 'Business Mathematics', code: 'BM' },
   '2320': { school: 'School of Applied STEM', shortSchool: 'STEM', name: 'Food Business Technology', code: 'FBT' },
@@ -38,17 +51,6 @@ export const PRASMUL_PRODI_MAP = {
   '2340': { school: 'School of Applied STEM', shortSchool: 'STEM', name: 'Applied AI & Robotics', code: 'AIR' },
   '2350': { school: 'School of Applied STEM', shortSchool: 'STEM', name: 'Digital Business Technology', code: 'DBT' },
   '2360': { school: 'School of Applied STEM', shortSchool: 'STEM', name: 'Product Design Engineering', code: 'PDI' },
-
-  // SBE (School of Business and Economics)
-  '1316': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Financial Technology (Fintech)', code: 'Fintech' },
-  '1311': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'S1 Business', code: 'Business' },
-  '1312': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'International Marketing', code: 'Marketing' },
-  '1313': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Finance & Banking', code: 'Finance' },
-  '1314': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Branding', code: 'Branding' },
-  '1315': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Hospitality Business', code: 'Hospitality' },
-  '1317': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Event Management', code: 'Event' },
-  '1318': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Business Economics', code: 'Economics' },
-  '1319': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Accounting', code: 'Accounting' },
 
   // SLIS (School of Law and International Studies)
   '3310': { school: 'School of Law and International Studies', shortSchool: 'SLIS', name: 'International Business Law (Buslaw)', code: 'Buslaw' },
@@ -63,9 +65,17 @@ export const validateNimStructure = (nimStr) => {
     }
   }
 
-  const prodiPrefix = clean.slice(0, 4)
-  const angkatanDigits = clean.slice(4, 6)
-  const rawNomor = clean.slice(6)
+  // Cek prefix 5 digit terlebih dahulu (seperti 13142 untuk Branding), lalu default ke 4 digit
+  let prodiPrefix = clean.slice(0, 4)
+  let angkatanDigits = clean.slice(4, 6)
+  let rawNomor = clean.slice(6)
+
+  if (clean.startsWith('13142')) {
+    prodiPrefix = '13142'
+    angkatanDigits = clean.slice(5, 7)
+    rawNomor = clean.slice(7)
+  }
+
   // Nomor urut tanpa awalan kampus (contoh 10001 -> 1, 10032 -> 32)
   const nomorUrut = parseInt(rawNomor.slice(1), 10) || rawNomor
 
