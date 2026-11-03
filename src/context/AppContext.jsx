@@ -9,7 +9,7 @@ export const ADMIN_DISPLAY_NAMES = {
   'sharren1999@gmail.com': 'Xyliarenn',
   'gabrieljason47@gmail.com': 'Prottt',
   'jasonlimsurya@gmail.com': 'Jason',
-  'admin@gmail.com': 'Admin Sarpras'
+  'admin@gmail.com': 'Admin EventLoop'
 }
 
 export const ADMIN_EMAILS = Object.keys(ADMIN_DISPLAY_NAMES)
@@ -202,7 +202,7 @@ export function AppProvider({ children }) {
 
         if (isAdminEmail(userEmail)) {
           setCurrentUserRole('admin')
-          setCurrentUserName(adminName || 'Admin Sarpras')
+          setCurrentUserName(adminName || 'Admin EventLoop')
         } else {
           const metaName = currentSession.user?.user_metadata?.full_name
           if (metaName) setCurrentUserName(metaName)
@@ -242,7 +242,7 @@ export function AppProvider({ children }) {
           size: item.size || 'Standar',
           material: item.material || 'Material Campuran',
           condition: item.condition || 'Good',
-          owner: item.owner || 'Sarpras / Prasmul Org',
+          owner: item.owner || 'Ormawa / Pengelola Kampus',
           ownerBank: item.ownerBank || 'BCA 8012345678',
           description: item.description || '',
           lastLocation: item.lastLocation || 'Warehouse Kampus Gedung C',
@@ -270,7 +270,7 @@ export function AppProvider({ children }) {
           payoutStatus: t.payout_status || 'Waiting Admin Approval',
           paidAt: t.created_at ? new Date(t.created_at).toLocaleString('id-ID') : 'Baru saja',
           bankAdminRef: `BCA-QRIS-${String(t.id).slice(0, 6)}`,
-          ownerOrg: 'Organisasi Pemilik & Sarpras',
+          ownerOrg: 'Organisasi Pemilik & EventLoop',
           ownerBank: 'BCA 8012345678 a.n Owner',
           payoutAmount: Math.round((Number(t.amount) || 0) * 0.95),
           adminFee: Math.round((Number(t.amount) || 0) * 0.05),
@@ -518,16 +518,23 @@ export function AppProvider({ children }) {
       return eq
     }))
 
+    const firstCartItem = cartItems[0]
+    const detectedOwnerOrg = firstCartItem?.owner || 'Organisasi Pemilik Barang'
+    const detectedOwnerBank = firstCartItem?.ownerBank || 'BCA 8012345678 a.n Owner'
+
     const newTxn = {
       id: txnId,
-      buyerOrg: reservationDetails.buyerOrg || currentUserName || 'SISO Prasmulyan',
+      buyerOrg: reservationDetails.buyerOrg || currentUserName || 'Prasmulyan Organization',
       itemName: reservationDetails.itemNames || 'Reservasi Perlengkapan Event',
       amount: reservationDetails.totalAmount,
+      durationDays: reservationDetails.durationDays || activeReservation?.durationDays || 1,
+      paymentProofPhoto: reservationDetails.paymentProofPhoto || null,
+      payoutProofPhoto: null,
       qrisStatus: 'Pending Admin Verification',
       paidAt: `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`,
       bankAdminRef: `BCA-QRIS-${Math.floor(1000000 + Math.random() * 9000000)}`,
-      ownerOrg: 'Organisasi Pemilik & Sarpras',
-      ownerBank: 'BCA 8012345678 a.n Owner',
+      ownerOrg: detectedOwnerOrg,
+      ownerBank: detectedOwnerBank,
       payoutStatus: 'Waiting Admin Approval',
       payoutAmount: Math.round(reservationDetails.totalAmount * 0.95),
       adminFee: Math.round(reservationDetails.totalAmount * 0.05),
@@ -557,10 +564,16 @@ export function AppProvider({ children }) {
     setTransactions(prev => [newTxn, ...prev])
     
     setActiveReservation({ 
+      ...activeReservation,
       ...reservationDetails, 
-      items: cartItems, 
+      items: cartItems.map(item => ({
+        ...item,
+        lastLocation: item.lastLocation || item.initialLocation || 'Gedung C Ruang Ormawa B-04'
+      })), 
       txnId,
-      totalAmount: reservationDetails.totalAmount
+      totalAmount: reservationDetails.totalAmount,
+      durationDays: reservationDetails.durationDays || activeReservation?.durationDays || 1,
+      paymentProofPhoto: reservationDetails.paymentProofPhoto || null
     })
     
     setCartItems([])
@@ -593,7 +606,7 @@ export function AppProvider({ children }) {
     setUserPaymentStatus('approved_success')
   }
 
-  const transferPayoutToOwner = async (txnId) => {
+  const transferPayoutToOwner = async (txnId, proofPhoto = null) => {
     try {
       await supabase
         .from('transactions')
@@ -609,11 +622,22 @@ export function AppProvider({ children }) {
           ...t,
           payoutStatus: 'Transferred',
           payoutRef: `TRF-BCA-${Math.floor(100000 + Math.random() * 900000)}`,
-          transferredAt: 'Baru saja'
+          payoutProofPhoto: proofPhoto || t.payoutProofPhoto || null,
+          transferredAt: `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`
         }
       }
       return t
     }))
+  }
+
+  // --- BATALKAN / RESET EVENT AKTIF ---
+  const clearActiveEvent = () => {
+    setActiveReservation(null)
+    setUserPaymentStatus('idle')
+    setCartItems([])
+    localStorage.removeItem('eventloop_active_reservation')
+    localStorage.removeItem('eventloop_user_payment_status')
+    localStorage.removeItem('eventloop_cart')
   }
 
   // --- ACTIONS ADMIN MANAGE STOK ---
@@ -687,17 +711,18 @@ export function AppProvider({ children }) {
 
   const approveReturnByAdmin = async (returnId, equipmentId, returnedQty) => {
     const returnData = pendingReturns.find(r => r.id === returnId)
+    const targetEq = equipments.find(e => e.id === equipmentId)
+    const finalLocation = returnData?.returnLocation || targetEq?.lastLocation || targetEq?.initialLocation || 'Warehouse Kampus Gedung C'
     
     try {
       await supabase.from('returns').update({ status: 'Approved' }).ilike('borrower', '%')
       if (equipmentId) {
-        const targetEq = equipments.find(e => e.id === equipmentId)
         if (targetEq) {
           await supabase
             .from('equipments')
             .update({ 
               available: targetEq.available + returnedQty,
-              lastLocation: 'Warehouse Kampus Gedung C (Rak B-04)'
+              lastLocation: finalLocation
             })
             .eq('id', equipmentId)
         }
@@ -714,7 +739,7 @@ export function AppProvider({ children }) {
         return { 
           ...item, 
           available: item.available + returnedQty,
-          lastLocation: 'Warehouse Kampus Gedung C (Rak B-04)',
+          lastLocation: finalLocation,
           lastStoragePhoto: returnData?.storagePhoto || item.lastStoragePhoto,
           lastConditionPhoto: returnData?.conditionPhoto || null
         }
@@ -756,7 +781,7 @@ export function AppProvider({ children }) {
       session, ssoUser, setSsoUser, sessionUser: session?.user || ssoUser || null, 
       logout, loadingDb, refetchData: fetchSupabaseData,
       campusImpact, orgImpacts,
-      equipments, pendingApprovals, transactions, userPaymentStatus, activeReservation, setActiveReservation, returnStatus, pendingReturns,
+      equipments, pendingApprovals, transactions, userPaymentStatus, activeReservation, setActiveReservation, clearActiveEvent, returnStatus, pendingReturns,
       cartItems, addToCart, removeFromCart, updateCartQty,
       uploadEquipmentByUser, approveEquipmentByAdmin, rejectEquipmentByAdmin, submitUserQrisPayment, approvePaymentByAdmin,
       transferPayoutToOwner, updateEquipmentPriceAndStock, deleteEquipment, setUserPaymentStatus, submitUserReturnProof, approveReturnByAdmin,

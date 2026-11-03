@@ -9,11 +9,37 @@ import {
   Check, 
   FileText,
   BadgeCheck,
-  RotateCcw
+  RotateCcw,
+  Eye,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react'
+
+// Fungsi Kompresi Bukti Foto Transfer Admin
+const compressImage = (file, callback) => {
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const MAX_WIDTH = 600
+      const scaleSize = MAX_WIDTH / img.width
+      canvas.width = MAX_WIDTH
+      canvas.height = img.height * scaleSize
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      callback(canvas.toDataURL('image/jpeg', 0.65))
+    }
+    img.src = e.target.result
+  }
+  reader.readAsDataURL(file)
+}
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('payouts') // 'payouts' | 'approvals' | 'returns'
+  const [viewingProof, setViewingProof] = useState(null) // { title, photo, details }
+  const [payoutModalTxn, setPayoutModalTxn] = useState(null)
+  const [adminProofPhoto, setAdminProofPhoto] = useState(null)
   const { 
     transactions, 
     pendingApprovals, 
@@ -69,7 +95,7 @@ export default function AdminPanel() {
           <div>
             <div className="inline-flex items-center gap-1.5 bg-emerald-500/20 text-emerald-300 text-xs font-bold px-3 py-1 rounded-full mb-3 border border-emerald-500/30">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              Portal Khusus Admin Kampus & Sarpras
+              Portal Khusus Admin & Manajemen Kampus
             </div>
             <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
               EventLoop Admin & Escrow Hub 🏦
@@ -163,7 +189,7 @@ export default function AdminPanel() {
                   <tr className="border-b border-gray-200 bg-gray-50 text-gray-500 uppercase tracking-wider text-[10px]">
                     <th className="p-4">ID Transaksi & Waktu</th>
                     <th className="p-4">Barang & Pembeli</th>
-                    <th className="p-4 text-right">Uang Masuk (QRIS)</th>
+                    <th className="p-4 text-right">Uang Masuk & Bukti Transfer</th>
                     <th className="p-4">Rekening Owner (Tujuan Payout)</th>
                     <th className="p-4 text-right">Net Payout</th>
                     <th className="p-4 text-center">Status & Aksi Admin</th>
@@ -390,7 +416,7 @@ export default function AdminPanel() {
           </div>
           <div className="p-3 bg-white rounded-xl border border-blue-100 shadow-sm">
             <span className="font-bold block text-blue-700 mb-1">2. Verifikasi Fisik</span>
-            Admin Sarpras mengecek kondisi barang saat diserahkan ke pembeli/peminjam.
+            Admin mengecek kondisi barang saat diserahkan ke pembeli/peminjam.
           </div>
           <div className="p-3 bg-white rounded-xl border border-blue-100 shadow-sm">
             <span className="font-bold block text-blue-700 mb-1">3. Admin Transfer Dana</span>
@@ -402,6 +428,128 @@ export default function AdminPanel() {
           </div>
         </div>
       </div>
+      {/* MODAL 1: VIEW PROOF (PREVIEW BUKTI TRANSFER MAHASISWA / ADMIN) */}
+      {viewingProof && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-gray-100 animate-fade-in max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h4 className="font-extrabold text-gray-900 text-sm flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-emerald-600" />
+                {viewingProof.title}
+              </h4>
+              <button onClick={() => setViewingProof(null)} className="text-gray-400 hover:text-gray-600 font-bold text-sm">
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center max-h-80">
+              <img src={viewingProof.photo} alt="Bukti Transfer" className="w-full h-auto object-contain max-h-80" />
+            </div>
+
+            {viewingProof.details && (
+              <div className="p-3 bg-gray-50 rounded-xl text-xs text-gray-600 font-mono">
+                {viewingProof.details}
+              </div>
+            )}
+
+            <button
+              onClick={() => setViewingProof(null)}
+              className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-colors"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: TRANSFER PAYOUT & UPLOAD BUKTI TRANSFER DARI ADMIN KE OWNER */}
+      {payoutModalTxn && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-gray-100 animate-fade-in max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div>
+                <h4 className="font-extrabold text-gray-900 text-base flex items-center gap-2">
+                  <Send className="w-4 h-4 text-emerald-600" />
+                  Kirim Payout ke Organisasi Pemilik
+                </h4>
+                <p className="text-xs text-gray-500 mt-0.5">ID: {payoutModalTxn.id}</p>
+              </div>
+              <button onClick={() => setPayoutModalTxn(null)} className="text-gray-400 hover:text-gray-600 font-bold text-sm">
+                ✕
+              </button>
+            </div>
+
+            {/* Rincian Rekening & Nominal */}
+            <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl text-xs space-y-2 text-emerald-950">
+              <div className="flex justify-between">
+                <span className="text-emerald-800">Organisasi Pemilik:</span>
+                <strong className="text-emerald-950">{payoutModalTxn.ownerOrg}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-emerald-800">Rekening Tujuan:</span>
+                <strong className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-300">{payoutModalTxn.ownerBank}</strong>
+              </div>
+              <div className="flex justify-between items-baseline pt-1 border-t border-emerald-200">
+                <span className="text-emerald-800 font-bold">Nominal Net Payout:</span>
+                <span className="text-xl font-black text-emerald-700">Rp{payoutModalTxn.payoutAmount?.toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+
+            {/* Upload Bukti Transfer Admin */}
+            <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-2 text-left">
+              <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                  Upload Bukti Transfer Bank (Wajib) *
+                </span>
+                <span className="text-[10px] text-red-500 font-semibold">Wajib Diisi</span>
+              </label>
+
+              <input
+                type="file"
+                accept="image/*"
+                required
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) {
+                    compressImage(f, (b64) => setAdminProofPhoto(b64))
+                  }
+                }}
+                className="w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-700 file:text-white hover:file:bg-emerald-800 cursor-pointer"
+              />
+
+              {adminProofPhoto && (
+                <div className="relative mt-2 rounded-xl overflow-hidden border border-emerald-300 max-h-40 bg-black/5 flex items-center justify-center">
+                  <img src={adminProofPhoto} alt="Bukti Transfer Admin" className="w-full h-auto object-contain max-h-40" />
+                  <span className="absolute bottom-1 right-1 bg-emerald-700 text-white text-[9px] font-bold px-2 py-0.5 rounded shadow">
+                    ✓ Foto Terpasang
+                  </span>
+                </div>
+              )}
+              <p className="text-[10px] text-gray-400">
+                Bukti transfer ini dapat dilihat langsung oleh organisasi pemilik barang di halaman Barang Saya.
+              </p>
+            </div>
+
+            <div className="pt-2 space-y-2">
+              <button
+                disabled={!adminProofPhoto}
+                onClick={handleConfirmPayoutWithProof}
+                className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-gray-200 disabled:text-gray-400"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{adminProofPhoto ? 'Konfirmasi & Kirim Bukti ke Owner' : 'Upload Bukti Transfer Terlebih Dahulu'}</span>
+              </button>
+              <button
+                onClick={() => setPayoutModalTxn(null)}
+                className="w-full text-xs text-gray-400 hover:text-gray-600 py-1"
+              >
+                Batalkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

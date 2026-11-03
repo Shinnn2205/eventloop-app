@@ -34,7 +34,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [nim, setNim] = useState('')
-  const [role, setRole] = useState('student_org') // 'student_org' | 'sarpras'
   const [otpCode, setOtpCode] = useState('')
 
   // State status
@@ -89,13 +88,6 @@ export default function LoginPage() {
       loginEmail = `${loginEmail}@student.prasetiyamulya.ac.id`
     }
 
-    // Validasi admin role jika memilih sarpras
-    if (role === 'sarpras' && !isAdminEmail(loginEmail)) {
-      setErrorMsg('Akses ditolak: Email ini bukan akun Administrator yang terdaftar!')
-      setLoading(false)
-      return
-    }
-
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmail,
@@ -121,7 +113,7 @@ export default function LoginPage() {
           console.warn('Gagal ambil data profil:', fetchErr)
         }
 
-        if (role === 'sarpras' || isAdminEmail(loginEmail)) {
+        if (isAdminEmail(loginEmail)) {
           const adminName = getAdminDisplayName(loginEmail) || 'Admin Kampus'
           setCurrentUserRole('admin')
           setCurrentUserName(adminName)
@@ -394,37 +386,7 @@ export default function LoginPage() {
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Role Masuk
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRole('student_org')}
-                    className={`py-2 text-xs font-semibold rounded-xl border transition-all ${
-                      role === 'student_org'
-                        ? 'bg-green-50 border-green-500 text-green-700 font-bold'
-                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    🎓 Mahasiswa / Org
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('sarpras')}
-                    className={`py-2 text-xs font-semibold rounded-xl border transition-all ${
-                      role === 'sarpras'
-                        ? 'bg-green-50 border-green-500 text-green-700 font-bold'
-                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    🏫 Admin Kampus
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  {role === 'sarpras' ? 'Email Administrator *' : 'NIM (11 Digit) atau Email Kampus *'}
+                  NIM (11 Digit) atau Email Akun *
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -433,15 +395,13 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={role === 'sarpras' ? 'admin@gmail.com' : 'Contoh: 23302410001 atau nim@student...'}
+                    placeholder="Contoh: 23302410001 atau nim@student... / email admin"
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
                   />
                 </div>
-                {role === 'student_org' && (
-                  <p className="text-[11px] text-gray-500 mt-1">
-                    💡 Cukup ketik 11 digit NIM atau alamat email mahasiswa Anda.
-                  </p>
-                )}
+                <p className="text-[11px] text-gray-500 mt-1">
+                  💡 Masukkan 11 digit NIM atau email kampus terdaftar (atau email administrator).
+                </p>
               </div>
 
               <div>

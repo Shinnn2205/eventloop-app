@@ -420,7 +420,7 @@ export default function UploadEquipment() {
           </div>
 
           <p className="text-sm text-gray-600 leading-relaxed max-w-md mx-auto">
-            Barang <strong>{name}</strong> telah masuk antrean. Admin Sarpras akan memeriksa kesesuaian foto & fisik sebelum menampilkannya di Marketplace.
+            Barang <strong>{name}</strong> telah masuk antrean. Admin EventLoop akan memeriksa kesesuaian foto & fisik sebelum menampilkannya di Marketplace.
           </p>
 
           <div className="p-5 bg-gray-50 rounded-2xl border border-gray-200 text-xs text-left max-w-md mx-auto space-y-3 shadow-inner">

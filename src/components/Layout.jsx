@@ -130,7 +130,7 @@ export default function Layout() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900 truncate">
-                {currentUserName || (currentUserRole === 'admin' ? 'Admin Sarpras' : 'Prasmulyan')}
+                {currentUserName || (currentUserRole === 'admin' ? 'Admin EventLoop' : 'Prasmulyan')}
               </p>
               <p className="text-xs text-gray-500 truncate">
                 {currentUserRole === 'admin' ? 'Admin EventLoop' : 'Student Organization'}

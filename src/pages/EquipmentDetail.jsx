@@ -115,7 +115,7 @@ export default function EquipmentDetail() {
               <span className={`px-2.5 py-1 rounded font-bold text-[10px] uppercase tracking-wider ${
                 item.listingType === 'sale' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
               }`}>
-                {item.listingType === 'sale' ? '🏷️ Beli Permanen (Preloved)' : '🔄 Sewa / Event'}
+                {item.listingType === 'sale' ? '🏷️ Beli Permanen (Preloved)' : '🔄 Sewa / Hari'}
               </span>
               <span className="text-[11px] text-gray-500 font-bold">
                 Tersedia: {item.available} / {item.total} Unit
@@ -131,7 +131,7 @@ export default function EquipmentDetail() {
                 Rp{(item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price).toLocaleString('id-ID')}
               </span>
               <span className="text-sm text-gray-500 font-semibold">
-                {item.listingType === 'sale' ? 'Sekali Bayar' : '/ Unit'}
+                {item.listingType === 'sale' ? 'Sekali Bayar' : '/ Unit / Hari'}
               </span>
             </div>
           </div>
@@ -153,7 +153,7 @@ export default function EquipmentDetail() {
           <div className="space-y-3">
             <h3 className="font-extrabold text-gray-900 text-sm">Deskripsi Barang</h3>
             <p className="text-sm text-gray-600 leading-relaxed">
-              {item.description || "Peralatan organisasi yang siap digunakan. Terverifikasi aman dan dikelola menggunakan sistem keamanan Admin Sarpras EventLoop."}
+              {item.description || "Peralatan organisasi yang siap digunakan. Terverifikasi aman dan dikelola menggunakan sistem keamanan Admin EventLoop."}
             </p>
           </div>
 

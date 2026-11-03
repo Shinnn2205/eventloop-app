@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 
 export default function Marketplace() {
-  const { currentUserRole, equipments, updateEquipmentPriceAndStock, deleteEquipment, cartItems, addToCart, removeFromCart } = useApp()
+  const { currentUserRole, equipments, updateEquipmentPriceAndStock, deleteEquipment, cartItems, addToCart, removeFromCart, activeReservation } = useApp()
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [minScore, setMinScore] = useState(0)
@@ -248,10 +248,13 @@ export default function Marketplace() {
                 <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
                   <div>
                     <div className="text-[10px] text-gray-400">
-                      {item.listingType === 'sale' ? 'Harga Jual' : 'Sewa / Event'}
+                      {item.listingType === 'sale' ? 'Harga Jual' : 'Sewa / Hari'}
                     </div>
-                    <div className="text-base font-black text-gray-900">
-                      Rp{(item.listingType === 'sale' ? (item.salePrice || item.price) : item.price).toLocaleString('id-ID')}
+                    <div className="text-base font-black text-gray-900 flex items-baseline gap-1">
+                      <span>Rp{(item.listingType === 'sale' ? (item.salePrice || item.price) : item.price).toLocaleString('id-ID')}</span>
+                      {item.listingType !== 'sale' && (
+                        <span className="text-[11px] text-gray-500 font-normal">/ hari</span>
+                      )}
                     </div>
                   </div>
 

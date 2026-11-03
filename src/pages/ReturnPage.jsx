@@ -114,6 +114,7 @@ export default function ReturnPage() {
       itemName: currentItem.name,
       itemCode: `ITEM-${currentItem.id}`,
       returnedQty: currentItem.qty || 1,
+      returnLocation: currentItem.lastLocation || currentItem.initialLocation || 'Warehouse Kampus Gedung C (Rak B-04)',
       conditionPhoto,
       storagePhoto,
       timestamp: conditionTime
@@ -184,14 +185,14 @@ export default function ReturnPage() {
                       <MapPin className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                       <div>
                         <span className="text-gray-400 text-[10px] block uppercase font-bold">Tempat Pengembalian Semula:</span>
-                        <span className="font-bold text-gray-900 text-xs">Warehouse Sarpras Kampus Gedung C (Rak B-04)</span>
+                        <span className="font-bold text-gray-900 text-xs">{currentItem.lastLocation || currentItem.initialLocation || 'Warehouse Kampus Gedung C (Rak B-04)'}</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 leading-relaxed flex items-start gap-2 mt-3">
                     <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <span>Kedua foto bukti di bawah wajib diupload dengan stempel waktu untuk verifikasi Admin Sarpras.</span>
+                    <span>Kedua foto bukti di bawah wajib diupload dengan stempel waktu untuk verifikasi Admin Pengelola.</span>
                   </div>
                 </div>
               )}
@@ -249,10 +250,10 @@ export default function ReturnPage() {
                       {/* BUKTI FOTO 2: BUKTI DILETAKKAN KEMBALI DI TEMPAT SEMULA */}
                       <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50 space-y-3">
                         <div className="text-xs font-bold text-gray-800">
-                          2. Foto di Tempat Semula (Rak Gudang)
+                          2. Foto di Tempat Semula ({currentItem?.lastLocation || currentItem?.initialLocation || 'Lokasi Asal'})
                         </div>
                         <p className="text-[11px] text-gray-500">
-                          Tunjukkan barang telah disimpan rapi di lokasi rak warehouse semula.
+                          Tunjukkan barang telah disimpan rapi di tempat semula barang diambil ({currentItem?.lastLocation || currentItem?.initialLocation || 'lokasi asal'}).
                         </p>
 
                         <div className="relative border-2 border-dashed border-gray-300 rounded-xl p-3 text-center hover:border-green-500 transition-colors bg-white">
@@ -310,7 +311,7 @@ export default function ReturnPage() {
                           onChange={(e) => setChecklist(prev => ({ ...prev, returnedToOriginalPlace: e.target.checked }))}
                           className="rounded text-green-600 focus:ring-green-500" 
                         />
-                        <span className="text-gray-700">Barang telah diletakkan kembali di posisi rak gudang asal</span>
+                        <span className="text-gray-700">Barang telah diletakkan kembali di tempat pengambilan asalnya ({currentItem?.lastLocation || currentItem?.initialLocation || 'lokasi asal'})</span>
                       </label>
                     </div>
                   </div>
@@ -342,7 +343,7 @@ export default function ReturnPage() {
                   </div>
                   <div>
                     <h3 className="text-2xl font-black text-amber-950 mt-2">
-                      MENUNGGU ACC ADMIN GUDANG ⏳
+                      MENUNGGU ACC ADMIN PENGELOLA ⏳
                     </h3>
                     <p className="text-xs text-amber-800 max-w-md mx-auto mt-2 leading-relaxed">
                       Bukti pengembalian <strong>{currentItem?.name}</strong> telah masuk ke sistem. Admin akan memverifikasi foto kondisi fisik dan penempatan di rak.
