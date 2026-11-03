@@ -46,8 +46,25 @@ export default function LoginPage() {
   // State Modal SSO Microsoft 365 Kampus
   const [showSsoModal, setShowSsoModal] = useState(false)
   const [ssoNim, setSsoNim] = useState('23302410001')
-  const [ssoName, setSsoName] = useState('Mahasiswa Prasetiya Mulya')
+  const [ssoName, setSsoName] = useState('Choirul Arifin')
+  const [ssoPassword, setSsoPassword] = useState('')
   const [isEditingSsoAccount, setIsEditingSsoAccount] = useState(false)
+
+  // Otomatis deteksi nama mahasiswa dari NIM jika sudah terdaftar
+  useEffect(() => {
+    if (ssoNim && ssoNim.length === 11) {
+      supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('nim', ssoNim)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.full_name) {
+            setSsoName(data.full_name)
+          }
+        })
+    }
+  }, [ssoNim])
 
   // Timer cooldown untuk kirim ulang OTP
   useEffect(() => {
@@ -230,7 +247,8 @@ export default function LoginPage() {
   // ============================================================
   // 3. ALUR LOGIN CEPAT SSO KAMPUS (MICROSOFT 365 / OUTLOOK)
   // ============================================================
-  const handleSsoLogin = async () => {
+  const handleSsoLogin = async (e) => {
+    if (e && e.preventDefault) e.preventDefault()
     setErrorMsg('')
     setLoading(true)
 
@@ -242,13 +260,13 @@ export default function LoginPage() {
     }
 
     const ssoEmail = `${cleanNim}@student.prasetiyamulya.ac.id`
-    const defaultSsoPassword = `PrasMul${cleanNim}!`
+    const pwToUse = ssoPassword || `PrasMul${cleanNim}!`
 
     try {
-      // 1. Coba login jika akun sudah ada di database
+      // 1. Coba login terlebih dahulu dengan password yang dimasukkan
       const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
         email: ssoEmail,
-        password: defaultSsoPassword
+        password: pwToUse
       })
 
       if (loginData?.session) {
@@ -269,13 +287,29 @@ export default function LoginPage() {
         return
       }
 
-      // 2. Jika belum ada, otomatis daftarkan akun SSO mahasiswa
+      // Jika login gagal dan error adalah password salah
+      if (loginError && loginError.message.toLowerCase().includes('invalid login credentials')) {
+        // Cek apakah akun memang sudah terdaftar
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id, full_name, nim')
+          .eq('email', ssoEmail)
+          .maybeSingle()
+
+        if (existingProfile) {
+          setErrorMsg('Password akun Anda salah. Silakan masukkan password yang benar yang Anda buat saat mendaftar.')
+          setLoading(false)
+          return
+        }
+      }
+
+      // 2. Jika akun belum terdaftar sama sekali di Supabase, buat akun baru secara otomatis
       const { data: signupData, error: signupError } = await supabase.auth.signUp({
         email: ssoEmail,
-        password: defaultSsoPassword,
+        password: pwToUse,
         options: {
           data: {
-            full_name: ssoName.trim() || 'Mahasiswa Prasetiya Mulya',
+            full_name: ssoName.trim() || 'Choirul Arifin',
             nim: cleanNim,
             role: 'student_org'
           }
@@ -287,18 +321,18 @@ export default function LoginPage() {
           await supabase.from('profiles').upsert({
             id: signupData.user.id,
             email: ssoEmail,
-            full_name: ssoName.trim() || 'Mahasiswa Prasetiya Mulya',
+            full_name: ssoName.trim() || 'Choirul Arifin',
             nim: cleanNim,
             updated_at: new Date().toISOString()
           })
         } catch (pErr) {}
 
         setCurrentUserRole('user')
-        setCurrentUserName(ssoName.trim() || 'Mahasiswa Prasetiya Mulya')
+        setCurrentUserName(ssoName.trim() || 'Choirul Arifin')
         setShowSsoModal(false)
         navigate('/dashboard', { replace: true })
       } else {
-        setErrorMsg('Gagal memproses otentikasi SSO: ' + (signupError?.message || loginError?.message || 'Error'))
+        setErrorMsg('Gagal otentikasi SSO: ' + (signupError?.message || loginError?.message || 'Periksa kembali data Anda.'))
       }
     } catch (err) {
       setErrorMsg('Terjadi kendala koneksi ke server SSO.')
@@ -756,6 +790,23 @@ export default function LoginPage() {
                   Ganti NIM / Akun Mahasiswa Lain
                 </button>
               )}
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                  Password Akun Mahasiswa *
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    required
+                    value={ssoPassword}
+                    onChange={(e) => setSsoPassword(e.target.value)}
+                    placeholder="Masukkan password akun Anda"
+                    className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  />
+                </div>
+              </div>
 
               <div className="pt-2 space-y-2">
                 <button
