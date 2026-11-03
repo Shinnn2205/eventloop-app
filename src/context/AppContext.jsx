@@ -33,11 +33,9 @@ export const isCampusEmail = (emailStr) => {
 export const PRASMUL_PRODI_MAP = {
   // SBE (School of Business and Economics)
   '1311': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'S1 Business (Bisnis)', code: 'Business' },
+  '1312': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Branding', code: 'Branding' },
   '1313': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Finance & Banking', code: 'Finance' },
   '1314': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'International Marketing', code: 'Marketing' },
-  '13142': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Branding', code: 'Branding' },
-  '1315': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Branding', code: 'Branding' },
-  '1312': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Branding', code: 'Branding' },
   '1316': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Financial Technology (Fintech)', code: 'Fintech' },
   '1320': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Accounting (Akuntansi)', code: 'Accounting' },
   '1330': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Business Economics', code: 'Economics' },
@@ -65,17 +63,9 @@ export const validateNimStructure = (nimStr) => {
     }
   }
 
-  // Cek prefix 5 digit terlebih dahulu (seperti 13142 untuk Branding), lalu default ke 4 digit
-  let prodiPrefix = clean.slice(0, 4)
-  let angkatanDigits = clean.slice(4, 6)
-  let rawNomor = clean.slice(6)
-
-  if (clean.startsWith('13142')) {
-    prodiPrefix = '13142'
-    angkatanDigits = clean.slice(5, 7)
-    rawNomor = clean.slice(7)
-  }
-
+  const prodiPrefix = clean.slice(0, 4)
+  const angkatanDigits = clean.slice(4, 6)
+  const rawNomor = clean.slice(6)
   // Nomor urut tanpa awalan kampus (contoh 10001 -> 1, 10032 -> 32)
   const nomorUrut = parseInt(rawNomor.slice(1), 10) || rawNomor
 
