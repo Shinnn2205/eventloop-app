@@ -83,10 +83,6 @@ export default function ReturnPage() {
     }
   }
 
-  const handleItemChange = (e) => {
-    selectItem(Number(e.target.value))
-  }
-
   // HAPUS FOTO LAMA KETIKA ID BARANG BERUBAH
   useEffect(() => {
     setConditionPhoto(null)
@@ -139,51 +135,51 @@ export default function ReturnPage() {
   const canSubmit = conditionPhoto && storagePhoto && Object.values(checklist).every(Boolean) && currentItem
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto">
       <div>
-        <div className="inline-flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full mb-1">
-          <RotateCcw className="w-3.5 h-3.5" /> Pengembalian & Verifikasi Lokasi Asal
-        </div>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-          Pengembalian Barang Sesuai Tempat Pengambilan 📸
+        <span className="badge-sage mb-2">
+          <RotateCcw className="w-3.5 h-3.5" /> Tahap 3 · Pengembalian Perlengkapan
+        </span>
+        <h2 className="text-2xl font-bold text-[#2C332E] tracking-tight">
+          Pengembalian ke Lokasi Asal
         </h2>
-        <p className="text-sm text-gray-500">
-          Setiap barang wajib dikembalikan ke lokasi tempat barang tersebut diambil dengan melampirkan bukti foto kondisi fisik dan foto penempatan kembali ber-timestamp.
+        <p className="text-sm text-[#6E7871] mt-1">
+          Kembalikan setiap perlengkapan ke tempat pengambilan asalnya dan lampirkan dua foto dokumentasi ber-timestamp.
         </p>
       </div>
 
       {/* KONDISI 1: PEMBAYARAN MASIH MENUNGGU VERIFIKASI ADMIN */}
       {userPaymentStatus === 'pending_admin_approval' ? (
-        <div className="text-center p-10 bg-amber-50/70 border-2 border-amber-300 rounded-3xl shadow-2xs space-y-4">
-          <div className="w-16 h-16 bg-amber-500 text-white rounded-full flex items-center justify-center mx-auto shadow-md animate-pulse">
-            <Clock className="w-8 h-8" />
+        <div className="card p-10 text-center space-y-4">
+          <div className="w-12 h-12 bg-[#F7F1E3] text-[#8A6116] rounded-2xl flex items-center justify-center mx-auto border border-[#EBE2CC]">
+            <Clock className="w-6 h-6" />
           </div>
-          <h3 className="text-xl font-black text-amber-950">Pembayaran Reservasi Sedang Diverifikasi Admin</h3>
-          <p className="text-xs text-amber-800 max-w-md mx-auto leading-relaxed">
-            Anda telah memesan <strong>{rentedItems.length} jenis barang sewa</strong> untuk event <strong>{activeReservation?.eventName}</strong>. Formulir pengembalian akan otomatis terbuka setelah Admin menyetujui pembayaran QRIS Anda.
+          <h3 className="text-lg font-bold text-[#2C332E]">Pembayaran Sedang Diverifikasi Admin</h3>
+          <p className="text-xs text-[#6E7871] max-w-md mx-auto leading-relaxed">
+            Anda telah memesan <strong>{rentedItems.length} jenis barang sewa</strong> untuk event <strong>{activeReservation?.eventName}</strong>. Formulir pengembalian akan terbuka otomatis setelah pembayaran QRIS disetujui Admin.
           </p>
           <div className="pt-2">
-            <Link to="/reservation" className="btn-primary text-xs !py-2.5 !px-5 inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700">
+            <Link to="/reservation" className="btn-primary text-xs !py-2.5 !px-5 inline-flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
-              <span>Lihat Status Reservasi Saya</span>
+              <span>Lihat Status Reservasi</span>
             </Link>
           </div>
         </div>
       ) : rentedItems.length === 0 ? (
         /* KONDISI 2: TIDAK ADA TANGGUNGAN BARANG / SEMUA SUDAH DIKEMBALIKAN */
-        <div className="text-center p-12 bg-white border border-gray-200 rounded-3xl shadow-2xs space-y-4">
-          <div className="w-16 h-16 bg-green-50 text-green-600 rounded-full flex items-center justify-center mx-auto border border-green-200">
-            <CheckCircle2 className="w-8 h-8" />
+        <div className="card p-10 text-center space-y-4">
+          <div className="w-12 h-12 bg-[#EAF0EC] text-[#3A6351] rounded-2xl flex items-center justify-center mx-auto border border-[#DCE5DF]">
+            <CheckCircle2 className="w-6 h-6" />
           </div>
-          <h3 className="text-xl font-bold text-gray-900">
-            {hasActiveEvent ? 'Seluruh Barang Event Telah Dikembalikan! 🎉' : 'Tidak Ada Tanggungan Pengembalian Barang'}
+          <h3 className="text-lg font-bold text-[#2C332E]">
+            {hasActiveEvent ? 'Seluruh Perlengkapan Event Telah Dikembalikan' : 'Tidak Ada Tanggungan Pengembalian'}
           </h3>
-          <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed">
+          <p className="text-xs text-[#6E7871] max-w-md mx-auto leading-relaxed">
             {hasActiveEvent 
-              ? `Terima kasih! Seluruh perlengkapan sewa untuk event "${activeReservation.eventName}" telah selesai dikembalikan ke lokasi asalnya. Anda kini dapat menutup siklus event ini untuk membuat event baru.`
-              : 'Anda belum memiliki pinjaman barang rental aktif saat ini. Silakan buat event dan pilih perlengkapan di Marketplace.'}
+              ? `Terima kasih! Seluruh perlengkapan sewa untuk event "${activeReservation.eventName}" telah dikembalikan ke lokasi asalnya. Anda dapat menutup siklus kegiatan ini untuk membuat event baru.`
+              : 'Anda belum memiliki pinjaman perlengkapan aktif saat ini. Silakan daftarkan kegiatan dan pilih perlengkapan di Marketplace.'}
           </p>
-          <div className="pt-4 flex flex-wrap justify-center gap-3">
+          <div className="pt-2 flex flex-wrap justify-center gap-2.5">
             {hasActiveEvent ? (
               <button
                 type="button"
@@ -191,30 +187,30 @@ export default function ReturnPage() {
                   clearActiveEvent()
                   navigate('/create-event')
                 }}
-                className="btn-primary text-xs !py-3 !px-6 flex items-center gap-2 cursor-pointer shadow-lg shadow-green-600/20"
+                className="btn-primary text-xs !py-2.5 !px-5 flex items-center gap-2 cursor-pointer"
               >
                 <PlusCircle className="w-4 h-4" />
                 <span>Selesaikan Siklus Event & Buat Event Baru</span>
               </button>
             ) : (
-              <Link to="/create-event" className="btn-primary text-xs !py-3 !px-6">
-                + Buat Event & Pinjam Barang
+              <Link to="/create-event" className="btn-primary text-xs !py-2.5 !px-5">
+                Buat Event Baru
               </Link>
             )}
-            <Link to="/marketplace" className="btn-secondary text-xs !py-3 !px-6">
-              Lihat Marketplace
+            <Link to="/marketplace" className="btn-secondary text-xs !py-2.5 !px-5">
+              Buka Marketplace
             </Link>
           </div>
         </div>
       ) : (
         /* KONDISI 3: FORM PENGEMBALIAN BARANG AKTIF */
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-6">
           {/* Left Col: Target Item & Storage Info */}
-          <div className="space-y-6">
-            <div className="card p-6 space-y-4">
+          <div className="space-y-5">
+            <div className="card p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-gray-700 uppercase">
-                  Daftar Barang Disewa ({rentedItems.length} Sisa):
+                <label className="block text-xs font-semibold text-[#5C645E]">
+                  Perlengkapan Disewa ({rentedItems.length} tersisa)
                 </label>
               </div>
 
@@ -230,20 +226,20 @@ export default function ReturnPage() {
                       onClick={() => selectItem(item.id)}
                       className={`w-full text-left p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
                         isSelected
-                          ? 'bg-green-50 border-green-500 ring-2 ring-green-500/20'
-                          : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100'
+                          ? 'bg-[#EAF0EC] border-[#A5C0B2]'
+                          : 'bg-[#F6F5F0] border-[#E8E6DF] hover:bg-[#EFECE6]'
                       }`}
                     >
                       <div className="min-w-0">
-                        <div className="font-bold text-gray-900 text-xs truncate">{item.name}</div>
-                        <div className="text-[10px] text-gray-500 truncate mt-0.5">
-                          {item.qty} Unit • 📍 {item.lastLocation || item.initialLocation || 'Warehouse Kampus'}
+                        <div className="font-semibold text-[#2C332E] text-xs truncate">{item.name}</div>
+                        <div className="text-[11px] text-[#6E7871] truncate mt-0.5">
+                          {item.qty} unit · {item.lastLocation || item.initialLocation || 'Warehouse Kampus'}
                         </div>
                       </div>
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                        isPending ? 'bg-amber-100 text-amber-800' : 'bg-white text-gray-600 border border-gray-200'
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-lg flex-shrink-0 ${
+                        isPending ? 'bg-[#F7F1E3] text-[#8A6116]' : 'bg-[#FAF9F5] text-[#5C645E] border border-[#E8E6DF]'
                       }`}>
-                        {isPending ? '⏳ Dicek Admin' : 'Pilih'}
+                        {isPending ? 'Dicek Admin' : 'Pilih'}
                       </span>
                     </button>
                   )
@@ -251,37 +247,32 @@ export default function ReturnPage() {
               </div>
 
               {currentItem && (
-                <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
+                <div className="pt-4 border-t border-[#ECEAE3] space-y-3.5">
                   <div>
-                    <span className="text-[10px] font-black uppercase text-green-700 bg-green-100 px-2 py-0.5 rounded">
-                      ITEM-{currentItem.id}
-                    </span>
-                    <h4 className="font-extrabold text-gray-900 text-base mt-1.5">{currentItem.name}</h4>
-                    <p className="text-xs text-gray-500 mt-1">Peminjam: <strong className="text-gray-800">{currentUserName || 'Prasmulyan'}</strong></p>
-                    <p className="text-xs text-gray-500 mt-0.5">Jumlah Dikembalikan: <strong className="text-gray-800">{currentItem.qty} unit</strong></p>
+                    <span className="badge-stone">ITEM-{currentItem.id}</span>
+                    <h4 className="font-semibold text-[#2C332E] text-sm mt-1.5">{currentItem.name}</h4>
+                    <p className="text-xs text-[#6E7871] mt-1">Peminjam: <strong className="text-[#2C332E]">{currentUserName || 'Prasmulyan'}</strong></p>
+                    <p className="text-xs text-[#6E7871] mt-0.5">Jumlah: <strong className="text-[#2C332E]">{currentItem.qty} unit</strong></p>
                   </div>
 
                   {/* Highlight Lokasi Pengembalian Asal */}
-                  <div className="p-4 bg-emerald-50 rounded-2xl border-2 border-emerald-300 text-xs space-y-1.5 shadow-2xs">
-                    <div className="flex items-start gap-2.5">
-                      <MapPin className="w-5 h-5 text-emerald-700 flex-shrink-0 mt-0.5" />
+                  <div className="p-3.5 bg-[#EAF0EC] rounded-xl border border-[#DCE5DF] text-xs space-y-1">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-[#3A6351] flex-shrink-0 mt-0.5" />
                       <div>
-                        <span className="text-emerald-800 text-[10px] block uppercase font-black tracking-wider">
-                          Wajib Dikembalikan Ke Lokasi Asal:
+                        <span className="text-[#4B6B5C] text-[11px] font-medium block">
+                          Wajib Dikembalikan ke Lokasi Asal:
                         </span>
-                        <span className="font-black text-emerald-950 text-sm block mt-0.5">
+                        <span className="font-semibold text-[#264738] text-xs block mt-0.5">
                           {currentOriginLocation}
-                        </span>
-                        <span className="text-[10px] text-emerald-700 block mt-1">
-                          Harap letakkan kembali tepat di tempat barang ini diambil semula.
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 leading-relaxed flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <span>Kedua foto bukti di sebelah kanan wajib diupload dengan stempel waktu untuk verifikasi Admin Pengelola.</span>
+                  <div className="p-3 bg-[#F6F5F0] rounded-xl border border-[#E8E6DF] text-[11px] text-[#6E7871] leading-relaxed flex items-start gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 text-[#8A938C] flex-shrink-0 mt-0.5" />
+                    <span>Lampirkan foto kondisi fisik dan foto penempatan di lokasi asal untuk diverifikasi Admin.</span>
                   </div>
                 </div>
               )}
@@ -290,29 +281,29 @@ export default function ReturnPage() {
 
           {/* Right 2 Cols: Form Upload 2 Bukti Foto + Checklist */}
           <div className="md:col-span-2 space-y-6">
-            <div className="card p-6 md:p-8 space-y-6">
+            <div className="card p-6 space-y-6">
 
               {returnStatus === 'idle' ? (
-                <form onSubmit={handleReturn} className="space-y-6">
+                <form onSubmit={handleReturn} className="space-y-5">
                   
                   {/* 2 PHOTO UPLOAD SECTIONS WITH TIMESTAMPS */}
-                  <div className="space-y-4">
-                    <h4 className="font-extrabold text-gray-900 text-sm flex items-center gap-2">
-                      <Camera className="w-4 h-4 text-emerald-600" />
-                      Wajib Upload 2 Bukti Foto Pengembalian ({currentItem?.name})
+                  <div className="space-y-3.5">
+                    <h4 className="font-semibold text-[#2C332E] text-sm flex items-center gap-2">
+                      <Camera className="w-4 h-4 text-[#3A6351]" />
+                      Dokumentasi Foto Pengembalian ({currentItem?.name})
                     </h4>
 
                     <div className="grid sm:grid-cols-2 gap-4">
                       {/* BUKTI FOTO 1: KONDISI FISIK BARANG */}
-                      <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50 space-y-3">
-                        <div className="text-xs font-bold text-gray-800">
+                      <div className="border border-[#E8E6DF] rounded-xl p-4 bg-[#F6F5F0] space-y-2.5">
+                        <div className="text-xs font-semibold text-[#2C332E]">
                           1. Foto Kondisi Fisik Barang
                         </div>
-                        <p className="text-[11px] text-gray-500">
-                          Pastikan barang utuh, bersih, dan berfungsi baik seperti saat diambil.
+                        <p className="text-[11px] text-[#6E7871]">
+                          Pastikan barang utuh, bersih, dan berfungsi baik.
                         </p>
 
-                        <div className="relative border-2 border-dashed border-gray-300 rounded-xl p-3 text-center hover:border-green-500 transition-colors bg-white">
+                        <div className="relative border border-dashed border-[#D5D1C8] rounded-xl p-3 text-center hover:border-[#3A6351] transition-colors bg-[#FAF9F5]">
                           <input 
                             type="file" 
                             accept="image/*" 
@@ -321,31 +312,31 @@ export default function ReturnPage() {
                           />
                           {conditionPhoto ? (
                             <div className="space-y-2">
-                              <img src={conditionPhoto} alt="Kondisi Fisik" className="w-full h-32 object-cover rounded-lg mx-auto border" />
-                              <span className="text-[10px] text-emerald-700 font-bold block bg-emerald-50 py-1 px-2 rounded">
-                                🕒 {conditionTime}
+                              <img src={conditionPhoto} alt="Kondisi Fisik" className="w-full h-32 object-cover rounded-lg mx-auto border border-[#E8E6DF]" />
+                              <span className="text-[10px] text-[#264738] font-medium block bg-[#EAF0EC] py-1 px-2 rounded-md">
+                                {conditionTime}
                               </span>
                             </div>
                           ) : (
                             <div className="py-6 flex flex-col items-center">
-                              <Camera className="w-6 h-6 text-gray-400 mb-1" />
-                              <span className="text-xs font-bold text-gray-700">Ambil / Upload Foto Fisik</span>
-                              <span className="text-[10px] text-gray-400">Otomatis mencatat waktu</span>
+                              <Camera className="w-5 h-5 text-[#8A938C] mb-1.5" />
+                              <span className="text-xs font-medium text-[#2C332E]">Pilih Foto Fisik</span>
+                              <span className="text-[10px] text-[#8A938C] mt-0.5">Otomatis mencatat waktu</span>
                             </div>
                           )}
                         </div>
                       </div>
 
                       {/* BUKTI FOTO 2: BUKTI DILETAKKAN KEMBALI DI TEMPAT SEMULA */}
-                      <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50 space-y-3">
-                        <div className="text-xs font-bold text-gray-800">
-                          2. Foto di Lokasi Asal ({currentOriginLocation})
+                      <div className="border border-[#E8E6DF] rounded-xl p-4 bg-[#F6F5F0] space-y-2.5">
+                        <div className="text-xs font-semibold text-[#2C332E]">
+                          2. Foto di Lokasi Asal
                         </div>
-                        <p className="text-[11px] text-gray-500">
-                          Tunjukkan barang telah diletakkan rapi di tempat pengambilan semula.
+                        <p className="text-[11px] text-[#6E7871] truncate" title={currentOriginLocation}>
+                          Lokasi: {currentOriginLocation}
                         </p>
 
-                        <div className="relative border-2 border-dashed border-gray-300 rounded-xl p-3 text-center hover:border-green-500 transition-colors bg-white">
+                        <div className="relative border border-dashed border-[#D5D1C8] rounded-xl p-3 text-center hover:border-[#3A6351] transition-colors bg-[#FAF9F5]">
                           <input 
                             type="file" 
                             accept="image/*" 
@@ -354,16 +345,16 @@ export default function ReturnPage() {
                           />
                           {storagePhoto ? (
                             <div className="space-y-2">
-                              <img src={storagePhoto} alt="Lokasi Asal" className="w-full h-32 object-cover rounded-lg mx-auto border" />
-                              <span className="text-[10px] text-emerald-700 font-bold block bg-emerald-50 py-1 px-2 rounded">
-                                🕒 {storageTime}
+                              <img src={storagePhoto} alt="Lokasi Asal" className="w-full h-32 object-cover rounded-lg mx-auto border border-[#E8E6DF]" />
+                              <span className="text-[10px] text-[#264738] font-medium block bg-[#EAF0EC] py-1 px-2 rounded-md">
+                                {storageTime}
                               </span>
                             </div>
                           ) : (
                             <div className="py-6 flex flex-col items-center">
-                              <MapPin className="w-6 h-6 text-gray-400 mb-1" />
-                              <span className="text-xs font-bold text-gray-700">Upload Foto di Lokasi Asal</span>
-                              <span className="text-[10px] text-gray-400">Wajib memperlihatkan posisi simpan</span>
+                              <MapPin className="w-5 h-5 text-[#8A938C] mb-1.5" />
+                              <span className="text-xs font-medium text-[#2C332E]">Pilih Foto Lokasi Simpan</span>
+                              <span className="text-[10px] text-[#8A938C] mt-0.5">Perlihatkan posisi rak/gudang</span>
                             </div>
                           )}
                         </div>
@@ -372,36 +363,36 @@ export default function ReturnPage() {
                   </div>
 
                   {/* CHECKLIST PENGECEKAN FISIK */}
-                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-3">
-                    <h5 className="font-bold text-gray-900 text-xs">Konfirmasi Pernyataan Peminjam:</h5>
+                  <div className="p-4 bg-[#F6F5F0] rounded-xl border border-[#E8E6DF] space-y-2.5">
+                    <h5 className="font-semibold text-[#2C332E] text-xs">Konfirmasi Pengembalian:</h5>
                     <div className="space-y-2 text-xs">
-                      <label className="flex items-center gap-2 cursor-pointer">
+                      <label className="flex items-center gap-2.5 cursor-pointer text-[#5C645E]">
                         <input 
                           type="checkbox" 
                           checked={checklist.goodCondition} 
                           onChange={(e) => setChecklist(prev => ({ ...prev, goodCondition: e.target.checked }))}
-                          className="rounded text-green-600 focus:ring-green-500" 
+                          className="rounded accent-[#3A6351]" 
                         />
-                        <span className="text-gray-700">Barang dalam keadaan berfungsi baik dan bersih seperti semula</span>
+                        <span>Barang berfungsi baik dan bersih seperti semula</span>
                       </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
+                      <label className="flex items-center gap-2.5 cursor-pointer text-[#5C645E]">
                         <input 
                           type="checkbox" 
                           checked={checklist.complete} 
                           onChange={(e) => setChecklist(prev => ({ ...prev, complete: e.target.checked }))}
-                          className="rounded text-green-600 focus:ring-green-500" 
+                          className="rounded accent-[#3A6351]" 
                         />
-                        <span className="text-gray-700">Kelengkapan aksesoris, kabel, dan komponen pendukung lengkap</span>
+                        <span>Kelengkapan komponen pendukung lengkap</span>
                       </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
+                      <label className="flex items-center gap-2.5 cursor-pointer text-[#5C645E]">
                         <input 
                           type="checkbox" 
                           checked={checklist.returnedToOriginalPlace} 
                           onChange={(e) => setChecklist(prev => ({ ...prev, returnedToOriginalPlace: e.target.checked }))}
-                          className="rounded text-green-600 focus:ring-green-500" 
+                          className="rounded accent-[#3A6351]" 
                         />
-                        <span className="text-gray-700">
-                          Barang telah dipulangkan ke tempat asalnya (<strong>{currentOriginLocation}</strong>)
+                        <span>
+                          Dikembalikan ke tempat asalnya (<strong className="text-[#2C332E]">{currentOriginLocation}</strong>)
                         </span>
                       </label>
                     </div>
@@ -411,83 +402,77 @@ export default function ReturnPage() {
                     <button
                       type="submit"
                       disabled={!canSubmit}
-                      className={`w-full text-sm !py-3.5 flex items-center justify-center gap-2 rounded-xl font-bold transition-all ${
-                        canSubmit 
-                          ? 'btn-primary shadow-lg shadow-green-600/20 cursor-pointer' 
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      }`}
+                      className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <RotateCcw className="w-4 h-4" />
-                      <span>Kirim Bukti Pengembalian ke Admin</span>
+                      <span>Kirim Bukti Pengembalian</span>
                     </button>
                     {!canSubmit && (
-                      <p className="text-center text-[11px] text-gray-400 mt-2">
-                        ⚠️ Harap upload Foto Kondisi Fisik dan Foto di Lokasi Asal terlebih dahulu.
+                      <p className="text-center text-[11px] text-[#8A938C] mt-2">
+                        Lengkapi kedua foto bukti di atas untuk mengirim pengembalian.
                       </p>
                     )}
                   </div>
                 </form>
               ) : returnStatus === 'pending_admin_approval' ? (
-                <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-6 text-center space-y-5 animate-fade-in-up">
-                  <div className="w-14 h-14 bg-amber-500 text-white rounded-full flex items-center justify-center mx-auto shadow-md animate-pulse">
-                    <RotateCcw className="w-8 h-8" />
+                <div className="bg-[#F7F1E3] border border-[#EBE2CC] rounded-2xl p-6 text-center space-y-4">
+                  <div className="w-12 h-12 bg-[#FAF9F5] text-[#8A6116] rounded-2xl flex items-center justify-center mx-auto border border-[#EBE2CC]">
+                    <RotateCcw className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-black text-amber-950 mt-2">
-                      MENUNGGU VERIFIKASI ADMIN ⏳
+                    <h3 className="text-base font-bold text-[#2C332E]">
+                      Menunggu Verifikasi Admin
                     </h3>
-                    <p className="text-xs text-amber-800 max-w-md mx-auto mt-2 leading-relaxed">
-                      Bukti pengembalian <strong>{currentItem?.name}</strong> ke lokasi <strong>{currentOriginLocation}</strong> telah masuk ke sistem. Admin akan memverifikasi foto fisik dan lokasi penempatan barang.
+                    <p className="text-xs text-[#6E5626] max-w-md mx-auto mt-1.5 leading-relaxed">
+                      Bukti pengembalian <strong>{currentItem?.name}</strong> ke lokasi <strong>{currentOriginLocation}</strong> sedang diperiksa oleh Admin.
                     </p>
                   </div>
-                  <div className="pt-2 flex flex-col items-center gap-3">
-                    {rentedItems.length > 1 && (
+                  {rentedItems.length > 1 && (
+                    <div className="pt-2">
                       <button 
                         onClick={() => setReturnStatus('idle')}
-                        className="btn-secondary text-xs !py-2.5 !px-5 bg-white cursor-pointer"
+                        className="btn-secondary text-xs !py-2 !px-4 cursor-pointer"
                       >
-                        Kembalikan Barang Lainnya Dulu
+                        Kembalikan Barang Lainnya
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               ) : (
-                /* Success State - Digital Return Certificate */
-                <div className="bg-green-50 border-2 border-green-400 rounded-3xl p-6 md:p-8 text-center space-y-5 animate-fade-in-up">
-                  <div className="w-14 h-14 bg-green-600 text-white rounded-full flex items-center justify-center mx-auto shadow-md">
-                    <CheckCircle2 className="w-8 h-8" />
+                /* Success State */
+                <div className="bg-[#EAF0EC] border border-[#DCE5DF] rounded-2xl p-6 text-center space-y-4">
+                  <div className="w-12 h-12 bg-[#3A6351] text-white rounded-2xl flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-6 h-6" />
                   </div>
 
                   <div>
-                    <span className="text-[10px] font-black uppercase text-green-700 bg-green-100 px-3 py-1 rounded-full border border-green-300">
-                      BERITA ACARA PENGEMBALIAN DIGITAL SAH
-                    </span>
-                    <h3 className="text-2xl font-black text-green-950 mt-2">
-                      PENGEMBALIAN DIVERIFIKASI! ♻️
+                    <span className="badge-sage mb-2">Pengembalian Terverifikasi</span>
+                    <h3 className="text-lg font-bold text-[#264738]">
+                      Barang Selesai Dikembalikan
                     </h3>
-                    <p className="text-xs text-green-800 max-w-md mx-auto mt-1 leading-relaxed">
-                      Pengembalian barang telah disetujui Admin. Stok barang telah dipulihkan ke Marketplace beserta posisi penyimpanannya.
+                    <p className="text-xs text-[#4B6B5C] max-w-md mx-auto mt-1 leading-relaxed">
+                      Pengembalian barang telah disetujui Admin dan stok telah dipulihkan ke Marketplace.
                     </p>
                   </div>
 
-                  <div className="pt-4 border-t border-green-200/50 flex flex-col sm:flex-row gap-3 justify-center">
+                  <div className="pt-3 flex flex-col sm:flex-row gap-2.5 justify-center">
                     {rentedItems.length > 0 ? (
                       <button 
                         onClick={() => {
                           setReturnStatus('idle')
                           setSelectedItemId(rentedItems[0]?.id)
                         }} 
-                        className="btn-primary text-xs !py-3 !px-6 cursor-pointer"
+                        className="btn-primary text-xs !py-2.5 !px-5 cursor-pointer"
                       >
-                        Kembalikan Sisa Barang Lainnya ({rentedItems.length})
+                        Kembalikan Sisa Barang ({rentedItems.length})
                       </button>
                     ) : (
-                      <Link to="/marketplace" className="btn-primary text-xs !py-3 !px-6">
+                      <Link to="/marketplace" className="btn-primary text-xs !py-2.5 !px-5">
                         Lihat Katalog Marketplace
                       </Link>
                     )}
 
-                    <Link to="/impact" className="btn-secondary text-xs !py-3 !px-6 bg-white">
+                    <Link to="/impact" className="btn-secondary text-xs !py-2.5 !px-5">
                       Lihat Dampak Sirkular
                     </Link>
                   </div>

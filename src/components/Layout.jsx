@@ -17,21 +17,19 @@ import {
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 
-// 1. MENU KHUSUS USER
 const userNavItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
   { path: '/create-event', label: 'Buat Event', icon: CalendarPlus },
-  { path: '/marketplace', label: 'Marketplace', icon: ShoppingBag },
-  { path: '/reservation', label: 'Reservasi & Tiket', icon: ClipboardList },
-  { path: '/return', label: 'Pengembalian (Return)', icon: RotateCcw },
-  { path: '/upload-equipment', label: 'Upload Barang', icon: PackagePlus },
-  { path: '/my-equipment', label: 'Barang & Payout Saya', icon: Package },
-  { path: '/impact', label: 'Impact Analytics', icon: BarChart3 },
+  { path: '/marketplace', label: 'Katalog Barang', icon: ShoppingBag },
+  { path: '/reservation', label: 'Reservasi Saya', icon: ClipboardList },
+  { path: '/return', label: 'Pengembalian', icon: RotateCcw },
+  { path: '/upload-equipment', label: 'Pinjamkan Barang', icon: PackagePlus },
+  { path: '/my-equipment', label: 'Barang & Payout', icon: Package },
+  { path: '/impact', label: 'Dampak Sirkular', icon: BarChart3 },
 ]
 
-// 2. MENU KHUSUS ADMIN
 const adminNavItems = [
-  { path: '/admin', label: 'Admin & Escrow Hub', icon: ShieldCheck },
+  { path: '/admin', label: 'Panel Verifikasi', icon: ShieldCheck },
   { path: '/marketplace', label: 'Kelola Katalog', icon: ShoppingBag },
   { path: '/impact', label: 'Dampak Kampus', icon: BarChart3 },
 ]
@@ -53,7 +51,6 @@ export default function Layout() {
 
   const currentNavItems = currentUserRole === 'admin' ? adminNavItems : userNavItems
 
-  // Hitung badge dinamis untuk memudahkan navigasi user
   const unreturnedCount = (activeReservation?.items || []).filter(i => i.listingType !== 'sale').length
   const adminPendingTotal = 
     transactions.filter(t => t.qrisStatus?.includes('Pending') || t.payoutStatus === 'Pending Transfer').length +
@@ -62,71 +59,59 @@ export default function Layout() {
 
   const getNavBadge = (path) => {
     if (currentUserRole === 'admin') {
-      if (path === '/admin' && adminPendingTotal > 0) {
-        return { text: `${adminPendingTotal}`, style: 'bg-amber-400 text-amber-950' }
-      }
+      if (path === '/admin' && adminPendingTotal > 0) return `${adminPendingTotal}`
       return null
     }
-
-    if (path === '/create-event' && activeReservation?.eventName) {
-      return { text: '1 Aktif', style: 'bg-emerald-100 text-emerald-800 border border-emerald-200' }
-    }
+    if (path === '/create-event' && activeReservation?.eventName) return 'Aktif'
     if (path === '/reservation') {
-      if (userPaymentStatus === 'approved_success') {
-        return { text: 'Lunas', style: 'bg-emerald-100 text-emerald-800 border border-emerald-200' }
-      }
-      if (userPaymentStatus === 'pending_admin_approval') {
-        return { text: 'Verifikasi', style: 'bg-amber-100 text-amber-800 border border-amber-200' }
-      }
-      if (cartItems.length > 0) {
-        return { text: `${cartItems.length} Item`, style: 'bg-green-100 text-green-800 border border-green-200' }
-      }
+      if (userPaymentStatus === 'approved_success') return 'Lunas'
+      if (userPaymentStatus === 'pending_admin_approval') return 'Proses'
+      if (cartItems.length > 0) return `${cartItems.length}`
     }
     if (path === '/return' && userPaymentStatus === 'approved_success' && unreturnedCount > 0) {
-      return { text: `${unreturnedCount}`, style: 'bg-amber-100 text-amber-800 border border-amber-200' }
+      return `${unreturnedCount}`
     }
     return null
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile overlay */}
+    <div className="min-h-screen bg-[#F6F5F0] text-[#2C332E] flex">
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-xs"
+          className="fixed inset-0 bg-black/25 z-40 lg:hidden backdrop-blur-xs"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar Cozy */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-50
-        w-64 bg-white border-r border-gray-200
+        w-64 bg-[#FAF9F5] border-r border-[#E8E6DF]
         transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0
         transition-transform duration-200 ease-in-out
         flex flex-col
       `}>
         {/* Brand */}
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-6 py-6 flex items-center justify-between">
           <Link to={currentUserRole === 'admin' ? '/admin' : '/dashboard'} className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md ${currentUserRole === 'admin' ? 'bg-gradient-to-br from-emerald-600 to-teal-700 shadow-emerald-500/20' : 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-green-500/20'}`}>
+            <div className="w-9 h-9 rounded-xl bg-[#3A6351] flex items-center justify-center text-white">
               <Recycle className="w-5 h-5" />
             </div>
             <div>
-              <span className="font-extrabold text-gray-900 text-lg tracking-tight">EventLoop</span>
-              <p className="text-[10px] text-gray-400 font-medium">Universitas Prasetiya Mulya</p>
+              <span className="font-bold text-[#232925] text-base tracking-tight block leading-none">EventLoop</span>
+              <span className="text-[11px] text-[#8A928C] mt-1 block">Prasetiya Mulya</span>
             </div>
           </Link>
           <button 
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-gray-400 hover:text-gray-600 p-1"
+            className="lg:hidden text-[#8A928C] hover:text-[#2C332E] p-1"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-3.5 py-2 space-y-1 overflow-y-auto">
           {currentNavItems.map((item) => {
             const Icon = item.icon
             const isActive = location.pathname === item.path
@@ -138,25 +123,25 @@ export default function Layout() {
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
                 className={`
-                  flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-sm font-medium
-                  transition-all duration-150
+                  flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-sm
+                  transition-colors duration-150
                   ${isActive 
-                    ? currentUserRole === 'admin'
-                      ? 'bg-emerald-700 text-white shadow-sm shadow-emerald-700/25'
-                      : 'bg-green-600 text-white shadow-sm shadow-green-600/25'
-                    : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900'
+                    ? 'bg-[#E6EFE9] text-[#264738] font-semibold'
+                    : 'text-[#5C645E] hover:bg-[#EFECE6]/70 hover:text-[#232925] font-medium'
                   }
                 `}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                  <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-[#3A6351]' : 'text-[#8A928C]'}`} />
                   <span className="truncate">{item.label}</span>
                 </div>
                 {badge && (
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                    isActive ? 'bg-white/25 text-white border-0' : badge.style
+                  <span className={`text-[11px] px-2 py-0.5 rounded-md font-medium flex-shrink-0 ${
+                    isActive 
+                      ? 'bg-[#3A6351] text-white' 
+                      : 'bg-[#ECEAE2] text-[#5C645E]'
                   }`}>
-                    {badge.text}
+                    {badge}
                   </span>
                 )}
               </Link>
@@ -164,33 +149,25 @@ export default function Layout() {
           })}
         </nav>
 
-        {/* Circular Tagline Banner */}
-        <div className={`p-4 mx-4 mb-2 rounded-2xl border ${currentUserRole === 'admin' ? 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200/60' : 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200/60'}`}>
-          <div className={`flex items-center gap-2 font-semibold text-xs mb-1 ${currentUserRole === 'admin' ? 'text-emerald-900' : 'text-green-800'}`}>
-            <Recycle className={`w-4 h-4 ${currentUserRole === 'admin' ? 'text-emerald-700' : 'text-green-600'}`} />
-            <span>Circular Economy</span>
-          </div>
-          <p className={`text-[11px] leading-relaxed ${currentUserRole === 'admin' ? 'text-emerald-800' : 'text-green-700'}`}>
-            Reuse · Rent · Return · Repeat. Wujudkan event kampus bebas limbah.
-          </p>
-        </div>
-
         {/* User profile section */}
-        <div className="p-4 border-t border-gray-100">
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100">
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm flex-shrink-0 ${currentUserRole === 'admin' ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : 'bg-gradient-to-br from-green-500 to-emerald-600'}`}>
+        <div className="p-4 border-t border-[#E8E6DF]">
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[#F3F1EA]">
+            <div className="w-8 h-8 rounded-lg bg-[#3A6351] flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
               {currentUserName ? currentUserName.slice(0, 2).toUpperCase() : (currentUserRole === 'admin' ? 'AD' : 'PR')}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-gray-900 truncate">
+              <p className="text-xs font-semibold text-[#232925] truncate">
                 {currentUserName || (currentUserRole === 'admin' ? 'Admin EventLoop' : 'Prasmulyan')}
               </p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span className="text-[11px] text-gray-500 truncate"> Sesi Aktif</span>
-              </div>
+              <p className="text-[11px] text-[#7A827C] truncate">
+                Sesi Aktif
+              </p>
             </div>
-            <button onClick={logout} title="Keluar / Logout" className="text-gray-400 hover:text-red-500 transition-colors p-1.5 rounded-lg hover:bg-red-50 cursor-pointer">
+            <button 
+              onClick={logout} 
+              title="Keluar" 
+              className="text-[#8A928C] hover:text-[#B84A39] transition-colors p-1.5 rounded-lg hover:bg-white/60 cursor-pointer"
+            >
               <LogOut className="w-4 h-4" />
             </button>
           </div>
@@ -199,23 +176,22 @@ export default function Layout() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen min-w-0 overflow-hidden">
-        {/* Top bar for mobile */}
-        <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30">
-          <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600">
+        <header className="lg:hidden bg-[#FAF9F5] border-b border-[#E8E6DF] px-4 py-3 flex items-center justify-between sticky top-0 z-30">
+          <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-[#EFECE6] rounded-lg text-[#5C645E]">
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm ${currentUserRole === 'admin' ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : 'bg-gradient-to-br from-green-500 to-emerald-600'}`}>
+            <div className="w-7 h-7 rounded-lg bg-[#3A6351] flex items-center justify-center text-white">
               <Recycle className="w-4 h-4" />
             </div>
-            <span className="font-bold text-gray-900 text-lg">EventLoop</span>
+            <span className="font-bold text-[#232925] text-base">EventLoop</span>
           </div>
-          <button onClick={logout} className={`text-xs font-semibold px-3 py-1.5 rounded-lg border ${currentUserRole === 'admin' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-green-600 bg-green-50 border-green-200'}`}>
+          <button onClick={logout} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-[#EFECE6] text-[#5C645E]">
             Keluar
           </button>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 p-5 sm:p-8 lg:p-10 overflow-y-auto">
           <Outlet />
         </main>
       </div>

@@ -4,53 +4,97 @@
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #F6F5F0;
+    color: #2C332E;
+    @apply antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: #232925;
+    letter-spacing: -0.015em;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-green-600/20 hover:shadow-green-600/30 hover:-translate-y-0.5;
+    background-color: #3A6351;
+    color: #FFFFFF;
+    @apply font-medium py-2.5 px-5 rounded-xl transition-all duration-200 shadow-sm;
   }
+  .btn-primary:hover {
+    background-color: #2E5041;
+  }
+  .btn-primary:disabled {
+    background-color: #E2E0D8;
+    color: #9A9890;
+    cursor: not-allowed;
+  }
+
   .btn-secondary {
-    @apply bg-white hover:bg-gray-50 text-gray-700 font-semibold py-3 px-6 rounded-xl border-2 border-gray-200 hover:border-green-300 transition-all duration-200;
+    background-color: #FFFFFF;
+    color: #3D4540;
+    border: 1px solid #DFDDD4;
+    @apply font-medium py-2.5 px-5 rounded-xl transition-all duration-200;
   }
+  .btn-secondary:hover {
+    background-color: #F2F0E8;
+    border-color: #C8C5B9;
+  }
+
   .card {
-    @apply bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200;
+    background-color: #FFFFFF;
+    border: 1px solid #E8E6DF;
+    box-shadow: 0 2px 8px rgba(44, 51, 46, 0.03);
+    @apply rounded-2xl transition-all duration-200;
   }
-  .glass {
-    @apply bg-white/80 backdrop-blur-xl border border-white/20 shadow-xl;
+
+  .cozy-input {
+    background-color: #FAF9F5;
+    border: 1px solid #E2E0D8;
+    color: #2C332E;
+    @apply w-full px-4 py-2.5 rounded-xl text-sm transition-all duration-150 focus:outline-none focus:bg-white focus:border-[#3A6351] focus:ring-2 focus:ring-[#3A6351]/15;
+  }
+
+  .badge-sage {
+    background-color: #EAF0EC;
+    color: #2F5243;
+    @apply inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg;
+  }
+
+  .badge-warm {
+    background-color: #F7F1E3;
+    color: #855D27;
+    @apply inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg;
+  }
+
+  .badge-stone {
+    background-color: #EFECE6;
+    color: #5C645E;
+    @apply inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg;
   }
 }
 
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #F6F5F0;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  background: #D5D2C8;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-}
-
-.animate-float {
-  animation: float 3s ease-in-out infinite;
+  background: #B8B4A8;
 }
 
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -59,11 +103,9 @@
 }
 
 .animate-fade-in-up {
-  animation: fadeInUp 0.6s ease-out forwards;
+  animation: fadeInUp 0.35s ease-out forwards;
 }
 
-.animate-delay-100 { animation-delay: 0.1s; }
-.animate-delay-200 { animation-delay: 0.2s; }
-.animate-delay-300 { animation-delay: 0.3s; }
-.animate-delay-400 { animation-delay: 0.4s; }
-.animate-delay-500 { animation-delay: 0.5s; }
+.animate-fade-in {
+  animation: fadeInUp 0.25s ease-out forwards;
+}
