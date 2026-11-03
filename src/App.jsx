@@ -15,18 +15,22 @@ import AdminPanel from './pages/AdminPanel'
 import Layout from './components/Layout'
 import { AppProvider, useApp } from './context/AppContext'
 
-// Komponen penangkap sesi untuk otomatis melempar ke dashboard jika sudah login
+// Komponen penangkap sesi untuk otomatis melempar ke dashboard jika user sudah login
 function AuthHandler() {
-  const { sessionUser } = useApp()
+  const { sessionUser, currentUserRole } = useApp()
   const navigate = useNavigate()
   const location = useLocation()
 
   useEffect(() => {
-    // Jika user sudah login dan sedang berada di halaman landing (/) atau login (/login)
-    if (sessionUser && (location.pathname === '/' || location.pathname === '/login')) {
-      navigate('/dashboard', { replace: true })
+    // Jika user sudah login dan sengaja membuka /login lagi
+    if (sessionUser && location.pathname === '/login') {
+      if (currentUserRole === 'admin') {
+        navigate('/admin', { replace: true })
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
     }
-  }, [sessionUser, location, navigate])
+  }, [sessionUser, currentUserRole, location, navigate])
 
   return null
 }

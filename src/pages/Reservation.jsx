@@ -12,12 +12,30 @@ import {
 } from 'lucide-react'
 
 export default function Reservation() {
-  const { userPaymentStatus, submitUserQrisPayment, cartItems, updateCartQty, removeFromCart } = useApp()
+  const { 
+    userPaymentStatus, 
+    submitUserQrisPayment, 
+    cartItems, 
+    updateCartQty, 
+    removeFromCart, 
+    currentUserName,
+    activeReservation 
+  } = useApp()
   const [showQrisModal, setShowQrisModal] = useState(false)
 
-  const totalCost = cartItems.reduce((sum, item) => sum + ((item.listingType === 'sale' ? (item.salePrice || item.price) : item.price) * item.qty), 0)
+  const cartTotal = cartItems.reduce((sum, item) => sum + ((item.listingType === 'sale' ? (item.salePrice || item.price) : item.price) * item.qty), 0)
+  const totalCost = cartItems.length > 0 ? cartTotal : (activeReservation?.totalAmount || 0)
+  
   const estimatedAvoidedCost = totalCost * 4.8 
-  const estimatedWasteAvoided = (cartItems.reduce((sum, item) => sum + item.qty, 0) * 1.8).toFixed(1)
+  const totalQtyCount = cartItems.length > 0 
+    ? cartItems.reduce((sum, item) => sum + item.qty, 0)
+    : (activeReservation?.items?.reduce((sum, item) => sum + item.qty, 0) || 1)
+  const estimatedWasteAvoided = (totalQtyCount * 1.8).toFixed(1)
+
+  const eventTitle = activeReservation?.eventName || 'INNOFAIR 2026'
+  const eventDateFormatted = activeReservation?.eventDate 
+    ? new Date(activeReservation.eventDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+    : '18 September 2026'
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
@@ -25,13 +43,13 @@ export default function Reservation() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full mb-1">
-            <ClipboardList className="w-3.5 h-3.5" /> Screen 6 — Reservation
+            <ClipboardList className="w-3.5 h-3.5" /> Screen 6 — Reservation & Checkout
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
             Your Event Equipment Reservation
           </h2>
           <p className="text-sm text-gray-500">
-            Kepanitiaan: <strong>INNOFAIR 2026</strong> (SISO BEM) • Tanggal: 18 September 2026
+            Kepanitiaan: <strong>{eventTitle}</strong> ({currentUserName || 'SISO BEM'}) • Tanggal: {eventDateFormatted}
           </p>
         </div>
 
@@ -123,7 +141,9 @@ export default function Reservation() {
 
             {cartItems.length === 0 && (
               <div className="p-8 text-center text-gray-400 text-xs">
-                Belum ada equipment yang dimasukkan ke reservasi. Silakan tambahkan barang dari Marketplace.
+                {userPaymentStatus !== 'idle' 
+                  ? 'Pesanan Anda sedang diproses. Rincian tersimpan di ringkasan pembayaran di sebelah kanan.' 
+                  : 'Belum ada equipment yang dimasukkan ke reservasi. Silakan tambahkan barang dari Marketplace.'}
               </div>
             )}
           </div>
@@ -134,7 +154,7 @@ export default function Reservation() {
               Jadwal & Lokasi Pengambilan (Pick-up)
             </h4>
             <p className="text-xs text-blue-800 leading-relaxed">
-              Barang dapat diambil di <strong>Warehouse Kampus Gedung C (Lantai Dasar)</strong> pada <strong>H-1 (17 September 2026, 09:00 - 16:00 WIB)</strong> dengan menunjukkan QR Code booking kepada petugas Sarpras.
+              Barang dapat diambil di <strong>Warehouse Kampus Gedung C (Lantai Dasar)</strong> pada <strong>H-1 ({eventDateFormatted}, 09:00 - 16:00 WIB)</strong> dengan menunjukkan QR Code booking kepada petugas Sarpras.
             </p>
           </div>
         </div>
@@ -149,10 +169,10 @@ export default function Reservation() {
             <div className="space-y-3 text-xs">
               <div className="flex justify-between text-gray-600">
                 <span>Total Items Dipesan</span>
-                <span className="font-bold text-gray-900">{cartItems.reduce((s, i) => s + i.qty, 0)} unit</span>
+                <span className="font-bold text-gray-900">{totalQtyCount} unit</span>
               </div>
               <div className="flex justify-between text-gray-600">
-                <span>Subtotal Rental</span>
+                <span>Subtotal Biaya</span>
                 <span className="font-bold text-gray-900">Rp{totalCost.toLocaleString('id-ID')}</span>
               </div>
               <div className="flex justify-between text-gray-600">
@@ -161,7 +181,7 @@ export default function Reservation() {
               </div>
 
               <div className="pt-3 border-t border-gray-100 flex justify-between items-baseline">
-                <span className="font-bold text-gray-900 text-sm">Total Biaya Rental</span>
+                <span className="font-bold text-gray-900 text-sm">Total Pembayaran</span>
                 <span className="text-2xl font-black text-green-700">
                   Rp{totalCost.toLocaleString('id-ID')}
                 </span>
@@ -230,8 +250,7 @@ export default function Reservation() {
                     Admin Keuangan Kampus telah mengkonfirmasi penerimaan dana sebesar <strong>Rp{totalCost.toLocaleString('id-ID')}</strong>. Booking Anda telah disetujui dan perlengkapan siap diambil di warehouse!
                   </p>
                   <div className="text-[10px] bg-white p-2.5 rounded-xl border border-emerald-200 text-left font-mono space-y-0.5">
-                    <div>No. Trx: <strong>#TXN-QRIS-2026-092</strong></div>
-                    <div>Ref Bank: <strong>BCA-QRIS-9912048</strong></div>
+                    <div>Ref Transaksi: <strong>{activeReservation?.txnId || '#TXN-QRIS-2026'}</strong></div>
                     <div>Verifikasi: <strong className="text-green-700">Approved by Admin Sarpras ✓</strong></div>
                   </div>
                   <div className="pt-2 flex flex-col gap-2">
@@ -332,7 +351,7 @@ export default function Reservation() {
                 type="button"
                 onClick={() => {
                   submitUserQrisPayment({
-                    buyerOrg: 'SISO Prasmulyan',
+                    buyerOrg: currentUserName || 'SISO Prasmulyan',
                     totalAmount: totalCost,
                     itemNames: cartItems.map(i => `${i.qty}x ${i.name}`).join(', ')
                   })

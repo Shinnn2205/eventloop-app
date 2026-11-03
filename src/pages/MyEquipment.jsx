@@ -6,35 +6,52 @@ import {
   Clock,
   CheckCircle2,
   Box,
-  MapPin
+  MapPin,
+  Plus
 } from 'lucide-react'
 
 export default function MyEquipment() {
-  const { equipments, pendingApprovals } = useApp()
+  const { equipments, pendingApprovals, currentUserName } = useApp()
 
-  // Saring barang yang HANYA diupload oleh currentUser
-  const myApprovedEquipments = equipments.filter(item => item.uploader === 'currentUser')
-  const myPendingEquipments = pendingApprovals.filter(item => item.uploader === 'currentUser')
+  const isMine = (uploader) => {
+    if (!uploader) return false
+    const uLow = String(uploader).toLowerCase()
+    const nameLow = String(currentUserName || 'Prasmulyan').toLowerCase()
+    return uLow === 'currentuser' || uLow.includes(nameLow) || nameLow.includes(uLow) || uLow.includes('prasmul')
+  }
+
+  const myApprovedEquipments = equipments.filter(item => isMine(item.uploader))
+  const myPendingEquipments = pendingApprovals.filter(item => isMine(item.uploader))
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       {/* Header Breadcrumb */}
-      <div className="flex items-center gap-4">
-        <Link 
-          to="/marketplace"
-          className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div>
-          <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
-            <Package className="w-6 h-6 text-blue-600" />
-            Manajemen Barang Saya
-          </h2>
-          <p className="text-sm text-gray-500">
-            Pantau status verifikasi dan stok barang milik organisasi Anda.
-          </p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Link 
+            to="/marketplace"
+            className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <div>
+            <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
+              <Package className="w-6 h-6 text-blue-600" />
+              Manajemen Barang Saya
+            </h2>
+            <p className="text-sm text-gray-500">
+              Pantau status verifikasi dan stok barang milik {currentUserName || 'organisasi Anda'}.
+            </p>
+          </div>
         </div>
+
+        <Link
+          to="/upload-equipment"
+          className="btn-primary text-xs !py-2.5 !px-4 flex items-center gap-1.5"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Upload Barang Baru</span>
+        </Link>
       </div>
 
       {/* SECTION 1: MENUNGGU VERIFIKASI ADMIN */}
@@ -46,7 +63,7 @@ export default function MyEquipment() {
         
         {myPendingEquipments.length === 0 ? (
           <div className="p-6 bg-gray-50 border border-gray-200 rounded-2xl text-center text-sm text-gray-500">
-            Tidak ada barang dalam antrean verifikasi.
+            Tidak ada barang dalam antrean verifikasi saat ini.
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 gap-4">
@@ -110,13 +127,13 @@ export default function MyEquipment() {
                   </div>
                   <div className="p-2 bg-green-50 rounded-lg border border-green-100">
                     <span className="text-[9px] text-green-600 block uppercase font-bold">Sedang Disewa</span>
-                    <strong className="text-green-800">{item.total - item.available} Unit</strong>
+                    <strong className="text-green-800">{Math.max(0, item.total - item.available)} Unit</strong>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5 text-[10px] text-gray-500 bg-gray-50 p-2 rounded-lg truncate">
                   <MapPin className="w-3 h-3 text-blue-500 flex-shrink-0" />
-                  <span className="truncate" title={item.lastLocation}>{item.lastLocation || 'Lokasi Gudang'}</span>
+                  <span className="truncate" title={item.lastLocation}>{item.lastLocation || 'Warehouse Kampus'}</span>
                 </div>
               </div>
             ))}

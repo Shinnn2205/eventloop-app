@@ -8,15 +8,12 @@ import {
   Sparkles, 
   ArrowRight, 
   CheckCircle2, 
-  Plus, 
-  Recycle,
-  Layers,
-  HelpCircle
+  Recycle
 } from 'lucide-react'
 
 export default function CreateEvent() {
   const navigate = useNavigate()
-  const { addToCart, equipments } = useApp()
+  const { addToCart, equipments, setActiveReservation } = useApp()
   
   const [eventName, setEventName] = useState('INNOFAIR 2026')
   const [eventDate, setEventDate] = useState('2026-09-18')
@@ -80,14 +77,36 @@ export default function CreateEvent() {
       setRecommendedList(recs)
       setLoading(false)
       setGenerated(true)
-    }, 600)
+    }, 400)
   }
 
   const handleSaveAndProceed = () => {
+    setActiveReservation({
+      eventName,
+      eventDate,
+      location,
+      participants,
+      eventType
+    })
+
     recommendedList.forEach(rec => {
-      const actualItem = equipments.find(eq => eq.name.includes(rec.name.split(' ')[0]))
+      const searchWord = rec.name.split(' ')[0].toLowerCase()
+      const actualItem = equipments.find(eq => eq.name.toLowerCase().includes(searchWord))
       if (actualItem) {
         addToCart(actualItem, rec.qty)
+      } else {
+        addToCart({
+          id: Math.floor(Math.random() * 80000) + 10000,
+          name: rec.name,
+          category: 'Event Equipment',
+          price: rec.price,
+          available: 50,
+          circularScore: rec.score,
+          listingType: 'rental',
+          image: '📦',
+          material: 'Aluminium / Modular',
+          condition: 'Excellent'
+        }, rec.qty)
       }
     })
     navigate('/reservation')
@@ -197,7 +216,7 @@ export default function CreateEvent() {
             </label>
             <textarea
               rows={2}
-              placeholder="cth. Butuh 2 booth modular pameran, standing banner registrasi, sound system, dan gelas reusable untuk coffee break..."
+              placeholder="cth. Butuh booth modular pameran, standing banner registrasi, sound system, dan gelas reusable..."
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
             />
           </div>

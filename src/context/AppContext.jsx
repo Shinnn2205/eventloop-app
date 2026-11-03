@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { equipmentData as initialEquipment, adminTransactions as initialTransactions, pendingApprovalEquipments as initialPending } from '../data/mockData'
 import { supabase } from '../lib/supabaseClient'
 
@@ -67,130 +67,127 @@ export function AppProvider({ children }) {
   useEffect(() => { localStorage.setItem('eventloop_pending_returns', JSON.stringify(pendingReturns)) }, [pendingReturns])
   useEffect(() => { localStorage.setItem('eventloop_cart', JSON.stringify(cartItems)) }, [cartItems])
 
-  // --- INITIAL FETCH DARI SUPABASE ---
-  useEffect(() => {
-    const initSupabaseData = async () => {
-      try {
-        setLoadingDb(true)
+  // --- FETCH FUNCTION DARI SUPABASE ---
+  const fetchSupabaseData = useCallback(async () => {
+    try {
+      setLoadingDb(true)
 
-        // 1. Session Auth
-        const { data: { session: currentSession } } = await supabase.auth.getSession()
-        if (currentSession) {
-          setSession(currentSession)
-          const metaName = currentSession.user?.user_metadata?.full_name
-          if (metaName) setCurrentUserName(metaName)
+      // 1. Session Auth
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
+      if (currentSession) {
+        setSession(currentSession)
+        const metaName = currentSession.user?.user_metadata?.full_name
+        if (metaName) setCurrentUserName(metaName)
 
-          // Cek profile table
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name, nim')
-            .eq('id', currentSession.user.id)
-            .single()
-          if (profile?.full_name) {
-            setCurrentUserName(profile.full_name)
-          }
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, nim')
+          .eq('id', currentSession.user.id)
+          .single()
+        if (profile?.full_name) {
+          setCurrentUserName(profile.full_name)
         }
-
-        // Listener jika ada perubahan status login
-        const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-          setSession(newSession)
-          if (newSession?.user) {
-            const name = newSession.user.user_metadata?.full_name || 'Prasmulyan'
-            setCurrentUserName(name)
-          }
-        })
-
-        // 2. Fetch Equipments dari Supabase
-        const { data: eqData, error: eqErr } = await supabase
-          .from('equipments')
-          .select('*')
-          .order('created_at', { ascending: false })
-
-        if (!eqErr && eqData && eqData.length > 0) {
-          // Normalisasi data dari database Supabase
-          const normalizedEquipments = eqData.map(item => ({
-            id: item.id,
-            name: item.name,
-            category: item.category || 'General',
-            price: Number(item.price) || 0,
-            salePrice: item.salePrice ? Number(item.salePrice) : null,
-            listingType: item.listingType || (item.salePrice ? 'sale' : 'rental'),
-            available: Number(item.available) || 0,
-            total: Number(item.total) || 1,
-            image: item.image || '📦',
-            imageUrl: item.imageUrl || null,
-            circularScore: item.circularScore || 85,
-            reusedCount: item.reusedCount || 0,
-            maxReuse: item.maxReuse || 30,
-            size: item.size || 'Standar',
-            material: item.material || 'Material Campuran',
-            condition: item.condition || 'Good',
-            owner: item.owner || 'Sarpras / Prasmul Org',
-            ownerBank: item.ownerBank || 'BCA 8012345678',
-            description: item.description || '',
-            lastLocation: item.lastLocation || 'Warehouse Kampus Gedung C',
-            lastStoragePhoto: item.lastStoragePhoto || null,
-            uploader: item.uploader || 'Admin'
-          }))
-          setEquipments(normalizedEquipments)
-        }
-
-        // 3. Fetch Transactions dari Supabase
-        const { data: txnData, error: txnErr } = await supabase
-          .from('transactions')
-          .select('*')
-          .order('created_at', { ascending: false })
-
-        if (!txnErr && txnData && txnData.length > 0) {
-          const normalizedTxn = txnData.map(t => ({
-            id: t.id,
-            buyerOrg: t.buyer_org || 'SISO Prasmulyan',
-            itemName: t.item_names || 'Reservasi Perlengkapan',
-            amount: Number(t.amount) || 0,
-            qrisStatus: t.qris_status || 'Pending Admin Verification',
-            payoutStatus: t.payout_status || 'Waiting Admin Approval',
-            paidAt: t.created_at ? new Date(t.created_at).toLocaleString('id-ID') : 'Baru saja',
-            bankAdminRef: `BCA-QRIS-${String(t.id).slice(0, 6)}`,
-            ownerOrg: 'Organisasi Pemilik & Sarpras',
-            ownerBank: 'BCA 8012345678 a.n Owner',
-            payoutAmount: Math.round((Number(t.amount) || 0) * 0.95),
-            adminFee: Math.round((Number(t.amount) || 0) * 0.05),
-          }))
-          setTransactions(normalizedTxn)
-        }
-
-        // 4. Fetch Returns dari Supabase
-        const { data: retData, error: retErr } = await supabase
-          .from('returns')
-          .select('*')
-          .order('created_at', { ascending: false })
-
-        if (!retErr && retData && retData.length > 0) {
-          const normalizedRet = retData.map(r => ({
-            id: r.id,
-            equipmentId: r.equipment_id,
-            conditionPhoto: r.condition_photo,
-            storagePhoto: r.storage_photo,
-            returnedQty: r.returned_qty || 1,
-            borrower: r.borrower || 'SISO Prasmulyan',
-            status: r.status || 'Pending Admin Verification',
-            timestamp: r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : 'Baru saja'
-          }))
-          setPendingReturns(normalizedRet)
-        }
-
-        return () => {
-          authListener?.subscription?.unsubscribe()
-        }
-      } catch (err) {
-        console.warn('Gagal memuat data dari Supabase, menggunakan data lokal:', err)
-      } finally {
-        setLoadingDb(false)
       }
-    }
 
-    initSupabaseData()
+      // 2. Fetch Equipments dari Supabase
+      const { data: eqData, error: eqErr } = await supabase
+        .from('equipments')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (!eqErr && eqData && eqData.length > 0) {
+        const normalizedEquipments = eqData.map(item => ({
+          id: item.id,
+          name: item.name,
+          category: item.category || 'General',
+          price: Number(item.price) || 0,
+          salePrice: item.salePrice ? Number(item.salePrice) : null,
+          listingType: item.listingType || (item.salePrice ? 'sale' : 'rental'),
+          available: Number(item.available) || 0,
+          total: Number(item.total) || 1,
+          image: item.image || '📦',
+          imageUrl: item.imageUrl || null,
+          circularScore: item.circularScore || 85,
+          reusedCount: item.reusedCount || 0,
+          maxReuse: item.maxReuse || 30,
+          size: item.size || 'Standar',
+          material: item.material || 'Material Campuran',
+          condition: item.condition || 'Good',
+          owner: item.owner || 'Sarpras / Prasmul Org',
+          ownerBank: item.ownerBank || 'BCA 8012345678',
+          description: item.description || '',
+          lastLocation: item.lastLocation || 'Warehouse Kampus Gedung C',
+          lastStoragePhoto: item.lastStoragePhoto || null,
+          uploader: item.uploader || 'Admin'
+        }))
+        setEquipments(normalizedEquipments)
+      }
+
+      // 3. Fetch Transactions dari Supabase
+      const { data: txnData, error: txnErr } = await supabase
+        .from('transactions')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (!txnErr && txnData && txnData.length > 0) {
+        const normalizedTxn = txnData.map(t => ({
+          id: t.id,
+          buyerOrg: t.buyer_org || 'SISO Prasmulyan',
+          itemName: t.item_names || 'Reservasi Perlengkapan',
+          amount: Number(t.amount) || 0,
+          qrisStatus: t.qris_status || 'Pending Admin Verification',
+          payoutStatus: t.payout_status || 'Waiting Admin Approval',
+          paidAt: t.created_at ? new Date(t.created_at).toLocaleString('id-ID') : 'Baru saja',
+          bankAdminRef: `BCA-QRIS-${String(t.id).slice(0, 6)}`,
+          ownerOrg: 'Organisasi Pemilik & Sarpras',
+          ownerBank: 'BCA 8012345678 a.n Owner',
+          payoutAmount: Math.round((Number(t.amount) || 0) * 0.95),
+          adminFee: Math.round((Number(t.amount) || 0) * 0.05),
+        }))
+        setTransactions(normalizedTxn)
+      }
+
+      // 4. Fetch Returns dari Supabase
+      const { data: retData, error: retErr } = await supabase
+        .from('returns')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (!retErr && retData && retData.length > 0) {
+        const normalizedRet = retData.map(r => ({
+          id: r.id,
+          equipmentId: r.equipment_id,
+          conditionPhoto: r.condition_photo,
+          storagePhoto: r.storage_photo,
+          returnedQty: r.returned_qty || 1,
+          borrower: r.borrower || 'SISO Prasmulyan',
+          status: r.status || 'Pending Admin Verification',
+          timestamp: r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : 'Baru saja'
+        }))
+        setPendingReturns(normalizedRet)
+      }
+    } catch (err) {
+      console.warn('Gagal memuat data dari Supabase, menggunakan data lokal:', err)
+    } finally {
+      setLoadingDb(false)
+    }
   }, [])
+
+  useEffect(() => {
+    fetchSupabaseData()
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      setSession(newSession)
+      if (newSession?.user) {
+        const name = newSession.user.user_metadata?.full_name || 'Prasmulyan'
+        setCurrentUserName(name)
+      }
+    })
+
+    return () => {
+      authListener?.subscription?.unsubscribe()
+    }
+  }, [fetchSupabaseData])
 
   // --- CART ACTIONS ---
   const addToCart = (equipment, qty = 1) => {
@@ -200,7 +197,7 @@ export function AppProvider({ children }) {
     setCartItems(prev => {
       const existing = prev.find(item => item.id === equipment.id)
       if (existing) {
-        return prev.map(item => item.id === equipment.id ? { ...item, qty: Math.min(item.available, item.qty + qty) } : item)
+        return prev.map(item => item.id === equipment.id ? { ...item, qty: Math.min(item.available || 99, item.qty + qty) } : item)
       }
       return [...prev, { ...equipment, qty }]
     })
@@ -211,7 +208,8 @@ export function AppProvider({ children }) {
   const updateCartQty = (id, delta) => {
     setCartItems(prev => prev.map(item => {
       if (item.id === id) {
-        const newQty = Math.max(1, Math.min(item.available, item.qty + delta))
+        const maxAvail = item.available || 99
+        const newQty = Math.max(1, Math.min(maxAvail, item.qty + delta))
         return { ...item, qty: newQty }
       }
       return item
@@ -262,7 +260,6 @@ export function AppProvider({ children }) {
       uploader: itemToApprove.uploader || currentUserName
     }
 
-    // 1. Simpan ke Supabase `equipments`
     try {
       const { data, error } = await supabase
         .from('equipments')
@@ -315,7 +312,6 @@ export function AppProvider({ children }) {
       adminFee: Math.round(reservationDetails.totalAmount * 0.05),
     }
 
-    // 1. Simpan Transaksi & Reservasi ke Supabase
     try {
       await supabase.from('transactions').insert([{
         buyer_org: newTxn.buyerOrg,
@@ -339,11 +335,11 @@ export function AppProvider({ children }) {
 
     setTransactions(prev => [newTxn, ...prev])
     
-    // Sinkronisasi item keranjang agar muncul di halaman Return & Dashboard
     setActiveReservation({ 
       ...reservationDetails, 
       items: cartItems, 
-      txnId 
+      txnId,
+      totalAmount: reservationDetails.totalAmount
     })
     
     setCartItems([])
@@ -351,7 +347,6 @@ export function AppProvider({ children }) {
   }
 
   const approvePaymentByAdmin = async (txnId) => {
-    // 1. Update ke Supabase
     try {
       await supabase
         .from('transactions')
@@ -359,7 +354,7 @@ export function AppProvider({ children }) {
           qris_status: 'Payment Approved by Admin (Lunas)',
           payout_status: 'Pending Transfer'
         })
-        .ilike('buyer_org', '%') // fallback match atau eq('id') jika uuid
+        .ilike('buyer_org', '%')
     } catch (err) {
       console.warn('Gagal update transaksi di Supabase:', err)
     }
@@ -475,7 +470,6 @@ export function AppProvider({ children }) {
     try {
       await supabase.from('returns').update({ status: 'Approved' }).ilike('borrower', '%')
       if (equipmentId) {
-        // Tambahkan stok kembali di Supabase
         const targetEq = equipments.find(e => e.id === equipmentId)
         if (targetEq) {
           await supabase
@@ -524,6 +518,7 @@ export function AppProvider({ children }) {
     } catch (e) {
       console.warn(e)
     }
+    setSession(null)
     setCurrentUserRole('user')
     setCurrentUserName('Prasmulyan')
     localStorage.removeItem('eventloop_session')
@@ -534,8 +529,10 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{
       currentUserRole, setCurrentUserRole,
-      currentUserName, setCurrentUserName, session, logout, loadingDb,
-      equipments, pendingApprovals, transactions, userPaymentStatus, activeReservation, returnStatus, pendingReturns,
+      currentUserName, setCurrentUserName, 
+      session, sessionUser: session?.user || null, 
+      logout, loadingDb, refetchData: fetchSupabaseData,
+      equipments, pendingApprovals, transactions, userPaymentStatus, activeReservation, setActiveReservation, returnStatus, pendingReturns,
       cartItems, addToCart, removeFromCart, updateCartQty,
       uploadEquipmentByUser, approveEquipmentByAdmin, rejectEquipmentByAdmin, submitUserQrisPayment, approvePaymentByAdmin,
       transferPayoutToOwner, updateEquipmentPriceAndStock, deleteEquipment, setUserPaymentStatus, submitUserReturnProof, approveReturnByAdmin,

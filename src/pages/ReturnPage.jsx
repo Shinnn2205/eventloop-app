@@ -6,9 +6,7 @@ import {
   CheckCircle2, 
   Camera, 
   MapPin, 
-  AlertCircle,
-  PackageCheck,
-  X
+  AlertCircle
 } from 'lucide-react'
 
 // Fungsi Kompresi Foto
@@ -32,7 +30,7 @@ const compressImage = (file, callback) => {
 }
 
 export default function ReturnPage() {
-  const { returnStatus, setReturnStatus, submitUserReturnProof, activeReservation, pendingReturns } = useApp()
+  const { returnStatus, setReturnStatus, submitUserReturnProof, activeReservation, pendingReturns, currentUserName } = useApp()
   
   // Mengambil daftar barang rental dari reservasi aktif (yang belum dikembalikan)
   const rentedItems = activeReservation?.items?.filter(item => item.listingType !== 'sale') || []
@@ -112,10 +110,10 @@ export default function ReturnPage() {
     if (!currentItem) return
 
     submitUserReturnProof({
-      equipmentId: currentItem.id, // ID Asli Barang (Penting untuk Admin)
+      equipmentId: currentItem.id,
       itemName: currentItem.name,
       itemCode: `ITEM-${currentItem.id}`,
-      returnedQty: currentItem.qty, // Jumlah yang dikembalikan
+      returnedQty: currentItem.qty || 1,
       conditionPhoto,
       storagePhoto,
       timestamp: conditionTime
@@ -177,7 +175,7 @@ export default function ReturnPage() {
                   </span>
                   <div className="mt-2">
                     <h4 className="font-extrabold text-gray-900 text-base">{currentItem.name}</h4>
-                    <p className="text-xs text-gray-500 mt-1">Peminjam: <strong className="text-gray-800">SISO Prasmulyan</strong></p>
+                    <p className="text-xs text-gray-500 mt-1">Peminjam: <strong className="text-gray-800">{currentUserName || 'SISO Prasmulyan'}</strong></p>
                     <p className="text-xs text-gray-500 mt-1">Jumlah Pinjaman: <strong className="text-gray-800">{currentItem.qty} unit</strong></p>
                   </div>
 
@@ -221,132 +219,113 @@ export default function ReturnPage() {
                           1. Foto Kondisi Fisik Barang
                         </div>
                         <p className="text-[11px] text-gray-500">
-                          Tunjukkan frame, baut, kain, dan kelengkapan tidak ada yang patah.
+                          Pastikan barang utuh, bersih, dan tidak mengalami kerusakan struktural.
                         </p>
 
-                        {!conditionPhoto ? (
-                          <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-emerald-500 rounded-xl p-5 bg-white cursor-pointer group transition-all">
-                            <Camera className="w-6 h-6 text-gray-400 group-hover:text-emerald-600 mb-1" />
-                            <span className="text-[11px] font-bold text-gray-700 group-hover:text-emerald-700">Ambil/Upload Foto Fisik</span>
-                            <span className="text-[9px] text-gray-400 mt-0.5">+ Auto-Generated Timestamp</span>
-                            <input type="file" accept="image/*" onChange={handleConditionPhotoChange} className="hidden" />
-                          </label>
-                        ) : (
-                          <div className="relative rounded-xl overflow-hidden border border-gray-300 shadow-sm">
-                            <img src={conditionPhoto} alt="Kondisi Fisik" className="w-full h-36 object-cover" />
-                            {/* Automatic Timestamp Stamp Watermark */}
-                            <div className="absolute bottom-0 inset-x-0 bg-black/75 backdrop-blur-xs text-white p-2 font-mono text-[9px] space-y-0.5">
-                              <div className="text-emerald-300 font-bold">✓ TIMESTAMP VERIFIED</div>
-                              <div>{conditionTime} • SISO BEM</div>
+                        <div className="relative border-2 border-dashed border-gray-300 rounded-xl p-3 text-center hover:border-green-500 transition-colors bg-white">
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleConditionPhotoChange}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                          {conditionPhoto ? (
+                            <div className="space-y-2">
+                              <img src={conditionPhoto} alt="Kondisi Fisik" className="w-full h-32 object-cover rounded-lg mx-auto border" />
+                              <span className="text-[10px] text-emerald-700 font-bold block bg-emerald-50 py-1 px-2 rounded">
+                                🕒 {conditionTime}
+                              </span>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => setConditionPhoto(null)}
-                              className="absolute top-2 right-2 bg-black/60 text-white p-1 rounded-full hover:bg-red-600 transition-colors"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
+                          ) : (
+                            <div className="py-6 flex flex-col items-center">
+                              <Camera className="w-6 h-6 text-gray-400 mb-1" />
+                              <span className="text-xs font-bold text-gray-700">Ambil / Upload Foto Fisik</span>
+                              <span className="text-[10px] text-gray-400">Otomatis stamp waktu</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      {/* BUKTI FOTO 2: KEMBALI KE TEMPAT/RAK SEMULA */}
+                      {/* BUKTI FOTO 2: BUKTI DILETAKKAN KEMBALI DI TEMPAT SEMULA */}
                       <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50 space-y-3">
                         <div className="text-xs font-bold text-gray-800">
-                          2. Foto Bukti di Tempat/Rak Semula
+                          2. Foto di Tempat Semula (Rak Gudang)
                         </div>
                         <p className="text-[11px] text-gray-500">
-                          Tunjukkan barang sudah rapi diletakkan di rak gudang semula.
+                          Tunjukkan barang telah disimpan rapi di lokasi rak warehouse semula.
                         </p>
 
-                        {!storagePhoto ? (
-                          <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-emerald-500 rounded-xl p-5 bg-white cursor-pointer group transition-all">
-                            <MapPin className="w-6 h-6 text-gray-400 group-hover:text-emerald-600 mb-1" />
-                            <span className="text-[11px] font-bold text-gray-700 group-hover:text-emerald-700">Upload Foto di Rak Semula</span>
-                            <span className="text-[9px] text-gray-400 mt-0.5">+ Auto-Location & Stamp</span>
-                            <input type="file" accept="image/*" onChange={handleStoragePhotoChange} className="hidden" />
-                          </label>
-                        ) : (
-                          <div className="relative rounded-xl overflow-hidden border border-gray-300 shadow-sm">
-                            <img src={storagePhoto} alt="Rak Semula" className="w-full h-36 object-cover" />
-                            {/* Automatic Location & Timestamp Stamp Watermark */}
-                            <div className="absolute bottom-0 inset-x-0 bg-black/75 backdrop-blur-xs text-white p-2 font-mono text-[9px] space-y-0.5">
-                              <div className="text-emerald-300 font-bold">✓ LOKASI: WAREHOUSE RAK B-04</div>
-                              <div>{storageTime} • RET-LOCATION OK</div>
+                        <div className="relative border-2 border-dashed border-gray-300 rounded-xl p-3 text-center hover:border-green-500 transition-colors bg-white">
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleStoragePhotoChange}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                          {storagePhoto ? (
+                            <div className="space-y-2">
+                              <img src={storagePhoto} alt="Rak Gudang" className="w-full h-32 object-cover rounded-lg mx-auto border" />
+                              <span className="text-[10px] text-emerald-700 font-bold block bg-emerald-50 py-1 px-2 rounded">
+                                🕒 {storageTime}
+                              </span>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => setStoragePhoto(null)}
-                              className="absolute top-2 right-2 bg-black/60 text-white p-1 rounded-full hover:bg-red-600 transition-colors"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
+                          ) : (
+                            <div className="py-6 flex flex-col items-center">
+                              <MapPin className="w-6 h-6 text-gray-400 mb-1" />
+                              <span className="text-xs font-bold text-gray-700">Upload Foto di Rak Semula</span>
+                              <span className="text-[10px] text-gray-400">Wajib memperlihatkan rak</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* VERIFICATION CHECKLIST (DIDUKUNG BUKTI FOTO) */}
-                  <div className="space-y-3 pt-2">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-extrabold text-gray-900 text-xs uppercase tracking-wider">
-                        Checklist Verifikasi Fisik & Penempatan
-                      </h4>
-                      <span className="text-[11px] text-gray-400">Pastikan sesuai dengan foto yang diunggah</span>
+                  {/* CHECKLIST PENGECEKAN FISIK */}
+                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-3">
+                    <h5 className="font-bold text-gray-900 text-xs">Konfirmasi Pernyataan Peminjam:</h5>
+                    <div className="space-y-2 text-xs">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={checklist.goodCondition} 
+                          onChange={(e) => setChecklist(prev => ({ ...prev, goodCondition: e.target.checked }))}
+                          className="rounded text-green-600 focus:ring-green-500" 
+                        />
+                        <span className="text-gray-700">Barang dalam keadaan berfungsi baik dan bersih seperti semula</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={checklist.complete} 
+                          onChange={(e) => setChecklist(prev => ({ ...prev, complete: e.target.checked }))}
+                          className="rounded text-green-600 focus:ring-green-500" 
+                        />
+                        <span className="text-gray-700">Kelengkapan aksesoris, kabel, dan pengunci lengkap</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={checklist.returnedToOriginalPlace} 
+                          onChange={(e) => setChecklist(prev => ({ ...prev, returnedToOriginalPlace: e.target.checked }))}
+                          className="rounded text-green-600 focus:ring-green-500" 
+                        />
+                        <span className="text-gray-700">Barang telah diletakkan kembali di posisi rak gudang asal</span>
+                      </label>
                     </div>
-
-                    <label className="flex items-start gap-3 p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={checklist.goodCondition}
-                        onChange={(e) => setChecklist({ ...checklist, goodCondition: e.target.checked })}
-                        className="w-4 h-4 mt-0.5 text-green-600 rounded"
-                      />
-                      <div>
-                        <div className="text-xs font-bold text-gray-900">✓ Kondisi Fisik Baik (Sesuai Foto 1)</div>
-                        <div className="text-[11px] text-gray-500">Tidak ada kerusakan patah, retak frame, atau sobekan material.</div>
-                      </div>
-                    </label>
-
-                    <label className="flex items-start gap-3 p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={checklist.complete}
-                        onChange={(e) => setChecklist({ ...checklist, complete: e.target.checked })}
-                        className="w-4 h-4 mt-0.5 text-green-600 rounded"
-                      />
-                      <div>
-                        <div className="text-xs font-bold text-gray-900">✓ Komponen & Aksesoris Lengkap</div>
-                        <div className="text-[11px] text-gray-500">Konektor pipa, baut, dan tas pembungkus kembali lengkap.</div>
-                      </div>
-                    </label>
-
-                    <label className="flex items-start gap-3 p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={checklist.returnedToOriginalPlace}
-                        onChange={(e) => setChecklist({ ...checklist, returnedToOriginalPlace: e.target.checked })}
-                        className="w-4 h-4 mt-0.5 text-green-600 rounded"
-                      />
-                      <div>
-                        <div className="text-xs font-bold text-gray-900">✓ Telah Diletakkan di Rak Semula (Sesuai Foto 2)</div>
-                        <div className="text-[11px] text-gray-500">Barang sudah ditaruh rapi di Warehouse Kampus Gedung C (Rak B-04).</div>
-                      </div>
-                    </label>
                   </div>
 
-                  <div className="pt-2">
+                  <div>
                     <button
                       type="submit"
                       disabled={!canSubmit}
-                      className={`w-full py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${
-                        canSubmit
-                          ? 'btn-primary'
+                      className={`w-full text-sm !py-3.5 flex items-center justify-center gap-2 rounded-xl font-bold transition-all ${
+                        canSubmit 
+                          ? 'btn-primary shadow-lg shadow-green-600/20' 
                           : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       }`}
                     >
-                      <PackageCheck className="w-4 h-4" />
+                      <RotateCcw className="w-4 h-4" />
                       <span>Kirim Bukti Pengembalian Ber-Timestamp ke Admin</span>
                     </button>
                     {!canSubmit && (
@@ -374,7 +353,6 @@ export default function ReturnPage() {
                       👉 Buka Admin Panel untuk ACC (Simulasi)
                     </Link>
                     
-                    {/* Tombol kembali ke form jika user mau upload barang lain sebelum di-ACC */}
                     <button 
                       onClick={() => setReturnStatus('idle')}
                       className="text-[11px] font-bold text-gray-500 hover:text-gray-800 underline"
@@ -403,7 +381,6 @@ export default function ReturnPage() {
                   </div>
 
                   <div className="pt-4 border-t border-green-200/50 flex flex-col sm:flex-row gap-3 justify-center">
-                    {/* JIKA MASIH ADA BARANG LAIN YANG BELUM DIKEMBALIKAN */}
                     {rentedItems.length > 0 ? (
                       <button 
                         onClick={() => {
