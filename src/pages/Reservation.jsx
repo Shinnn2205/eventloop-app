@@ -8,7 +8,9 @@ import {
   CheckCircle2, 
   QrCode, 
   Recycle, 
-  Clock
+  Clock,
+  Calendar,
+  AlertCircle
 } from 'lucide-react'
 
 export default function Reservation() {
@@ -29,13 +31,24 @@ export default function Reservation() {
   const estimatedAvoidedCost = totalCost * 4.8 
   const totalQtyCount = cartItems.length > 0 
     ? cartItems.reduce((sum, item) => sum + item.qty, 0)
-    : (activeReservation?.items?.reduce((sum, item) => sum + item.qty, 0) || 1)
+    : (activeReservation?.items?.reduce((sum, item) => sum + item.qty, 0) || 0)
   const estimatedWasteAvoided = (totalQtyCount * 1.8).toFixed(1)
 
-  const eventTitle = activeReservation?.eventName || 'INNOFAIR 2026'
+  // Booking detail (Hanya ada jika user sudah membuat event atau memilih barang)
+  const hasBooking = Boolean(
+    activeReservation?.eventName || 
+    activeReservation?.eventDate || 
+    cartItems.length > 0 || 
+    userPaymentStatus !== 'idle'
+  )
+
+  const eventTitle = activeReservation?.eventName || (cartItems.length > 0 ? 'Pemesanan Perlengkapan Event' : null)
   const eventDateFormatted = activeReservation?.eventDate 
     ? new Date(activeReservation.eventDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-    : '18 September 2026'
+    : null
+  const pickupLocation = activeReservation?.location 
+    ? `Warehouse Kampus Gedung C (Area ${activeReservation.location})` 
+    : 'Warehouse Kampus Gedung C (Lantai Dasar)'
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
@@ -43,14 +56,21 @@ export default function Reservation() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full mb-1">
-            <ClipboardList className="w-3.5 h-3.5" /> Screen 6 — Reservation & Checkout
+            <ClipboardList className="w-3.5 h-3.5" /> Reservasi & Checkout
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Your Event Equipment Reservation
+            Event Equipment Reservation
           </h2>
-          <p className="text-sm text-gray-500">
-            Kepanitiaan: <strong>{eventTitle}</strong> ({currentUserName || 'SISO BEM'}) • Tanggal: {eventDateFormatted}
-          </p>
+          {hasBooking ? (
+            <p className="text-sm text-gray-500">
+              Kepanitiaan: <strong>{eventTitle || 'Event Kampus'}</strong> ({currentUserName || 'Prasmulyan'})
+              {eventDateFormatted && ` • Tanggal: ${eventDateFormatted}`}
+            </p>
+          ) : (
+            <p className="text-sm text-gray-500">
+              Kelola item perlengkapan yang ingin dipinjam atau dibeli untuk kegiatan organisasi Anda.
+            </p>
+          )}
         </div>
 
         <Link to="/marketplace" className="btn-secondary text-xs !py-2.5 !px-4 flex items-center gap-1.5 self-start sm:self-auto">
@@ -96,7 +116,7 @@ export default function Reservation() {
                       </td>
                       <td className="p-4 text-center">
                         <span className="font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full text-[11px]">
-                          {item.circularScore || 90}
+                          {item.circularScore || 85}
                         </span>
                       </td>
                       <td className="p-4 text-center">
@@ -121,7 +141,7 @@ export default function Reservation() {
                       </td>
                       <td className="p-4 text-center">
                         <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 font-bold px-2.5 py-0.5 rounded-full text-[10px]">
-                          <CheckCircle2 className="w-3 h-3" /> Reserved
+                          <CheckCircle2 className="w-3 h-3" /> Ready
                         </span>
                       </td>
                       <td className="p-4 text-center">
@@ -140,23 +160,45 @@ export default function Reservation() {
             </div>
 
             {cartItems.length === 0 && (
-              <div className="p-8 text-center text-gray-400 text-xs">
-                {userPaymentStatus !== 'idle' 
-                  ? 'Pesanan Anda sedang diproses. Rincian tersimpan di ringkasan pembayaran di sebelah kanan.' 
-                  : 'Belum ada equipment yang dimasukkan ke reservasi. Silakan tambahkan barang dari Marketplace.'}
+              <div className="p-8 text-center text-gray-400 text-xs space-y-3">
+                {userPaymentStatus !== 'idle' ? (
+                  <p>Pesanan Anda sedang diproses. Rincian status tersimpan di ringkasan pembayaran di sebelah kanan.</p>
+                ) : (
+                  <>
+                    <AlertCircle className="w-8 h-8 text-gray-300 mx-auto" />
+                    <p className="text-gray-500 font-semibold">Belum ada perlengkapan yang dimasukkan ke reservasi</p>
+                    <p className="text-gray-400">Silakan buat event atau pilih perlengkapan yang tersedia di Marketplace.</p>
+                    <div className="pt-2 flex justify-center gap-3">
+                      <Link to="/create-event" className="btn-secondary text-xs !py-2 !px-4">
+                        + Buat Event
+                      </Link>
+                      <Link to="/marketplace" className="btn-primary text-xs !py-2 !px-4">
+                        + Buka Marketplace
+                      </Link>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
 
-          <div className="card p-5 bg-gradient-to-r from-blue-50/50 to-indigo-50/30 border-blue-200/60">
-            <h4 className="font-bold text-blue-950 text-xs uppercase tracking-wider mb-2 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-blue-700" />
-              Jadwal & Lokasi Pengambilan (Pick-up)
-            </h4>
-            <p className="text-xs text-blue-800 leading-relaxed">
-              Barang dapat diambil di <strong>Warehouse Kampus Gedung C (Lantai Dasar)</strong> pada <strong>H-1 ({eventDateFormatted}, 09:00 - 16:00 WIB)</strong> dengan menunjukkan QR Code booking kepada petugas Sarpras.
-            </p>
-          </div>
+          {/* Jadwal & Lokasi Pengambilan: HANYA TAMPIL JIKA ADA BOOKING AKTIF / BARANG DI-BOOKING */}
+          {hasBooking && (cartItems.length > 0 || userPaymentStatus !== 'idle') && (
+            <div className="card p-5 bg-gradient-to-r from-blue-50/50 to-indigo-50/30 border-blue-200/60 animate-fade-in-up">
+              <h4 className="font-bold text-blue-950 text-xs uppercase tracking-wider mb-2 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-blue-700" />
+                Jadwal & Lokasi Pengambilan (Pick-up)
+              </h4>
+              <p className="text-xs text-blue-800 leading-relaxed">
+                Barang dapat diambil di <strong>{pickupLocation}</strong>
+                {eventDateFormatted ? (
+                  <> pada <strong>H-1 ({eventDateFormatted}, 09:00 - 16:00 WIB)</strong></>
+                ) : (
+                  <> pada <strong>jam operasional Sarpras (09:00 - 16:00 WIB)</strong></>
+                )} dengan menunjukkan bukti transaksi QRIS / verifikasi kepada petugas Sarpras.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Right Summary Card */}
@@ -188,21 +230,23 @@ export default function Reservation() {
               </div>
             </div>
 
-            {/* Circular Impact Badge */}
-            <div className="bg-green-50 p-4 rounded-2xl border border-green-200/70 space-y-2 text-xs">
-              <div className="font-bold text-green-900 flex items-center gap-1.5">
-                <Recycle className="w-4 h-4 text-green-600" />
-                Dampak Sirkular Transaksi Ini:
+            {/* Circular Impact Badge (Jika ada item) */}
+            {totalQtyCount > 0 && (
+              <div className="bg-green-50 p-4 rounded-2xl border border-green-200/70 space-y-2 text-xs">
+                <div className="font-bold text-green-900 flex items-center gap-1.5">
+                  <Recycle className="w-4 h-4 text-green-600" />
+                  Dampak Sirkular Transaksi Ini:
+                </div>
+                <div className="flex justify-between text-green-800">
+                  <span>Biaya Beli Dihindari:</span>
+                  <span className="font-bold">~Rp{Math.round(estimatedAvoidedCost).toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between text-green-800">
+                  <span>Potensi Limbah Dicegah:</span>
+                  <span className="font-bold">~{estimatedWasteAvoided} kg</span>
+                </div>
               </div>
-              <div className="flex justify-between text-green-800">
-                <span>Biaya Beli Dihindari:</span>
-                <span className="font-bold">~Rp{Math.round(estimatedAvoidedCost).toLocaleString('id-ID')}</span>
-              </div>
-              <div className="flex justify-between text-green-800">
-                <span>Potensi Limbah Dicegah:</span>
-                <span className="font-bold">~{estimatedWasteAvoided} kg</span>
-              </div>
-            </div>
+            )}
 
             {/* Action Checkout & QRIS Payment */}
             <div className="space-y-3 pt-2">
@@ -302,68 +346,53 @@ export default function Reservation() {
             </div>
 
             <div>
-              <div className="text-xs text-gray-500 font-medium">Merchant Resmi Kampus:</div>
-              <h4 className="font-extrabold text-gray-900 text-sm mt-0.5">
-                EVENTLOOP PRASMUL - BANK BCA REKBER
-              </h4>
-              <div className="text-[10px] text-gray-400 font-mono mt-0.5">
-                NMID: ID1029384756910 • A01
+              <div className="text-xs text-gray-500">Total Pembayaran Rental / Beli</div>
+              <div className="text-2xl font-black text-gray-900 mt-0.5">
+                Rp{totalCost.toLocaleString('id-ID')}
+              </div>
+              <div className="text-[11px] text-green-700 font-semibold mt-1">
+                Event: {eventTitle || 'Event Kampus'}
               </div>
             </div>
 
-            <div className="bg-gradient-to-b from-gray-50 to-white p-5 rounded-2xl border-2 border-gray-200 inline-block shadow-inner">
-              <div className="w-48 h-48 bg-white p-2 rounded-xl border border-gray-300 flex flex-col items-center justify-center relative">
-                <div className="w-full h-full border-4 border-gray-900 p-2 flex flex-col justify-between">
-                  <div className="flex justify-between">
-                    <div className="w-10 h-10 border-4 border-gray-900 rounded-md p-1">
-                      <div className="w-full h-full bg-gray-900" />
-                    </div>
-                    <div className="w-10 h-10 border-4 border-gray-900 rounded-md p-1">
-                      <div className="w-full h-full bg-gray-900" />
-                    </div>
-                  </div>
-                  <div className="text-center font-bold text-[10px] tracking-widest text-gray-900 uppercase">
-                    [ SCAN VIA E-WALLET / BANK ]
-                  </div>
-                  <div className="flex justify-between">
-                    <div className="w-10 h-10 border-4 border-gray-900 rounded-md p-1">
-                      <div className="w-full h-full bg-gray-900" />
-                    </div>
-                    <div className="w-10 h-10 bg-gray-900 rounded-md" />
+            {/* Simulated QR Code Canvas */}
+            <div className="bg-gray-50 p-4 rounded-2xl border-2 border-dashed border-gray-200 inline-block mx-auto">
+              <div className="w-48 h-48 bg-white border border-gray-300 rounded-xl flex flex-col items-center justify-center p-3 relative shadow-inner">
+                <QrCode className="w-36 h-36 text-gray-900" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-10 h-10 bg-white rounded-lg shadow-md border flex items-center justify-center">
+                    <Recycle className="w-6 h-6 text-green-600" />
                   </div>
                 </div>
               </div>
+              <div className="text-[10px] text-gray-400 mt-2 font-mono">
+                NMID: ID10202688921098
+              </div>
             </div>
 
-            <div className="bg-green-50 p-3 rounded-xl border border-green-200">
-              <span className="text-[11px] text-green-700 block">Total Nominal Transfer:</span>
-              <span className="text-2xl font-black text-green-900">
-                Rp{totalCost.toLocaleString('id-ID')}
-              </span>
-            </div>
-
-            <p className="text-[10px] text-gray-400 leading-relaxed">
-              Buka aplikasi BCA Mobile, Mandiri Livin, GoPay, OVO, ShopeePay atau bank lain lalu scan kode QR di atas.
+            <p className="text-[11px] text-gray-500 leading-relaxed px-2">
+              Scan menggunakan BCA Mobile, GoPay, OVO, ShopeePay, atau aplikasi m-Banking Anda.
             </p>
 
-            <div className="pt-1 space-y-2">
+            <div className="pt-2 space-y-2">
               <button
-                type="button"
                 onClick={() => {
-                  submitUserQrisPayment({
-                    buyerOrg: currentUserName || 'SISO Prasmulyan',
-                    totalAmount: totalCost,
-                    itemNames: cartItems.map(i => `${i.qty}x ${i.name}`).join(', ')
-                  })
                   setShowQrisModal(false)
+                  submitUserQrisPayment({
+                    buyerOrg: currentUserName || 'Prasmulyan Organization',
+                    itemNames: cartItems.map(c => `${c.qty}x ${c.name}`).join(', '),
+                    totalAmount: totalCost,
+                    eventName: eventTitle,
+                    eventDate: activeReservation?.eventDate,
+                    location: activeReservation?.location
+                  })
                 }}
-                className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-1.5"
+                className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Kirim Bukti Pembayaran QRIS (Menunggu ACC)</span>
+                <span>Saya Sudah Membayar (Simulasi Sukses)</span>
               </button>
               <button
-                type="button"
                 onClick={() => setShowQrisModal(false)}
                 className="w-full text-xs text-gray-400 hover:text-gray-600 py-1"
               >

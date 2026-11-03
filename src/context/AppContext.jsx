@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { equipmentData as initialEquipment, adminTransactions as initialTransactions, pendingApprovalEquipments as initialPending } from '../data/mockData'
 import { supabase } from '../lib/supabaseClient'
 
 const AppContext = createContext()
@@ -19,17 +18,17 @@ export function AppProvider({ children }) {
 
   const [equipments, setEquipments] = useState(() => {
     const saved = localStorage.getItem('eventloop_equipments')
-    return saved ? JSON.parse(saved) : initialEquipment
+    return saved ? JSON.parse(saved) : []
   })
 
   const [pendingApprovals, setPendingApprovals] = useState(() => {
     const saved = localStorage.getItem('eventloop_pending_approvals')
-    return saved ? JSON.parse(saved) : initialPending
+    return saved ? JSON.parse(saved) : []
   })
 
   const [transactions, setTransactions] = useState(() => {
     const saved = localStorage.getItem('eventloop_transactions')
-    return saved ? JSON.parse(saved) : initialTransactions
+    return saved ? JSON.parse(saved) : []
   })
 
   const [userPaymentStatus, setUserPaymentStatus] = useState(() => {
@@ -95,7 +94,7 @@ export function AppProvider({ children }) {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (!eqErr && eqData && eqData.length > 0) {
+      if (!eqErr && eqData) {
         const normalizedEquipments = eqData.map(item => ({
           id: item.id,
           name: item.name,
@@ -121,6 +120,8 @@ export function AppProvider({ children }) {
           uploader: item.uploader || 'Admin'
         }))
         setEquipments(normalizedEquipments)
+      } else if (!eqErr) {
+        setEquipments([])
       }
 
       // 3. Fetch Transactions dari Supabase
@@ -129,7 +130,7 @@ export function AppProvider({ children }) {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (!txnErr && txnData && txnData.length > 0) {
+      if (!txnErr && txnData) {
         const normalizedTxn = txnData.map(t => ({
           id: t.id,
           buyerOrg: t.buyer_org || 'SISO Prasmulyan',
@@ -145,6 +146,8 @@ export function AppProvider({ children }) {
           adminFee: Math.round((Number(t.amount) || 0) * 0.05),
         }))
         setTransactions(normalizedTxn)
+      } else if (!txnErr) {
+        setTransactions([])
       }
 
       // 4. Fetch Returns dari Supabase
@@ -153,7 +156,7 @@ export function AppProvider({ children }) {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (!retErr && retData && retData.length > 0) {
+      if (!retErr && retData) {
         const normalizedRet = retData.map(r => ({
           id: r.id,
           equipmentId: r.equipment_id,
@@ -165,6 +168,8 @@ export function AppProvider({ children }) {
           timestamp: r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : 'Baru saja'
         }))
         setPendingReturns(normalizedRet)
+      } else if (!retErr) {
+        setPendingReturns([])
       }
     } catch (err) {
       console.warn('Gagal memuat data dari Supabase, menggunakan data lokal:', err)

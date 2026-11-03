@@ -1,6 +1,5 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { categories } from '../data/mockData'
 import { useApp } from '../context/AppContext'
 import { 
   Search, 
@@ -25,11 +24,29 @@ export default function Marketplace() {
   const [editPrice, setEditPrice] = useState('')
   const [editStock, setEditStock] = useState('')
 
+  // Kategori dinamis dari data equipments di Supabase
+  const dynamicCategories = useMemo(() => {
+    const uniqueCats = Array.from(new Set(equipments.map(e => e.category).filter(Boolean)))
+    return [
+      { name: 'All', icon: '📦', count: equipments.length },
+      ...uniqueCats.map(catName => ({
+        name: catName,
+        icon: catName.toLowerCase().includes('booth') ? '🏗️' :
+              catName.toLowerCase().includes('signage') || catName.toLowerCase().includes('banner') ? '🪧' :
+              catName.toLowerCase().includes('furniture') || catName.toLowerCase().includes('meja') ? '🪑' :
+              catName.toLowerCase().includes('elektronik') || catName.toLowerCase().includes('sound') || catName.toLowerCase().includes('led') ? '💡' :
+              catName.toLowerCase().includes('tenda') ? '⛺' :
+              catName.toLowerCase().includes('dekorasi') ? '🌿' : '📦',
+        count: equipments.filter(e => e.category === catName).length
+      }))
+    ]
+  }, [equipments])
+
   const filteredEquipment = equipments.filter(item => {
     const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          item.material.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesScore = item.circularScore >= minScore
+                          (item.material && item.material.toLowerCase().includes(searchQuery.toLowerCase()))
+    const matchesScore = (item.circularScore || 0) >= minScore
     const matchesType = listingFilter === 'all' || 
                         (listingFilter === 'sale' && item.listingType === 'sale') ||
                         (listingFilter === 'rental' && item.listingType !== 'sale')
@@ -109,7 +126,7 @@ export default function Marketplace() {
             <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Cari booth, banner, meja, sound, lighting..."
+              placeholder="Cari perlengkapan, material, nama barang..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
@@ -162,7 +179,7 @@ export default function Marketplace() {
 
         {/* Categories Tab Pill */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {categories.map((cat) => (
+          {dynamicCategories.map((cat) => (
             <button
               key={cat.name}
               onClick={() => setSelectedCategory(cat.name)}
@@ -173,7 +190,7 @@ export default function Marketplace() {
               }`}
             >
               <span>{cat.icon}</span>
-              <span>{cat.name}</span>
+              <span>{cat.name} ({cat.count})</span>
             </button>
           ))}
         </div>
@@ -193,24 +210,24 @@ export default function Marketplace() {
                   <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 ) : (
                   <span className="text-6xl group-hover:scale-110 transition-transform duration-300">
-                    {item.image}
+                    {item.image || '📦'}
                   </span>
                 )}
                 <div 
                   className={`absolute top-3 right-3 px-2.5 py-1 rounded-xl text-xs font-black flex items-center gap-1 shadow-sm backdrop-blur bg-white/90 ${
-                    item.circularScore >= 90
+                    (item.circularScore || 0) >= 90
                       ? 'text-green-800 border border-green-300'
-                      : item.circularScore >= 80
+                      : (item.circularScore || 0) >= 80
                       ? 'text-emerald-800 border border-emerald-300'
                       : 'text-amber-800 border border-amber-300'
                   }`}
                 >
                   <Sparkles className="w-3 h-3 text-green-600" />
-                  <span>{item.circularScore}</span>
+                  <span>{item.circularScore || 85}</span>
                   <span className="text-[10px] font-normal opacity-70">/100</span>
                 </div>
                 <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-2 py-0.5 rounded-md text-[10px] font-bold text-gray-600 border border-gray-200">
-                  {item.owner}
+                  {item.owner || 'Kampus'}
                 </div>
               </div>
 
@@ -234,7 +251,7 @@ export default function Marketplace() {
                       {item.listingType === 'sale' ? 'Harga Jual' : 'Sewa / Event'}
                     </div>
                     <div className="text-base font-black text-gray-900">
-                      Rp{(item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price).toLocaleString('id-ID')}
+                      Rp{(item.listingType === 'sale' ? (item.salePrice || item.price) : item.price).toLocaleString('id-ID')}
                     </div>
                   </div>
 
@@ -293,6 +310,14 @@ export default function Marketplace() {
           )
         })}
       </div>
+
+      {filteredEquipment.length === 0 && (
+        <div className="card p-12 text-center text-gray-400 space-y-2">
+          <Package className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+          <h4 className="font-bold text-gray-700">Tidak ada perlengkapan yang cocok</h4>
+          <p className="text-xs text-gray-500">Coba ubah filter pencarian atau pilih kategori lain.</p>
+        </div>
+      )}
 
       {/* QUICK EDIT MODAL DENGAN TOMBOL HAPUS (ADMIN ONLY) */}
       {editingItem && currentUserRole === 'admin' && (

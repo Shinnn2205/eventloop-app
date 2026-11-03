@@ -1,4 +1,7 @@
-import { impactData } from '../data/mockData'
+import { useState, useEffect } from 'react'
+import { useApp } from '../context/AppContext'
+import { supabase } from '../lib/supabaseClient'
+import Spinner from '../components/Spinner'
 import { 
   BarChart3, 
   Recycle, 
@@ -13,6 +16,64 @@ import {
 } from 'lucide-react'
 
 export default function ImpactDashboard() {
+  const { equipments, transactions, loadingDb } = useApp()
+  const [monthlyData, setMonthlyData] = useState([])
+  const [topOrgs, setTopOrgs] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // Compute live KPI stats from equipments & transactions
+  const totalItemsReused = equipments?.reduce((sum, e) => sum + (e.reusedCount || 0), 0) ?? 0
+  const totalEventsSupported = transactions?.length ?? 0
+  const wasteAvoided = Math.round(totalItemsReused * 0.15 * 10) / 10 // ~0.15 kg per reuse
+  const co2Avoided = Math.round(wasteAvoided * 1.32 * 10) / 10 // rough CO2 factor
+  const costAvoided = equipments?.reduce((sum, e) => {
+    const reuseCount = e.reusedCount || 0
+    const price = e.price || 0
+    return sum + (reuseCount * price)
+  }, 0) ?? 0
+
+  useEffect(() => {
+    fetchImpactData()
+  }, [])
+
+  async function fetchImpactData() {
+    try {
+      setLoading(true)
+
+      // Fetch monthly impact data
+      const { data: monthly, error: monthlyErr } = await supabase
+        .from('monthly_impact')
+        .select('*')
+        .order('id', { ascending: true })
+
+      if (!monthlyErr && monthly && monthly.length > 0) {
+        setMonthlyData(monthly)
+      }
+
+      // Fetch organization scores
+      const { data: orgs, error: orgsErr } = await supabase
+        .from('organization_scores')
+        .select('*')
+        .order('circular_score', { ascending: false })
+        .limit(5)
+
+      if (!orgsErr && orgs && orgs.length > 0) {
+        setTopOrgs(orgs)
+      }
+    } catch (err) {
+      console.warn('Error fetching impact data:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loadingDb && loading) return <Spinner />
+
+  // Find max reused for bar width calculation
+  const maxReused = monthlyData.length > 0
+    ? Math.max(...monthlyData.map(m => m.items_reused), 1)
+    : 1
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
       {/* Page Title & Intro */}
@@ -38,7 +99,7 @@ export default function ImpactDashboard() {
         </button>
       </div>
 
-      {/* 4 Big KPI Cards (Sesuai Konsep Green Tech) */}
+      {/* 4 Big KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="card p-6 border-l-4 border-l-green-500 bg-gradient-to-br from-white to-green-50/20">
           <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">
@@ -46,13 +107,13 @@ export default function ImpactDashboard() {
             <span className="text-xl">♻️</span>
           </div>
           <div className="text-3xl sm:text-4xl font-black text-gray-900">
-            {impactData.totalItemsReused.toLocaleString('id-ID')}
+            {totalItemsReused.toLocaleString('id-ID')}
           </div>
           <div className="text-xs text-green-700 font-semibold mt-2">
             Peralatan event dipakai berulang
           </div>
           <div className="text-[11px] text-gray-400 mt-0.5">
-            Mencegah pembelian {impactData.totalItemsReused} barang baru
+            Mencegah pembelian {totalItemsReused} barang baru
           </div>
         </div>
 
@@ -62,7 +123,7 @@ export default function ImpactDashboard() {
             <span className="text-xl">🎪</span>
           </div>
           <div className="text-3xl sm:text-4xl font-black text-gray-900">
-            {impactData.totalEventsSupported}
+            {totalEventsSupported}
           </div>
           <div className="text-xs text-emerald-700 font-semibold mt-2">
             Kegiatan organisasi terlaksana
@@ -78,13 +139,13 @@ export default function ImpactDashboard() {
             <span className="text-xl">🌱</span>
           </div>
           <div className="text-3xl sm:text-4xl font-black text-gray-900">
-            {impactData.wasteAvoided} kg
+            {wasteAvoided} kg
           </div>
           <div className="text-xs text-teal-700 font-semibold mt-2">
             Limbah dicegah masuk TPA
           </div>
           <div className="text-[11px] text-gray-400 mt-0.5">
-            Setara ~{impactData.co2Avoided} kg CO₂ emisi dicegah
+            Setara ~{co2Avoided} kg CO₂ emisi dicegah
           </div>
         </div>
 
@@ -94,13 +155,13 @@ export default function ImpactDashboard() {
             <span className="text-xl">💰</span>
           </div>
           <div className="text-3xl sm:text-4xl font-black text-gray-900">
-            Rp{(impactData.costAvoided / 1000000).toFixed(1)}M
+            Rp{(costAvoided / 1000000).toFixed(1)}M
           </div>
           <div className="text-xs text-blue-700 font-semibold mt-2">
             Total dana kampus dihemat
           </div>
           <div className="text-[11px] text-gray-400 mt-0.5">
-            Rata-rata hemat 78% per kepanitiaan
+            Dari reuse equipment vs beli baru
           </div>
         </div>
       </div>
@@ -113,43 +174,53 @@ export default function ImpactDashboard() {
           <div className="flex items-center justify-between pb-4 border-b border-gray-100">
             <div>
               <h3 className="font-bold text-gray-900 text-base">
-                Tren Pengurangan Limbah & Peminjaman (6 Bulan Terakhir)
+                Tren Pengurangan Limbah & Peminjaman
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
                 Peningkatan adopsi circular equipment di kalangan mahasiswa
               </p>
             </div>
-            <span className="text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5" /> +164% Semester ini
-            </span>
+            {monthlyData.length > 1 && (
+              <span className="text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full flex items-center gap-1">
+                <TrendingUp className="w-3.5 h-3.5" /> Trending Up
+              </span>
+            )}
           </div>
 
           {/* Monthly Bars Visualization */}
-          <div className="space-y-4 pt-2">
-            {impactData.monthlyData.map((m, idx) => (
-              <div key={idx} className="space-y-1.5">
-                <div className="flex justify-between text-xs">
-                  <span className="font-bold text-gray-700">{m.month} 2026</span>
-                  <div className="space-x-3 text-gray-500">
-                    <span><strong>{m.reused}</strong> items reused</span>
-                    <span>•</span>
-                    <span className="text-teal-700 font-semibold">🌱 {m.waste} kg waste avoided</span>
-                    <span>•</span>
-                    <span className="text-green-700 font-bold">Rp{(m.cost / 1000000).toFixed(1)}M saved</span>
+          {monthlyData.length > 0 ? (
+            <div className="space-y-4 pt-2">
+              {monthlyData.map((m, idx) => (
+                <div key={idx} className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="font-bold text-gray-700">{m.month_label} {m.year}</span>
+                    <div className="space-x-3 text-gray-500">
+                      <span><strong>{m.items_reused}</strong> items reused</span>
+                      <span>•</span>
+                      <span className="text-teal-700 font-semibold">🌱 {m.waste_avoided_kg} kg waste avoided</span>
+                      <span>•</span>
+                      <span className="text-green-700 font-bold">Rp{(m.cost_avoided / 1000000).toFixed(1)}M saved</span>
+                    </div>
+                  </div>
+
+                  {/* Dual bar representation */}
+                  <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden flex">
+                    <div 
+                      className="bg-green-600 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${(m.items_reused / maxReused) * 100}%` }}
+                      title={`${m.items_reused} items reused`}
+                    />
                   </div>
                 </div>
-
-                {/* Dual bar representation */}
-                <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden flex">
-                  <div 
-                    className="bg-green-600 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${(m.reused / 350) * 100}%` }}
-                    title={`${m.reused} items reused`}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-10 text-gray-400 text-sm">
+              <BarChart3 className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+              <p className="font-semibold text-gray-500">Belum ada data tren bulanan</p>
+              <p className="text-xs mt-1">Data akan muncul setelah ada aktivitas peminjaman di platform</p>
+            </div>
+          )}
 
           <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-600 gap-3">
             <div className="flex items-center gap-2">
@@ -157,7 +228,7 @@ export default function ImpactDashboard() {
               <span>Volume Perlengkapan Sirkular Tersewa</span>
             </div>
             <div className="font-semibold text-gray-900">
-              Target Target Semester Depan: 2,000 items reused / semester
+              Target Semester Depan: 2,000 items reused / semester
             </div>
           </div>
         </div>
@@ -177,41 +248,42 @@ export default function ImpactDashboard() {
               Organisasi dengan skor circularity tertinggi mendapatkan prioritas alokasi barang & subsidi sewa.
             </p>
 
-            <div className="space-y-2.5">
-              {impactData.topOrganizations.map((org, idx) => (
-                <div 
-                  key={idx}
-                  className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${
-                    idx === 0 
-                      ? 'bg-amber-50/50 border-amber-200' 
-                      : 'bg-gray-50/50 border-gray-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-xs ${
-                      idx === 0 ? 'bg-amber-400 text-amber-950' : idx === 1 ? 'bg-gray-300 text-gray-800' : 'bg-gray-200 text-gray-600'
-                    }`}>
-                      {idx + 1}
-                    </span>
-                    <div>
-                      <h5 className="font-bold text-gray-900 text-xs">{org.name}</h5>
-                      <span className="text-[11px] text-gray-500">{org.events} events • {org.reused} reuse</span>
+            {topOrgs.length > 0 ? (
+              <div className="space-y-2.5">
+                {topOrgs.map((org, idx) => (
+                  <div 
+                    key={idx}
+                    className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${
+                      idx === 0 
+                        ? 'bg-amber-50/50 border-amber-200' 
+                        : 'bg-gray-50/50 border-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-xs ${
+                        idx === 0 ? 'bg-amber-400 text-amber-950' : idx === 1 ? 'bg-gray-300 text-gray-800' : 'bg-gray-200 text-gray-600'
+                      }`}>
+                        {idx + 1}
+                      </span>
+                      <div>
+                        <h5 className="font-bold text-gray-900 text-xs">{org.org_name}</h5>
+                        <span className="text-[11px] text-gray-500">{org.events_count} events • {org.items_reused} reuse</span>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="font-black text-green-700 text-sm">{org.circular_score}</span>
+                      <span className="text-[10px] text-gray-400 block">/ 100</span>
                     </div>
                   </div>
-
-                  <div className="text-right">
-                    <span className="font-black text-green-700 text-sm">{org.score}</span>
-                    <span className="text-[10px] text-gray-400 block">/ 100</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="pt-2 text-center">
-              <span className="text-xs text-green-700 font-semibold">
-                Organisasimu (SISO) berada di peringkat #2! 🥈
-              </span>
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-gray-400 text-sm">
+                <Trophy className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                <p className="text-xs">Belum ada data organisasi</p>
+              </div>
+            )}
           </div>
 
           {/* Calculation Methodology Note for Presentation */}
