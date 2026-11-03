@@ -46,6 +46,7 @@ export default function Reservation() {
     removeFromCart, 
     activeReservation, 
     updateActiveEventDetails,
+    clearActiveEvent,
     userPaymentStatus, 
     submitUserQrisPayment,
     transactions
@@ -161,48 +162,77 @@ export default function Reservation() {
         {/* Left 2 Cols: Event Details & Item List */}
         <div className="lg:col-span-2 space-y-5">
           {/* Card Info Event */}
-          <div className="card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100">
-                <Calendar className="w-5 h-5" />
+          <div className="card p-5 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-400 font-medium block">
+                    Kegiatan Terdaftar
+                  </span>
+                  <h4 className="font-bold text-slate-900 text-sm">
+                    {activeReservation?.eventName || 'Belum Membuat Kegiatan'}
+                  </h4>
+                  <span className="text-xs text-slate-500">
+                    {activeReservation?.org} · {activeReservation?.eventDate || 'Belum ditentukan'}
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="text-[11px] text-slate-400 font-medium block">
-                  Kegiatan Terdaftar
-                </span>
-                <h4 className="font-bold text-slate-900 text-sm">
-                  {activeReservation?.eventName || 'Belum Membuat Kegiatan'}
-                </h4>
-                <span className="text-xs text-slate-500">
-                  {activeReservation?.org} · {activeReservation?.eventDate}
-                </span>
+
+              <div className="flex items-center gap-2 bg-emerald-50/60 px-3.5 py-2 rounded-xl border border-emerald-100">
+                <Clock className="w-4 h-4 text-emerald-600" />
+                <div className="text-xs">
+                  <span className="text-slate-500 block text-[10px]">Durasi Sewa</span>
+                  {userPaymentStatus === 'idle' ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={durationDays}
+                        onChange={(e) => {
+                          const d = Math.max(1, parseInt(e.target.value) || 1)
+                          updateActiveEventDetails({ durationDays: d })
+                        }}
+                        className="w-12 px-1.5 py-0.5 bg-white border border-emerald-200 rounded text-center font-bold text-emerald-800 text-xs"
+                      />
+                      <span className="font-semibold text-emerald-800">Hari</span>
+                    </div>
+                  ) : (
+                    <strong className="text-emerald-800">{durationDays} Hari</strong>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-emerald-50/60 px-3.5 py-2 rounded-xl border border-emerald-100">
-              <Clock className="w-4 h-4 text-emerald-600" />
-              <div className="text-xs">
-                <span className="text-slate-500 block text-[10px]">Durasi Sewa</span>
-                {userPaymentStatus === 'idle' ? (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min="1"
-                      max="30"
-                      value={durationDays}
-                      onChange={(e) => {
-                        const d = Math.max(1, parseInt(e.target.value) || 1)
-                        updateActiveEventDetails({ durationDays: d })
-                      }}
-                      className="w-12 px-1.5 py-0.5 bg-white border border-emerald-200 rounded text-center font-bold text-emerald-800 text-xs"
-                    />
-                    <span className="font-semibold text-emerald-800">Hari</span>
-                  </div>
-                ) : (
-                  <strong className="text-emerald-800">{durationDays} Hari</strong>
-                )}
+            {/* Tombol Ubah / Batalkan Event Sebelum Bayar */}
+            {userPaymentStatus === 'idle' && activeReservation?.eventName && (
+              <div className="pt-2.5 border-t border-emerald-100/70 flex items-center justify-between text-xs">
+                <span className="text-slate-500 text-[11px]">Mau ganti nama atau tanggal kegiatan?</span>
+                <div className="flex items-center gap-2">
+                  <Link
+                    to="/create-event"
+                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 underline"
+                  >
+                    Ubah Data Event
+                  </Link>
+                  <span className="text-slate-300">·</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Yakin ingin membatalkan event ini? Keranjang reservasi juga akan direset.')) {
+                        clearActiveEvent()
+                      }
+                    }}
+                    className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                  >
+                    Batalkan Event
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Item Table */}

@@ -29,6 +29,7 @@ export default function Dashboard() {
     activeReservation, 
     cartItems = [], 
     userPaymentStatus, 
+    clearActiveEvent,
     currentUserName, 
     equipments, 
     loadingDb, 
@@ -428,16 +429,37 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                <div className="pt-2 flex flex-wrap gap-2.5">
-                  <Link to="/reservation" className="btn-primary text-xs !py-2.5 !px-4 flex items-center gap-1.5">
-                    <ClipboardList className="w-3.5 h-3.5" />
-                    <span>{userPaymentStatus === 'idle' ? 'Lanjutkan Pembayaran' : 'Lihat Detail Reservasi'}</span>
-                  </Link>
-                  {userPaymentStatus === 'approved' && (
-                    <Link to="/return" className="btn-secondary text-xs !py-2.5 !px-4 flex items-center gap-1.5">
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Kembalikan Barang</span>
+                <div className="pt-2 flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex flex-wrap gap-2.5">
+                    <Link to="/reservation" className="btn-primary text-xs !py-2.5 !px-4 flex items-center gap-1.5">
+                      <ClipboardList className="w-3.5 h-3.5" />
+                      <span>{userPaymentStatus === 'idle' ? 'Lanjutkan Pembayaran' : 'Lihat Detail Reservasi'}</span>
                     </Link>
+                    {userPaymentStatus === 'idle' && (
+                      <Link to="/create-event" className="btn-secondary text-xs !py-2.5 !px-3.5 flex items-center gap-1.5">
+                        <span>Ubah Data Event</span>
+                      </Link>
+                    )}
+                    {userPaymentStatus === 'approved' && (
+                      <Link to="/return" className="btn-secondary text-xs !py-2.5 !px-4 flex items-center gap-1.5">
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Kembalikan Barang</span>
+                      </Link>
+                    )}
+                  </div>
+
+                  {userPaymentStatus === 'idle' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm('Yakin ingin membatalkan event ini? Pilihan perlengkapan di keranjang juga akan direset.')) {
+                          clearActiveEvent()
+                        }
+                      }}
+                      className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                    >
+                      Batalkan Event
+                    </button>
                   )}
                 </div>
               </div>
