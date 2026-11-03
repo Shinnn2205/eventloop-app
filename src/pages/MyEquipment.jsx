@@ -12,12 +12,24 @@ import {
   Eye,
   X,
   User,
-  Calendar
+  Calendar,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react'
 
 export default function MyEquipment() {
-  const { equipments, pendingApprovals, currentUserName, transactions, getEquipmentBorrowings } = useApp()
+  const { 
+    equipments, 
+    pendingApprovals, 
+    currentUserName, 
+    transactions, 
+    getEquipmentBorrowings,
+    deleteEquipment,
+    deletePendingEquipment 
+  } = useApp()
   const [viewingPayoutProof, setViewingPayoutProof] = useState(null)
+  const [itemToDelete, setItemToDelete] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const isMine = (uploader) => {
     if (!uploader) return false
@@ -73,19 +85,29 @@ export default function MyEquipment() {
         ) : (
           <div className="grid sm:grid-cols-2 gap-4">
             {myPendingEquipments.map(item => (
-              <div key={item.id} className="card p-4 flex gap-3.5 items-center">
-                <div className="w-14 h-14 bg-emerald-50/60 rounded-xl flex items-center justify-center border border-emerald-100 flex-shrink-0 overflow-hidden">
-                  {item.imagePreview ? (
-                    <img src={item.imagePreview} alt={item.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-2xl opacity-75">📦</span>
-                  )}
+              <div key={item.id} className="card p-4 flex gap-3.5 items-center justify-between">
+                <div className="flex gap-3.5 items-center min-w-0">
+                  <div className="w-14 h-14 bg-emerald-50/60 rounded-xl flex items-center justify-center border border-emerald-100 flex-shrink-0 overflow-hidden">
+                    {item.imagePreview ? (
+                      <img src={item.imagePreview} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-2xl opacity-75">📦</span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="badge-warm">Pending Review</span>
+                    <h4 className="font-bold text-slate-900 text-sm mt-1 truncate">{item.name}</h4>
+                    <div className="text-[11px] text-slate-500 mt-0.5">Stok diajukan: {item.qty} unit</div>
+                  </div>
                 </div>
-                <div>
-                  <span className="badge-warm">Pending Review</span>
-                  <h4 className="font-bold text-slate-900 text-sm mt-1">{item.name}</h4>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Stok diajukan: {item.qty} unit</div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => deletePendingEquipment && deletePendingEquipment(item.id)}
+                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors flex-shrink-0"
+                  title="Batalkan pengajuan barang"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             ))}
           </div>
@@ -206,6 +228,41 @@ export default function MyEquipment() {
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
                         <span>Seluruh unit sedang berada di lokasi penyimpanan asal dan siap dipinjam.</span>
                       </div>
+                    )}
+                  </div>
+
+                  {/* AKSI HAPUS DARI MARKETPLACE */}
+                  <div className="pt-3 border-t border-emerald-100/80 flex items-center justify-between gap-2">
+                    {borrowedQty > 0 || activeBorrowers.length > 0 ? (
+                      <>
+                        <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 flex items-center gap-1 font-medium truncate" title="Barang sedang dipinjam, tidak dapat dihapus">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                          Sedang dipinjam ({borrowedQty || activeBorrowers.reduce((s, b) => s + (b.qty || 1), 0)} unit)
+                        </span>
+                        <button
+                          disabled
+                          type="button"
+                          className="text-xs text-slate-300 bg-slate-50 cursor-not-allowed px-3 py-1.5 rounded-xl border border-slate-100 flex items-center gap-1 font-medium"
+                          title="Barang sedang dipinjam oleh kegiatan kampus. Tidak dapat dihapus sampai barang dipulangkan."
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Terkunci</span>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[11px] text-slate-400">
+                          Status: Siap di Marketplace
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setItemToDelete(item)}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200/80 transition-all shadow-2xs cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                          <span>Hapus Barang</span>
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -334,6 +391,59 @@ export default function MyEquipment() {
             >
               Tutup
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KONFIRMASI HAPUS PERLENGKAPAN DARI MARKETPLACE */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-xl border border-emerald-100 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            
+            <div className="space-y-1.5">
+              <h4 className="text-base font-bold text-slate-900">
+                Hapus Perlengkapan dari Marketplace?
+              </h4>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Apakah Anda yakin ingin menghapus <strong>"{itemToDelete.name}"</strong> ({itemToDelete.total} unit) dari katalog peminjaman kampus?
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Barang ini akan ditarik secara permanen dari katalog dan tidak akan muncul lagi di daftar peminjaman organisasi lain.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setItemToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={async () => {
+                  try {
+                    setIsDeleting(true)
+                    await deleteEquipment(itemToDelete.id)
+                    setItemToDelete(null)
+                  } catch (err) {
+                    console.warn(err)
+                  } finally {
+                    setIsDeleting(false)
+                  }
+                }}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Barang'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

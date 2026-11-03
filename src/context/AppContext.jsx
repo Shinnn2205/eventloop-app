@@ -422,15 +422,18 @@ export function AppProvider({ children }) {
         try {
           const parsedNim = validateNimStructure(nim)
           if (parsedNim.isValid) setCurrentUserStudyProgram(parsedNim.prodiName)
-          await supabase.from('profiles').upsert({
-            id: newSession.user.id,
-            email: userEmail,
-            full_name: name,
-            nim: nim,
-            prodi: parsedNim.isValid ? parsedNim.prodiName : (meta.prodi_name || null),
-            school: parsedNim.isValid ? parsedNim.schoolName : (meta.school || null),
-            updated_at: new Date().toISOString()
-          })
+          // Hanya sinkronkan ke tabel profiles jika email sudah terverifikasi resmi oleh OTP / Auth
+          if (newSession.user?.email_confirmed_at && (parsedNim.isValid || isAdminEmail(userEmail))) {
+            await supabase.from('profiles').upsert({
+              id: newSession.user.id,
+              email: userEmail,
+              full_name: name,
+              nim: nim,
+              prodi: parsedNim.isValid ? parsedNim.prodiName : (meta.prodi_name || null),
+              school: parsedNim.isValid ? parsedNim.schoolName : (meta.school || null),
+              updated_at: new Date().toISOString()
+            })
+          }
         } catch (e) {
           console.warn('Profile sync notice:', e)
         }
@@ -722,8 +725,6 @@ export function AppProvider({ children }) {
   }
 
   const deleteEquipment = async (id) => {
-    if (currentUserRole !== 'admin') return
-
     try {
       await supabase.from('equipments').delete().eq('id', id)
     } catch (err) {
@@ -732,6 +733,11 @@ export function AppProvider({ children }) {
 
     setEquipments(prev => prev.filter(item => item.id !== id))
     setCartItems(prev => prev.filter(item => item.id !== id))
+    return true
+  }
+
+  const deletePendingEquipment = (id) => {
+    setPendingApprovals(prev => prev.filter(item => item.id !== id))
   }
 
   // --- ACTIONS PENGEMBALIAN BARANG ---
@@ -929,7 +935,7 @@ export function AppProvider({ children }) {
       ongoingCampusEvents, getEquipmentBorrowings,
       cartItems, addToCart, removeFromCart, updateCartQty,
       uploadEquipmentByUser, approveEquipmentByAdmin, rejectEquipmentByAdmin, submitUserQrisPayment, approvePaymentByAdmin,
-      transferPayoutToOwner, updateEquipmentPriceAndStock, deleteEquipment, setUserPaymentStatus, submitUserReturnProof, approveReturnByAdmin,
+      transferPayoutToOwner, updateEquipmentPriceAndStock, deleteEquipment, deletePendingEquipment, setUserPaymentStatus, submitUserReturnProof, approveReturnByAdmin,
       setReturnStatus
     }}>
       {children}
