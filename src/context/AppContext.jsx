@@ -3,6 +3,15 @@ import { supabase } from '../lib/supabaseClient'
 
 const AppContext = createContext()
 
+export const isAdminEmail = (emailStr) => {
+  const lower = (emailStr || '').toLowerCase().trim()
+  return (
+    lower === 'ac523634@gmail.com' ||
+    lower.includes('admin') ||
+    lower.includes('sarpras')
+  )
+}
+
 export function AppProvider({ children }) {
   // STATE ROLE (Admin vs User)
   const [currentUserRole, setCurrentUserRole] = useState(() => {
@@ -85,8 +94,13 @@ export function AppProvider({ children }) {
       const { data: { session: currentSession } } = await supabase.auth.getSession()
       if (currentSession) {
         setSession(currentSession)
+        const userEmail = currentSession.user?.email || ''
         const metaName = currentSession.user?.user_metadata?.full_name
         if (metaName) setCurrentUserName(metaName)
+
+        if (isAdminEmail(userEmail)) {
+          setCurrentUserRole('admin')
+        }
 
         const { data: profile } = await supabase
           .from('profiles')
@@ -256,6 +270,10 @@ export function AppProvider({ children }) {
       if (newSession?.user) {
         const name = newSession.user.user_metadata?.full_name || 'Prasmulyan'
         setCurrentUserName(name)
+        const userEmail = newSession.user.email || ''
+        if (isAdminEmail(userEmail)) {
+          setCurrentUserRole('admin')
+        }
       }
     })
 

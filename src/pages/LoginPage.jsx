@@ -17,7 +17,7 @@ import {
   UserPlus
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
-import { useApp } from '../context/AppContext'
+import { useApp, isAdminEmail } from '../context/AppContext'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -73,8 +73,8 @@ export default function LoginPage() {
     setLoading(true)
 
     // Validasi admin role jika memilih sarpras
-    if (role === 'sarpras' && !email.includes('admin') && !email.includes('sarpras')) {
-      setErrorMsg('Akses ditolak: Email ini bukan akun Administrator Sarpras!')
+    if (role === 'sarpras' && !isAdminEmail(email)) {
+      setErrorMsg('Akses ditolak: Email ini bukan akun Administrator Sarpras yang diizinkan!')
       setLoading(false)
       return
     }
@@ -104,7 +104,7 @@ export default function LoginPage() {
           console.warn('Gagal ambil data profil:', fetchErr)
         }
 
-        if (role === 'sarpras') {
+        if (role === 'sarpras' || isAdminEmail(email)) {
           setCurrentUserRole('admin')
           setCurrentUserName('Admin Sarpras')
           navigate('/admin', { replace: true })
@@ -218,9 +218,15 @@ export default function LoginPage() {
           }
         }
 
-        setCurrentUserRole('user')
-        setCurrentUserName(fullName.trim())
-        navigate('/dashboard', { replace: true })
+        if (isAdminEmail(email)) {
+          setCurrentUserRole('admin')
+          setCurrentUserName(fullName.trim() || 'Admin Sarpras')
+          navigate('/admin', { replace: true })
+        } else {
+          setCurrentUserRole('user')
+          setCurrentUserName(fullName.trim())
+          navigate('/dashboard', { replace: true })
+        }
       }
     } catch (err) {
       setErrorMsg('Gagal memverifikasi pendaftaran. Silakan coba lagi.')
@@ -379,7 +385,7 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={role === 'sarpras' ? 'admin@prasetiyamulya.ac.id' : 'student@prasetiyamulya.ac.id'}
+                    placeholder={role === 'sarpras' ? 'ac523634@gmail.com' : 'student@prasetiyamulya.ac.id'}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
                   />
                 </div>
