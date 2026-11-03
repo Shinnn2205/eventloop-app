@@ -91,7 +91,7 @@ export default function LoginPage() {
 
     // Validasi admin role jika memilih sarpras
     if (role === 'sarpras' && !isAdminEmail(loginEmail)) {
-      setErrorMsg('Akses ditolak: Email ini bukan akun Administrator Sarpras yang diizinkan!')
+      setErrorMsg('Akses ditolak: Email ini bukan akun Administrator yang terdaftar!')
       setLoading(false)
       return
     }
@@ -122,7 +122,7 @@ export default function LoginPage() {
         }
 
         if (role === 'sarpras' || isAdminEmail(loginEmail)) {
-          const adminName = getAdminDisplayName(loginEmail) || 'Admin Sarpras'
+          const adminName = getAdminDisplayName(loginEmail) || 'Admin Kampus'
           setCurrentUserRole('admin')
           setCurrentUserName(adminName)
           navigate('/admin', { replace: true })
@@ -318,7 +318,7 @@ export default function LoginPage() {
             </div>
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-green-300" />
-              <span>Terintegrasi dengan Biro Kemahasiswaan & Sarpras</span>
+              <span>Ekosistem Peminjaman & Inventarisasi Perlengkapan Kampus</span>
             </div>
           </div>
         </div>
@@ -359,15 +359,15 @@ export default function LoginPage() {
             <h3 className="text-2xl font-bold text-gray-900">
               {activeTab === 'login' 
                 ? 'Selamat Datang Kembali 👋' 
-                : (signUpStep === 'sent' ? 'Periksa Inbox Outlook Kampus' : 'Daftar Akun Mahasiswa Resmi')
+                : (signUpStep === 'otp' ? 'Verifikasi Kode OTP Outlook' : 'Daftar Akun Mahasiswa Resmi')
               }
             </h3>
             <p className="text-xs text-gray-500 mt-1">
               {activeTab === 'login'
                 ? 'Masukkan NIM/email dan password akun Anda untuk masuk'
-                : (signUpStep === 'sent'
-                    ? `Link verifikasi telah dikirim ke ${nim}@student.prasetiyamulya.ac.id`
-                    : 'Pendaftaran diverifikasi langsung melalui link resmi ke Outlook kampus.')
+                : (signUpStep === 'otp'
+                    ? `Kode OTP telah dikirimkan ke ${nim}@student.prasetiyamulya.ac.id`
+                    : 'Pendaftaran resmi mahasiswa Universitas Prasetiya Mulya.')
               }
             </p>
           </div>
@@ -424,7 +424,7 @@ export default function LoginPage() {
 
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  {role === 'sarpras' ? 'Email Administrator Sarpras *' : 'NIM (11 Digit) atau Email Kampus *'}
+                  {role === 'sarpras' ? 'Email Administrator *' : 'NIM (11 Digit) atau Email Kampus *'}
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />

@@ -133,7 +133,7 @@ export default function Layout() {
                 {currentUserName || (currentUserRole === 'admin' ? 'Admin Sarpras' : 'Prasmulyan')}
               </p>
               <p className="text-xs text-gray-500 truncate">
-                {currentUserRole === 'admin' ? 'Admin Sarpras' : 'Student Organization'}
+                {currentUserRole === 'admin' ? 'Admin EventLoop' : 'Student Organization'}
               </p>
             </div>
             <button onClick={logout} title="Logout" className="text-gray-400 hover:text-red-500 transition-colors p-1">
