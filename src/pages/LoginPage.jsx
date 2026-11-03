@@ -122,7 +122,77 @@ export default function LoginPage() {
   }
 
   // ============================================================
-  // 2. ALUR BUAT AKUN (SIGN UP) - STEP 1: KIRIM KODE OTP
+  // 2. ALUR BUAT AKUN (SIGN UP) - DAFTAR LANGSUNG (BYPASS EMAIL GATEWAY)
+  // ============================================================
+  const handleDirectSignUp = async (e) => {
+    if (e && e.preventDefault) e.preventDefault()
+    setErrorMsg('')
+    setSuccessMsg('')
+
+    if (!fullName.trim() || !nim.trim()) {
+      setErrorMsg('Mohon lengkapi Nama Lengkap dan NIM Anda.')
+      return
+    }
+
+    if (!email.trim()) {
+      setErrorMsg('Mohon masukkan email mahasiswa kampus Anda.')
+      return
+    }
+
+    if (!password || password.length < 6) {
+      setErrorMsg('Password minimal harus 6 karakter.')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+            nim: nim.trim()
+          }
+        }
+      })
+
+      if (error) {
+        setErrorMsg('Gagal mendaftar: ' + error.message)
+      } else if (data?.user) {
+        // Simpan data lengkap ke tabel 'profiles' di Supabase
+        try {
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            email: email.trim(),
+            full_name: fullName.trim(),
+            nim: nim.trim(),
+            updated_at: new Date().toISOString()
+          })
+        } catch (profileErr) {
+          console.warn('Gagal simpan profil:', profileErr)
+        }
+
+        if (isAdminEmail(email)) {
+          setCurrentUserRole('admin')
+          setCurrentUserName(fullName.trim() || 'Admin Sarpras')
+          navigate('/admin', { replace: true })
+        } else {
+          setCurrentUserRole('user')
+          setCurrentUserName(fullName.trim())
+          navigate('/dashboard', { replace: true })
+        }
+      }
+    } catch (err) {
+      setErrorMsg('Terjadi kesalahan koneksi. Silakan coba lagi.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ============================================================
+  // 3. ALUR BUAT AKUN (SIGN UP) - STEP 1: KIRIM KODE OTP
   // ============================================================
   const handleSignUpRequestOtp = async (e) => {
     e.preventDefault()
@@ -495,17 +565,27 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-2 space-y-2">
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={handleDirectSignUp}
                     disabled={loading}
                     className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 text-white rounded-xl font-semibold shadow-md shadow-green-700/20 transition-all"
                   >
-                    <KeyRound className="w-4 h-4" />
-                    <span>{loading ? 'Mengirim Kode OTP...' : 'Daftar & Kirim Kode OTP ke Email'}</span>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{loading ? 'Mendaftarkan Akun...' : 'Daftar Akun Mahasiswa (Langsung Aktif)'}</span>
                   </button>
-                  <p className="text-[10px] text-gray-400 text-center mt-1.5">
-                    Sistem akan otomatis mengirimkan 6-digit kode verifikasi ke email Anda.
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-2.5 text-xs font-semibold text-gray-600 hover:text-green-800 hover:bg-green-50 rounded-xl border border-gray-200 transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <KeyRound className="w-3.5 h-3.5 text-green-700" />
+                    <span>Atau Kirim Kode OTP ke Email</span>
+                  </button>
+                  <p className="text-[10px] text-gray-400 text-center">
+                    Gunakan 'Daftar Langsung' jika server email SSO kampus memblokir email masuk dari luar.
                   </p>
                 </div>
               </form>
@@ -544,6 +624,21 @@ export default function LoginPage() {
                   <CheckCircle2 className="w-4 h-4" />
                   <span>{loading ? 'Memverifikasi...' : 'Verifikasi Kode & Masuk'}</span>
                 </button>
+
+                {/* Tombol Bypass jika email SSO kampus menolak email Supabase */}
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-center space-y-1.5">
+                  <p className="text-[11px] text-amber-900 font-medium">
+                    Kode tidak masuk karena filter email kampus?
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleDirectSignUp}
+                    disabled={loading}
+                    className="text-xs font-bold text-amber-800 hover:text-amber-950 underline inline-block"
+                  >
+                    👉 Klik di sini untuk Selesaikan Pendaftaran Langsung
+                  </button>
+                </div>
 
                 <div className="flex items-center justify-between text-xs pt-1">
                   <button
