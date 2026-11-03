@@ -4,10 +4,10 @@ import { useApp } from '../context/AppContext'
 import { Recycle, ArrowRight, Package, BarChart3, Shield, Zap, Sparkles, CheckCircle2 } from 'lucide-react'
 
 export default function LandingPage() {
-  const { sessionUser, currentUserRole, currentUserName, loadingDb, equipments, transactions } = useApp();
-  const itemsReused = equipments?.reduce((sum, e) => sum + (e.reusedCount || 0), 0) ?? 0;
-  const wasteAvoidedKg = Math.round(itemsReused * 0.15);
-  const eventsSupported = transactions?.length ?? 0;
+  const { sessionUser, currentUserRole, currentUserName, loadingDb, campusImpact } = useApp();
+  const itemsReused = campusImpact?.itemsReused ?? 0;
+  const wasteAvoidedKg = campusImpact?.wasteAvoidedKg ?? 0;
+  const eventsSupported = campusImpact?.eventsSupported ?? 0;
 
   const targetDashboard = currentUserRole === 'admin' ? '/admin' : '/dashboard'
 

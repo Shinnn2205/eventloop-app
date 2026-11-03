@@ -16,18 +16,16 @@ import {
 } from 'lucide-react'
 
 export default function Dashboard() {
-  const { activeReservation, transactions, currentUserName, equipments, loadingDb } = useApp()
+  const { activeReservation, transactions, currentUserName, equipments, loadingDb, campusImpact } = useApp()
   
   const hasActiveRentals = Boolean(activeReservation?.items && activeReservation.items.length > 0)
   const latestTxn = transactions && transactions.length > 0 ? transactions[0] : null
 
-  // Live impact calculations dari data Supabase equipments
-  const totalItemsReused = equipments?.reduce((sum, e) => sum + (e.reusedCount || 0), 0) ?? 0
-  const totalWasteAvoidedKg = Math.round(totalItemsReused * 0.15 * 10) / 10
-  const totalCostAvoided = equipments?.reduce((sum, e) => sum + ((e.reusedCount || 0) * (e.price || 0)), 0) ?? 0
-  const avgCircularScore = equipments && equipments.length > 0
-    ? Math.round(equipments.reduce((sum, e) => sum + (e.circularScore || 0), 0) / equipments.length)
-    : 0
+  // Live impact calculations dari Supabase
+  const totalItemsReused = campusImpact?.itemsReused ?? 0
+  const totalWasteAvoidedKg = campusImpact?.wasteAvoidedKg ?? 0
+  const totalCostAvoided = campusImpact?.costAvoided ?? 0
+  const avgCircularScore = campusImpact?.circularScore ?? 0
 
   // 3 Sumber Inventory dihitung live dari data Supabase
   const campusReady = equipments?.filter(e => {

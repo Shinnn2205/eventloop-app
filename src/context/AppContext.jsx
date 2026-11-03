@@ -49,6 +49,16 @@ export function AppProvider({ children }) {
     return saved ? JSON.parse(saved) : []
   })
 
+  const [campusImpact, setCampusImpact] = useState({
+    itemsReused: 0,
+    wasteAvoidedKg: 0,
+    costAvoided: 0,
+    eventsSupported: 0,
+    circularScore: 0
+  })
+
+  const [orgImpacts, setOrgImpacts] = useState([])
+
   const [cartItems, setCartItems] = useState(() => {
     const saved = localStorage.getItem('eventloop_cart')
     return saved ? JSON.parse(saved) : []
@@ -170,6 +180,66 @@ export function AppProvider({ children }) {
         setPendingReturns(normalizedRet)
       } else if (!retErr) {
         setPendingReturns([])
+      }
+
+      // 5. Fetch Campus Impact dari Supabase tabel 'campus_impact'
+      try {
+        const { data: impactRow, error: impactErr } = await supabase
+          .from('campus_impact')
+          .select('*')
+          .limit(1)
+          .maybeSingle()
+
+        if (!impactErr && impactRow) {
+          setCampusImpact({
+            itemsReused: Number(impactRow.items_reused) || 0,
+            wasteAvoidedKg: Number(impactRow.waste_avoided_kg) || 0,
+            costAvoided: Number(impactRow.cost_avoided) || 0,
+            eventsSupported: Number(impactRow.events_supported) || 0,
+            circularScore: Number(impactRow.circular_score) || 0
+          })
+        } else {
+          // Jika belum ada tabel/data campus_impact, hitung dari transaksi nyata yang approved
+          const approvedTxn = (txnData || []).filter(t => 
+            (t.qris_status || '').toLowerCase().includes('approved') || 
+            (t.qris_status || '').toLowerCase().includes('lunas') ||
+            (t.qris_status || '').toLowerCase().includes('paid')
+          )
+          const approvedRet = (retData || []).filter(r => 
+            (r.status || '').toLowerCase().includes('approved')
+          )
+          const calculatedReused = approvedRet.reduce((sum, r) => sum + (r.returned_qty || 1), 0)
+          const calculatedCost = approvedTxn.reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+          const calculatedWaste = Math.round(calculatedReused * 0.15 * 10) / 10
+
+          setCampusImpact({
+            itemsReused: calculatedReused,
+            wasteAvoidedKg: calculatedWaste,
+            costAvoided: calculatedCost,
+            eventsSupported: approvedTxn.length,
+            circularScore: eqData && eqData.length > 0 
+              ? Math.round(eqData.reduce((s, e) => s + (e.circularScore || 0), 0) / eqData.length) 
+              : 0
+          })
+        }
+      } catch (e) {
+        console.warn('campus_impact fetch error:', e)
+      }
+
+      // 6. Fetch Organization Impact dari Supabase tabel 'organization_impact'
+      try {
+        const { data: orgData, error: orgErr } = await supabase
+          .from('organization_impact')
+          .select('*')
+          .order('circular_score', { ascending: false })
+
+        if (!orgErr && orgData && orgData.length > 0) {
+          setOrgImpacts(orgData)
+        } else {
+          setOrgImpacts([])
+        }
+      } catch (e) {
+        console.warn('organization_impact fetch error:', e)
       }
     } catch (err) {
       console.warn('Gagal memuat data dari Supabase, menggunakan data lokal:', err)
@@ -537,6 +607,7 @@ export function AppProvider({ children }) {
       currentUserName, setCurrentUserName, 
       session, sessionUser: session?.user || null, 
       logout, loadingDb, refetchData: fetchSupabaseData,
+      campusImpact, orgImpacts,
       equipments, pendingApprovals, transactions, userPaymentStatus, activeReservation, setActiveReservation, returnStatus, pendingReturns,
       cartItems, addToCart, removeFromCart, updateCartQty,
       uploadEquipmentByUser, approveEquipmentByAdmin, rejectEquipmentByAdmin, submitUserQrisPayment, approvePaymentByAdmin,

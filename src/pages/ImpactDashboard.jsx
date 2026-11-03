@@ -16,31 +16,23 @@ import {
 } from 'lucide-react'
 
 export default function ImpactDashboard() {
-  const { equipments, transactions, loadingDb } = useApp()
+  const { equipments, transactions, loadingDb, campusImpact, orgImpacts } = useApp()
   const [monthlyData, setMonthlyData] = useState([])
-  const [topOrgs, setTopOrgs] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
 
-  // Compute live KPI stats from equipments & transactions
-  const totalItemsReused = equipments?.reduce((sum, e) => sum + (e.reusedCount || 0), 0) ?? 0
-  const totalEventsSupported = transactions?.length ?? 0
-  const wasteAvoided = Math.round(totalItemsReused * 0.15 * 10) / 10 // ~0.15 kg per reuse
-  const co2Avoided = Math.round(wasteAvoided * 1.32 * 10) / 10 // rough CO2 factor
-  const costAvoided = equipments?.reduce((sum, e) => {
-    const reuseCount = e.reusedCount || 0
-    const price = e.price || 0
-    return sum + (reuseCount * price)
-  }, 0) ?? 0
+  // Live KPI stats dari Supabase
+  const totalItemsReused = campusImpact?.itemsReused ?? 0
+  const totalEventsSupported = campusImpact?.eventsSupported ?? 0
+  const wasteAvoided = campusImpact?.wasteAvoidedKg ?? 0
+  const co2Avoided = Math.round(wasteAvoided * 1.32 * 10) / 10
+  const costAvoided = campusImpact?.costAvoided ?? 0
 
   useEffect(() => {
-    fetchImpactData()
+    fetchMonthlyData()
   }, [])
 
-  async function fetchImpactData() {
+  async function fetchMonthlyData() {
     try {
-      setLoading(true)
-
-      // Fetch monthly impact data
       const { data: monthly, error: monthlyErr } = await supabase
         .from('monthly_impact')
         .select('*')
@@ -49,21 +41,8 @@ export default function ImpactDashboard() {
       if (!monthlyErr && monthly && monthly.length > 0) {
         setMonthlyData(monthly)
       }
-
-      // Fetch organization scores
-      const { data: orgs, error: orgsErr } = await supabase
-        .from('organization_scores')
-        .select('*')
-        .order('circular_score', { ascending: false })
-        .limit(5)
-
-      if (!orgsErr && orgs && orgs.length > 0) {
-        setTopOrgs(orgs)
-      }
     } catch (err) {
-      console.warn('Error fetching impact data:', err)
-    } finally {
-      setLoading(false)
+      console.warn('Error fetching monthly impact data:', err)
     }
   }
 
@@ -248,9 +227,9 @@ export default function ImpactDashboard() {
               Organisasi dengan skor circularity tertinggi mendapatkan prioritas alokasi barang & subsidi sewa.
             </p>
 
-            {topOrgs.length > 0 ? (
+            {orgImpacts && orgImpacts.length > 0 ? (
               <div className="space-y-2.5">
-                {topOrgs.map((org, idx) => (
+                {orgImpacts.map((org, idx) => (
                   <div 
                     key={idx}
                     className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${
