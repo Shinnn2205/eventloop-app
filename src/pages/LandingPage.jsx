@@ -1,9 +1,14 @@
 import { Link } from 'react-router-dom'
+import Spinner from '../components/Spinner'
+// import { useApp } from '../context/AppContext' // duplicate removed
 import { Recycle, ArrowRight, Package, BarChart3, Shield, Zap, Sparkles, CheckCircle2 } from 'lucide-react'
-import { useApp } from '../context/AppContext'
+// import { useApp } from '../context/AppContext' // duplicate removed
 
 export default function LandingPage() {
-  const { sessionUser, currentUserRole, currentUserName } = useApp()
+  const { sessionUser, currentUserRole, currentUserName, loadingDb, equipments, transactions } = useApp();
+  const itemsReused = equipments?.reduce((sum, e) => sum + (e.reusedCount || 0), 0) ?? 0;
+  const wasteAvoidedKg = Math.round(itemsReused * 0.15);
+  const eventsSupported = transactions?.length ?? 0;
 
   const targetDashboard = currentUserRole === 'admin' ? '/admin' : '/dashboard'
 
