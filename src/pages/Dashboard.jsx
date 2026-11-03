@@ -559,8 +559,20 @@ export default function Dashboard() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 bg-emerald-50/20 rounded-2xl border border-dashed border-emerald-200 text-xs text-slate-500">
-            Tidak ditemukan event atau barang yang sesuai dengan kata kunci <strong>"{trackingSearch}"</strong>.
+          <div className="text-center py-10 px-4 bg-emerald-50/30 rounded-2xl border border-dashed border-emerald-200/90 space-y-2">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto text-lg">
+              ✨
+            </div>
+            <p className="text-xs font-semibold text-slate-700">
+              {trackingSearch.trim()
+                ? `Tidak ditemukan event atau barang yang sesuai dengan kata kunci "${trackingSearch}".`
+                : 'Saat ini belum ada event atau peminjaman barang yang sedang berjalan.'}
+            </p>
+            {!trackingSearch.trim() && (
+              <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+                Seluruh perlengkapan kampus tersedia di gudang penyimpanan dan siap dipinjam 100% untuk kegiatan organisasi Anda.
+              </p>
+            )}
           </div>
         )}
       </div>

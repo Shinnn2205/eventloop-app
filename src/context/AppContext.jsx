@@ -138,6 +138,17 @@ export function AppProvider({ children }) {
     }
   }, [ssoUser])
 
+  // One-time cleanup for active borrowings and reservations cache
+  if (typeof window !== 'undefined' && localStorage.getItem('eventloop_borrowing_cleaned_v3') !== 'true') {
+    localStorage.removeItem('eventloop_transactions')
+    localStorage.removeItem('eventloop_active_reservation')
+    localStorage.removeItem('eventloop_user_payment_status')
+    localStorage.removeItem('eventloop_return_status')
+    localStorage.removeItem('eventloop_pending_returns')
+    localStorage.removeItem('eventloop_cart')
+    localStorage.setItem('eventloop_borrowing_cleaned_v3', 'true')
+  }
+
   const [equipments, setEquipments] = useState(() => {
     const saved = localStorage.getItem('eventloop_equipments')
     return saved ? JSON.parse(saved) : []
@@ -284,36 +295,41 @@ export function AppProvider({ children }) {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (!txnErr && txnData && txnData.length > 0) {
-        setTransactions(prevLocal => {
-          const normalizedTxn = txnData.map(t => {
-            const localMatch = prevLocal.find(lt => lt.id === t.id || (lt.itemName === t.item_names && lt.amount === Number(t.amount)))
-            return {
-              id: t.id,
-              buyerOrg: t.buyer_org || localMatch?.buyerOrg || 'BEM Prasmul',
-              borrowerName: localMatch?.borrowerName || t.buyer_org || 'Mahasiswa Prasmul',
-              eventName: localMatch?.eventName || 'Kegiatan Kemahasiswaan Prasmul',
-              startDate: localMatch?.startDate || '03 Nov 2026',
-              endDate: localMatch?.endDate || '05 Nov 2026',
-              durationDays: localMatch?.durationDays || 2,
-              eventLocation: localMatch?.eventLocation || 'Auditorium Kampus BSD',
-              itemName: t.item_names || 'Reservasi Perlengkapan',
-              borrowedItems: localMatch?.borrowedItems || [],
-              amount: Number(t.amount) || 0,
-              paymentProofPhoto: localMatch?.paymentProofPhoto || null,
-              payoutProofPhoto: localMatch?.payoutProofPhoto || null,
-              qrisStatus: t.qris_status || 'Pending Admin Verification',
-              payoutStatus: t.payout_status || 'Waiting Admin Approval',
-              paidAt: t.created_at ? new Date(t.created_at).toLocaleString('id-ID') : 'Baru saja',
-              bankAdminRef: `BCA-QRIS-${String(t.id).slice(0, 6)}`,
-              ownerOrg: localMatch?.ownerOrg || 'Organisasi Pemilik & EventLoop',
-              ownerBank: localMatch?.ownerBank || 'BCA 8012345678 a.n Owner',
-              payoutAmount: Math.round((Number(t.amount) || 0) * 0.95),
-              adminFee: Math.round((Number(t.amount) || 0) * 0.05),
-            }
+      if (!txnErr && txnData) {
+        if (txnData.length === 0) {
+          setTransactions([])
+          localStorage.removeItem('eventloop_transactions')
+        } else {
+          setTransactions(prevLocal => {
+            const normalizedTxn = txnData.map(t => {
+              const localMatch = prevLocal.find(lt => lt.id === t.id || (lt.itemName === t.item_names && lt.amount === Number(t.amount)))
+              return {
+                id: t.id,
+                buyerOrg: t.buyer_org || localMatch?.buyerOrg || 'BEM Prasmul',
+                borrowerName: localMatch?.borrowerName || t.buyer_org || 'Mahasiswa Prasmul',
+                eventName: localMatch?.eventName || 'Kegiatan Kemahasiswaan Prasmul',
+                startDate: localMatch?.startDate || '03 Nov 2026',
+                endDate: localMatch?.endDate || '05 Nov 2026',
+                durationDays: localMatch?.durationDays || 2,
+                eventLocation: localMatch?.eventLocation || 'Auditorium Kampus BSD',
+                itemName: t.item_names || 'Reservasi Perlengkapan',
+                borrowedItems: localMatch?.borrowedItems || [],
+                amount: Number(t.amount) || 0,
+                paymentProofPhoto: localMatch?.paymentProofPhoto || null,
+                payoutProofPhoto: localMatch?.payoutProofPhoto || null,
+                qrisStatus: t.qris_status || 'Pending Admin Verification',
+                payoutStatus: t.payout_status || 'Waiting Admin Approval',
+                paidAt: t.created_at ? new Date(t.created_at).toLocaleString('id-ID') : 'Baru saja',
+                bankAdminRef: `BCA-QRIS-${String(t.id).slice(0, 6)}`,
+                ownerOrg: localMatch?.ownerOrg || 'Organisasi Pemilik & EventLoop',
+                ownerBank: localMatch?.ownerBank || 'BCA 8012345678 a.n Owner',
+                payoutAmount: Math.round((Number(t.amount) || 0) * 0.95),
+                adminFee: Math.round((Number(t.amount) || 0) * 0.05),
+              }
+            })
+            return normalizedTxn
           })
-          return normalizedTxn
-        })
+        }
       }
 
       // 4. Fetch Returns dari Supabase
@@ -323,17 +339,22 @@ export function AppProvider({ children }) {
         .order('created_at', { ascending: false })
 
       if (!retErr && retData) {
-        const normalizedRet = retData.map(r => ({
-          id: r.id,
-          equipmentId: r.equipment_id,
-          conditionPhoto: r.condition_photo,
-          storagePhoto: r.storage_photo,
-          returnedQty: r.returned_qty || 1,
-          borrower: r.borrower || 'Prasmulyan',
-          status: r.status || 'Pending Admin Verification',
-          timestamp: r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : 'Baru saja'
-        }))
-        setPendingReturns(normalizedRet)
+        if (retData.length === 0) {
+          setPendingReturns([])
+          localStorage.removeItem('eventloop_pending_returns')
+        } else {
+          const normalizedRet = retData.map(r => ({
+            id: r.id,
+            equipmentId: r.equipment_id,
+            conditionPhoto: r.condition_photo,
+            storagePhoto: r.storage_photo,
+            returnedQty: r.returned_qty || 1,
+            borrower: r.borrower || 'Prasmulyan',
+            status: r.status || 'Pending Admin Verification',
+            timestamp: r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : 'Baru saja'
+          }))
+          setPendingReturns(normalizedRet)
+        }
       }
 
       // 5. Fetch Campus Impact dari Supabase
@@ -790,33 +811,35 @@ export function AppProvider({ children }) {
   const ongoingCampusEvents = useMemo(() => {
     const list = []
 
-    // 1. Jika user saat ini punya event aktif
-    if (activeReservation?.eventName) {
+    // 1. Jika user saat ini punya event aktif dan sudah memiliki item yang dipinjam/dalam proses
+    if (activeReservation?.eventName && (userPaymentStatus === 'approved' || userPaymentStatus === 'pending_admin_approval')) {
       const currentItems = (cartItems && cartItems.length > 0) ? cartItems : (activeReservation.items || [])
-      const startLbl = activeReservation.startDateLabel || activeReservation.startDate || (activeReservation.eventDate ? activeReservation.eventDate.split('–')[0]?.trim() : '04 Nov 2026')
-      const endLbl = activeReservation.endDateLabel || activeReservation.endDate || '06 Nov 2026'
-      list.push({
-        id: activeReservation.txnId || 'EVT-CURRENT',
-        isCurrentUser: true,
-        eventName: activeReservation.eventName,
-        org: activeReservation.org || currentUserName || 'Organisasi Mahasiswa',
-        borrowerName: currentUserName || 'Prasmulyan',
-        startDate: startLbl,
-        endDate: endLbl,
-        durationDays: activeReservation.durationDays || 1,
-        location: activeReservation.location || 'Auditorium Kampus BSD',
-        status: userPaymentStatus === 'approved' ? 'Sedang Berjalan (Dipinjam)' : userPaymentStatus === 'pending_admin_approval' ? 'Verifikasi Pembayaran' : 'Persiapan / Booking',
-        items: currentItems.map(i => ({
-          id: i.id,
-          name: i.name,
-          qty: i.qty || 1,
-          image: i.image || '📦',
-          originLocation: i.lastLocation || i.initialLocation || 'Warehouse Kampus Gedung C'
-        }))
-      })
+      if (currentItems.length > 0) {
+        const startLbl = activeReservation.startDateLabel || activeReservation.startDate || (activeReservation.eventDate ? activeReservation.eventDate.split('–')[0]?.trim() : '04 Nov 2026')
+        const endLbl = activeReservation.endDateLabel || activeReservation.endDate || '06 Nov 2026'
+        list.push({
+          id: activeReservation.txnId || 'EVT-CURRENT',
+          isCurrentUser: true,
+          eventName: activeReservation.eventName,
+          org: activeReservation.org || currentUserName || 'Organisasi Mahasiswa',
+          borrowerName: currentUserName || 'Prasmulyan',
+          startDate: startLbl,
+          endDate: endLbl,
+          durationDays: activeReservation.durationDays || 1,
+          location: activeReservation.location || 'Auditorium Kampus BSD',
+          status: userPaymentStatus === 'approved' ? 'Sedang Berjalan (Dipinjam)' : 'Verifikasi Pembayaran',
+          items: currentItems.map(i => ({
+            id: i.id,
+            name: i.name,
+            qty: i.qty || 1,
+            image: i.image || '📦',
+            originLocation: i.lastLocation || i.initialLocation || 'Warehouse Kampus Gedung C'
+          }))
+        })
+      }
     }
 
-    // 2. Dari transaksi yang tercatat
+    // 2. Dari transaksi aktual yang tercatat di database
     transactions.forEach((txn, idx) => {
       if (activeReservation?.txnId && txn.id === activeReservation.txnId) return
       const parsedItems = txn.borrowedItems && txn.borrowedItems.length > 0
@@ -836,8 +859,8 @@ export function AppProvider({ children }) {
       list.push({
         id: txn.id || `EVT-TXN-${idx}`,
         isCurrentUser: false,
-        eventName: txn.eventName || (idx % 2 === 0 ? 'Prasmul FinTech & Startup Expo' : 'SBE Pop-Up Market & Talkshow'),
-        org: txn.buyerOrg || 'Hima Fintech Prasmul',
+        eventName: txn.eventName || 'Kegiatan Kemahasiswaan Prasmul',
+        org: txn.buyerOrg || 'Organisasi Kampus',
         borrowerName: txn.borrowerName || txn.buyerOrg || 'Panitia Mahasiswa',
         startDate: txn.startDate || '03 Nov 2026',
         endDate: txn.endDate || '05 Nov 2026',
@@ -848,59 +871,8 @@ export function AppProvider({ children }) {
       })
     })
 
-    // 3. Dari barang di katalog yang stoknya sedang terpakai (total > available) namun belum masuk list di atas
-    const sampleEvents = [
-      {
-        id: 'EVT-CAMPUS-01',
-        eventName: 'Prasmul Green Innovation Festival',
-        org: 'BEM & STEM Energy Club',
-        borrowerName: 'Kevin Wijaya (STEM)',
-        startDate: '03 Nov 2026',
-        endDate: '06 Nov 2026',
-        durationDays: 3,
-        location: 'Plaza Outdoor & Auditorium BSD',
-        status: 'Sedang Berjalan (Dipinjam)',
-        items: []
-      },
-      {
-        id: 'EVT-CAMPUS-02',
-        eventName: 'National Business Case Competition',
-        org: 'SBE Student Board',
-        borrowerName: 'Nadia Kusuma (SBE)',
-        startDate: '04 Nov 2026',
-        endDate: '07 Nov 2026',
-        durationDays: 3,
-        location: 'Function Hall Gedung B Lt. 3',
-        status: 'Sedang Berjalan (Dipinjam)',
-        items: []
-      }
-    ]
-
-    const alreadyTrackedIds = new Set()
-    list.forEach(ev => ev.items.forEach(it => alreadyTrackedIds.add(String(it.id))))
-
-    equipments.forEach((eq, idx) => {
-      const borrowedCount = Math.max(0, (Number(eq.total) || 0) - (Number(eq.available) || 0))
-      if (borrowedCount > 0 && !alreadyTrackedIds.has(String(eq.id))) {
-        const targetBucket = sampleEvents[idx % sampleEvents.length]
-        targetBucket.items.push({
-          id: eq.id,
-          name: eq.name,
-          qty: borrowedCount,
-          image: eq.image || '📦',
-          originLocation: eq.lastLocation || 'Warehouse Kampus Gedung C'
-        })
-      }
-    })
-
-    sampleEvents.forEach(se => {
-      if (se.items.length > 0) {
-        list.push(se)
-      }
-    })
-
     return list
-  }, [activeReservation, cartItems, currentUserName, userPaymentStatus, transactions, equipments])
+  }, [activeReservation, cartItems, currentUserName, userPaymentStatus, transactions])
 
   // Helper untuk mengecek siapa saja yang sedang meminjam suatu barang (dipakai di MyEquipment & EquipmentDetail)
   const getEquipmentBorrowings = useCallback((equipmentId, equipmentName) => {
