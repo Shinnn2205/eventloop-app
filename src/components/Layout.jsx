@@ -15,7 +15,8 @@ import {
   PlusCircle,
   ShieldAlert,
   LogOut,
-  Box
+  Box,
+  UserCircle
 } from 'lucide-react'
 
 const navItems = [
@@ -27,6 +28,7 @@ const navItems = [
   { path: '/upload-equipment', label: 'Upload Barang', icon: PlusCircle },
   { path: '/my-equipment', label: 'Barang Saya', icon: Box },
   { path: '/impact', label: 'Dampak Sirkular', icon: BarChart3 },
+  { path: '/profile', label: 'Profil Ormawa', icon: UserCircle },
 ]
 
 export default function Layout() {
@@ -212,14 +214,14 @@ export default function Layout() {
         <div className="p-4 border-t border-emerald-100/70 space-y-3">
           {sessionUser && (
             <div className="px-3 py-2.5 rounded-xl bg-emerald-50/50 border border-emerald-100 flex items-center justify-between gap-2">
-              <div className="min-w-0">
+              <Link to="/profile" className="min-w-0 flex-1 hover:opacity-80 transition-opacity">
                 <div className="text-xs font-semibold text-slate-800 truncate">
                   {currentUserName || 'Prasmulyan'}
                 </div>
                 <div className="text-[11px] text-emerald-700 truncate">
                   {currentUserRole === 'admin' ? 'Administrator' : (currentUserStudyProgram || 'Prasetiya Mulya')}
                 </div>
-              </div>
+              </Link>
               <button
                 onClick={handleLogout}
                 title="Keluar Sesi"
@@ -260,19 +262,19 @@ export default function Layout() {
               </Link>
             )}
 
-            <div className="flex items-center gap-2.5 pl-2">
+            <Link to="/profile" className="flex items-center gap-2.5 pl-2 group">
               <div className="text-right hidden md:block">
-                <div className="text-xs font-semibold text-slate-800 leading-tight">
+                <div className="text-xs font-semibold text-slate-800 leading-tight group-hover:text-emerald-700 transition-colors">
                   {currentUserName || 'Prasmulyan'}
                 </div>
                 <div className="text-[11px] text-emerald-600 font-medium">
                   {currentUserRole === 'admin' ? 'Admin EventLoop' : (currentUserStudyProgram || 'Prasetiya Mulya')}
                 </div>
               </div>
-              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center border border-emerald-200">
+              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center border border-emerald-200 group-hover:scale-105 transition-transform shadow-2xs">
                 {(currentUserName || 'P').substring(0, 2).toUpperCase()}
               </div>
-            </div>
+            </Link>
           </div>
         </header>
 

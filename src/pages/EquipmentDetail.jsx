@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { 
@@ -9,13 +10,32 @@ import {
   History,
   Lock,
   User,
-  Calendar
+  Calendar,
+  MessageSquare,
+  CalendarRange,
+  ClockAlert,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react'
 
 export default function EquipmentDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { equipments, cartItems, addToCart, removeFromCart, userPaymentStatus, currentUserRole, getEquipmentBorrowings } = useApp()
+  const { 
+    equipments, 
+    cartItems, 
+    addToCart, 
+    removeFromCart, 
+    userPaymentStatus, 
+    currentUserRole, 
+    getEquipmentBorrowings,
+    activeReservation,
+    updateActiveEventDetails 
+  } = useApp()
+
+  const [futureStartDate, setFutureStartDate] = useState('2026-11-20')
+  const [futureEndDate, setFutureEndDate] = useState('2026-11-22')
 
   const item = equipments.find(eq => eq.id.toString() === id)
   const isLockedByActivePayment = currentUserRole === 'user' && userPaymentStatus !== 'idle'
@@ -33,14 +53,59 @@ export default function EquipmentDetail() {
   const isReserved = cartItems.some(cartItem => cartItem.id === item.id)
   const activeBorrowings = getEquipmentBorrowings ? getEquipmentBorrowings(item.id, item.name) : []
 
+  // Periksa apakah rentang tanggal masa depan bertabrakan dengan jadwal aktif
+  const isFutureDateAvailable = () => {
+    if (!futureStartDate || !futureEndDate) return true
+    const reqStart = new Date(futureStartDate).getTime()
+    const reqEnd = new Date(futureEndDate).getTime()
+
+    for (const b of activeBorrowings) {
+      const bStart = new Date(b.startDate).getTime()
+      const bEnd = new Date(b.endDate).getTime()
+      if (!isNaN(bStart) && !isNaN(bEnd)) {
+        if (reqStart <= bEnd && reqEnd >= bStart) {
+          if (b.qty >= (item.total || 1)) return false
+        }
+      }
+    }
+    return true
+  }
+
+  const futureAvailable = isFutureDateAvailable()
+
   const toggleReserve = () => {
     if (isLockedByActivePayment) return
     if (isReserved) {
       removeFromCart(item.id)
     } else {
       addToCart(item, 1)
+      if (updateActiveEventDetails && (!activeReservation?.startDateLabel)) {
+        updateActiveEventDetails({
+          startDateLabel: futureStartDate,
+          endDateLabel: futureEndDate
+        })
+      }
     }
   }
+
+  const handleBookFutureDate = () => {
+    if (isLockedByActivePayment) return
+    if (!isReserved) {
+      addToCart(item, 1)
+    }
+    if (updateActiveEventDetails) {
+      updateActiveEventDetails({
+        startDateLabel: futureStartDate,
+        endDateLabel: futureEndDate,
+        eventDate: `${futureStartDate} – ${futureEndDate}`
+      })
+    }
+    navigate('/reservation')
+  }
+
+  const ownerWaText = encodeURIComponent(
+    `Halo PIC ${item.owner || 'Inventaris Kampus'}, saya tertarik untuk meminjam perlengkapan "${item.name}" melalui platform EventLoop Universitas Prasetiya Mulya. Apakah unit siap diambil di lokasi ${item.lastLocation || 'Warehouse Kampus'}?`
+  )
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -200,8 +265,102 @@ export default function EquipmentDetail() {
               </div>
             )}
 
+            {/* KALENDER RESERVASI JADWAL MENDATANG (FUTURE BOOKING CALENDAR) */}
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/70 via-teal-50/40 to-green-50/60 border border-emerald-200/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                  <CalendarRange className="w-4 h-4 text-emerald-600" />
+                  Kalender Ketersediaan Jadwal Mendatang
+                </span>
+                <span className="text-[10px] text-emerald-700 bg-white/80 px-2 py-0.5 rounded-full border border-emerald-200 font-semibold">
+                  Booking Bebas Bentrok
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Barang sedang dipakai hari ini? Anda tetap dapat memesan untuk kegiatan di tanggal mendatang jika jadwalnya tidak bertabrakan.
+              </p>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                    Mulai Pinjam
+                  </label>
+                  <input
+                    type="date"
+                    value={futureStartDate}
+                    onChange={(e) => setFutureStartDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                    Selesai Pinjam
+                  </label>
+                  <input
+                    type="date"
+                    value={futureEndDate}
+                    onChange={(e) => setFutureEndDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className={`p-2.5 rounded-xl text-xs flex items-center justify-between border ${
+                futureAvailable 
+                  ? 'bg-emerald-100/60 border-emerald-300 text-emerald-900' 
+                  : 'bg-rose-50 border-rose-200 text-rose-800'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {futureAvailable ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  )}
+                  <span className="text-[11px] font-medium">
+                    {futureAvailable 
+                      ? 'Tersedia untuk rentang tanggal yang dipilih!' 
+                      : 'Jadwal bertabrakan dengan kegiatan lain.'
+                    }
+                  </span>
+                </div>
+                {futureAvailable && currentUserRole === 'user' && !isLockedByActivePayment && (
+                  <button
+                    type="button"
+                    onClick={handleBookFutureDate}
+                    className="btn-primary !py-1 !px-2.5 !text-[10px] font-bold cursor-pointer"
+                  >
+                    Booking Jadwal Ini
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* KEBIJAKAN DENDA & JAMINAN SIRKULAR */}
+            <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-2.5 text-xs">
+              <span className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
+                <ClockAlert className="w-4 h-4 text-amber-600" />
+                Ketentuan Denda & Jaminan Perlengkapan
+              </span>
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="p-2.5 bg-white rounded-xl border border-slate-100">
+                  <span className="text-slate-400 block text-[10px]">Uang Jaminan (Deposit)</span>
+                  <strong className="text-emerald-700">Rp0 (Bebas Deposit)</strong>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Berbasis SSO & NIM Terverifikasi</span>
+                </div>
+                <div className="p-2.5 bg-white rounded-xl border border-slate-100">
+                  <span className="text-slate-400 block text-[10px]">Denda Terlambat</span>
+                  <strong className="text-amber-700">Rp25.000 / hari</strong>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Berlaku setelah batas tanggal usai</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-500 leading-relaxed">
+                Pemakaian wajar (<em>normal wear & tear</em>) tidak dikenakan biaya reparasi. Jika terjadi kehilangan atau kerusakan komponen fatal, panitia wajib mengganti biaya perbaikan sesuai taksiran teknis.
+              </p>
+            </div>
+
+            {/* ACTION BUTTONS: RESERVASI & WHATSAPP */}
             {currentUserRole === 'user' && (
-              <div className="pt-2">
+              <div className="pt-2 space-y-2">
                 {isLockedByActivePayment ? (
                   <div className="space-y-2">
                     <button
@@ -218,25 +377,38 @@ export default function EquipmentDetail() {
                 ) : (
                   <>
                     <button
-                      disabled={item.available <= 0 && !isReserved}
+                      disabled={item.available <= 0 && !futureAvailable && !isReserved}
                       onClick={toggleReserve}
                       className={`w-full py-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                         isReserved
                           ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                          : item.available <= 0 
+                          : item.available <= 0 && !futureAvailable
                           ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                           : 'btn-primary'
                       }`}
                     >
-                      {isReserved ? '✓ Di Keranjang (Klik untuk Batal)' : item.available <= 0 ? 'Stok Habis' : '+ Tambah ke Reservasi'}
+                      {isReserved 
+                        ? '✓ Di Keranjang (Klik untuk Batal)' 
+                        : (item.available <= 0 ? 'Booking Jadwal Mendatang' : '+ Tambah ke Reservasi')}
                     </button>
                     {isReserved && (
-                      <Link to="/reservation" className="block text-center mt-2.5 text-xs font-semibold text-emerald-700 hover:underline">
+                      <Link to="/reservation" className="block text-center mt-2 text-xs font-semibold text-emerald-700 hover:underline">
                         Lanjut ke Halaman Reservasi →
                       </Link>
                     )}
                   </>
                 )}
+
+                {/* Tombol Hubungi Pemilik via WhatsApp */}
+                <a
+                  href={`https://wa.me/?text=${ownerWaText}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-2.5 rounded-xl border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100/70 text-emerald-900 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <MessageSquare className="w-4 h-4 text-emerald-600" />
+                  <span>Hubungi Pemilik Barang via WhatsApp</span>
+                </a>
               </div>
             )}
           </div>

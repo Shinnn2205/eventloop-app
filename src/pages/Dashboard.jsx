@@ -18,7 +18,10 @@ import {
   Search,
   MapPin,
   User,
-  Clock
+  Clock,
+  MessageSquare,
+  AlertTriangle,
+  AlertCircle
 } from 'lucide-react'
 
 export default function Dashboard() {
@@ -105,8 +108,83 @@ export default function Dashboard() {
     return matchEvent || matchOrg || matchBorrower || matchLoc || matchItems
   })
 
+  // Hitung status sisa hari pengembalian untuk activeReservation
+  const calculateDaysLeft = () => {
+    if (!activeReservation?.eventName || userPaymentStatus !== 'approved') return null
+    const endStr = activeReservation.endDateLabel || activeReservation.endDate
+    if (!endStr) return null
+
+    const d = new Date(endStr)
+    if (isNaN(d.getTime())) return null
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    d.setHours(0, 0, 0, 0)
+    return Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  }
+
+  const daysLeft = calculateDaysLeft()
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
+      {/* NOTIFIKASI PENGINGAT PENGEMBALIAN (H-1 / DEADLINE REMINDER) */}
+      {daysLeft !== null && (
+        daysLeft < 0 ? (
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in shadow-2xs">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <strong className="block text-sm font-bold text-rose-950">
+                  ⚠️ Peringatan Keterlambatan Pengembalian ({Math.abs(daysLeft)} Hari Melewati Batas)
+                </strong>
+                Peminjaman untuk event <strong>"{activeReservation.eventName}"</strong> telah melewati tanggal {activeReservation.endDateLabel || activeReservation.endDate}. Denda keterlambatan Rp25.000 / hari sedang berjalan. Mohon segera pulangkan ke gudang kampus.
+              </div>
+            </div>
+            <Link
+              to="/return"
+              className="btn-primary !bg-rose-600 hover:!bg-rose-700 !py-2 !px-4 text-xs font-bold whitespace-nowrap self-start sm:self-auto"
+            >
+              Pulangkan Barang Sekarang
+            </Link>
+          </div>
+        ) : daysLeft === 0 ? (
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in shadow-2xs">
+            <div className="flex items-start gap-2.5">
+              <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <strong className="block text-sm font-bold text-amber-950">
+                  ⏰ Batas Akhir Pengembalian Adalah Hari Ini!
+                </strong>
+                Hari ini adalah batas waktu peminjaman perlengkapan event <strong>"{activeReservation.eventName}"</strong>. Silakan kembalikan ke gudang kampus untuk menghindari denda keterlambatan.
+              </div>
+            </div>
+            <Link
+              to="/return"
+              className="btn-primary !bg-amber-600 hover:!bg-amber-700 !py-2 !px-4 text-xs font-bold whitespace-nowrap self-start sm:self-auto"
+            >
+              Proses Pengembalian
+            </Link>
+          </div>
+        ) : daysLeft === 1 ? (
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in shadow-2xs">
+            <div className="flex items-start gap-2.5">
+              <Calendar className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <strong className="block text-sm font-bold text-emerald-900">
+                  📅 Pengingat Pengembalian (H-1 Besok Berakhir)
+                </strong>
+                Peminjaman perlengkapan untuk event <strong>"{activeReservation.eventName}"</strong> berakhir besok ({activeReservation.endDateLabel || activeReservation.endDate}). Pastikan perlengkapan siap diantarkan kembali ke gudang asal.
+              </div>
+            </div>
+            <Link
+              to="/return"
+              className="btn-secondary !py-2 !px-4 text-xs font-bold whitespace-nowrap self-start sm:self-auto"
+            >
+              Lihat Detail Pengembalian
+            </Link>
+          </div>
+        ) : null
+      )}
       {/* Soft, Low-Contrast Renewable Green Hero Card + Integrated Stepper */}
       <div className="bg-gradient-to-br from-emerald-50/95 via-green-50/75 to-teal-50/80 border border-emerald-200/70 rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-xs">
         <div className="absolute right-0 top-0 -mr-16 -mt-16 w-72 h-72 bg-emerald-200/25 rounded-full blur-3xl pointer-events-none" />
@@ -567,6 +645,22 @@ export default function Dashboard() {
                   ) : (
                     <p className="text-xs text-slate-400 italic">Sedang memilih perlengkapan di katalog</p>
                   )}
+                </div>
+
+                {/* Kontak Panitia via WhatsApp */}
+                <div className="pt-2 border-t border-emerald-100/60 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400">Koordinasi pemakaian bersama:</span>
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `Halo ${ev.borrowerName} (${ev.org}), saya ingin bertanya mengenai peminjaman perlengkapan di event "${ev.eventName}" yang sedang berjalan via EventLoop Prasmul.`
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-100/70 hover:bg-emerald-200/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Kontak Panitia (WhatsApp)</span>
+                  </a>
                 </div>
               </div>
             ))}

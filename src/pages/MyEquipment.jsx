@@ -14,7 +14,8 @@ import {
   User,
   Calendar,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  MessageCircle
 } from 'lucide-react'
 
 export default function MyEquipment() {
@@ -204,6 +205,18 @@ export default function MyEquipment() {
                               <Calendar className="w-3.5 h-3.5 text-emerald-600" />
                               <span>Dipinjam: <strong>{b.startDate}</strong> s/d <strong>{b.endDate}</strong> ({b.durationDays} hari)</span>
                             </div>
+
+                            <a
+                              href={`https://wa.me/?text=${encodeURIComponent(
+                                `Halo ${b.borrowerName} (${b.org}), saya pemilik inventaris "${item.name}" di EventLoop. Ingin koordinasi terkait pengembalian perlengkapan event "${b.eventName}" pada tanggal ${b.endDate} ke ${item.lastLocation || 'Warehouse Kampus'}.`
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-100/70 hover:bg-emerald-200/80 px-2.5 py-1 rounded-lg transition-colors mt-1 cursor-pointer"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Hubungi Peminjam (WhatsApp)</span>
+                            </a>
                           </div>
                         ))}
                       </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import Spinner from '../components/Spinner'
 import { 
@@ -12,12 +12,14 @@ import {
   MapPin,
   ShoppingBag,
   ArrowRight,
-  Clock
+  Clock,
+  Calendar
 } from 'lucide-react'
 
 const categories = ['All', 'Booth', 'Signage', 'Furniture', 'Electronics', 'Decoration', 'Others']
 
 export default function Marketplace() {
+  const navigate = useNavigate()
   const { 
     equipments, 
     cartItems, 
@@ -55,6 +57,10 @@ export default function Marketplace() {
     e.preventDefault()
     e.stopPropagation()
     if (isLockedByActivePayment) return
+    if (item.available <= 0 && !isInCart(item.id)) {
+      navigate(`/equipment/${item.id}`)
+      return
+    }
     if (isInCart(item.id)) {
       removeFromCart(item.id)
     } else {
@@ -266,6 +272,8 @@ export default function Marketplace() {
                         ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                         : reserved
                         ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : item.available <= 0
+                        ? 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
                         : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs'
                     }`}
                   >
@@ -278,6 +286,11 @@ export default function Marketplace() {
                       <>
                         <Check className="w-3.5 h-3.5" />
                         <span>Terpilih</span>
+                      </>
+                    ) : item.available <= 0 ? (
+                      <>
+                        <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Booking Nanti</span>
                       </>
                     ) : (
                       <>

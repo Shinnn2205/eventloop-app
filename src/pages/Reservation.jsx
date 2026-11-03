@@ -15,7 +15,8 @@ import {
   Eye, 
   RotateCcw,
   Package,
-  X
+  X,
+  MessageSquare
 } from 'lucide-react'
 
 // Fungsi Kompresi Foto Bukti Transfer QRIS
@@ -343,6 +344,17 @@ export default function Reservation() {
               </p>
             </div>
 
+            {/* Kebijakan Jaminan & Denda Keterlambatan */}
+            <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200/80 text-[11px] text-slate-600 space-y-1">
+              <div className="font-semibold text-slate-800 flex items-center justify-between">
+                <span>🛡️ Jaminan & Ketentuan Denda</span>
+                <span className="text-emerald-700 font-bold">Deposit Rp0</span>
+              </div>
+              <p className="text-[10px] text-slate-500 leading-relaxed">
+                Bebas deposit dengan verifikasi akun resmi kampus. Denda keterlambatan berlaku <strong>Rp25.000 / hari</strong> jika tidak ada konfirmasi perpanjangan sewa sebelum batas tanggal berakhir.
+              </p>
+            </div>
+
             {userPaymentStatus === 'idle' ? (
               <button
                 disabled={displayItems.length === 0}
@@ -353,10 +365,23 @@ export default function Reservation() {
                 <span>Bayar via QRIS & Upload Bukti</span>
               </button>
             ) : (
-              <div className="p-3 rounded-xl bg-emerald-50 text-emerald-800 text-center text-xs font-semibold border border-emerald-200">
-                {userPaymentStatus === 'approved'
-                  ? '✓ Pembayaran Telah Disetujui Admin'
-                  : '⏳ Menunggu Verifikasi Admin'}
+              <div className="space-y-2">
+                <div className="p-3 rounded-xl bg-emerald-50 text-emerald-800 text-center text-xs font-semibold border border-emerald-200">
+                  {userPaymentStatus === 'approved'
+                    ? '✓ Pembayaran Telah Disetujui Admin'
+                    : '⏳ Menunggu Verifikasi Admin'}
+                </div>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(
+                    `Halo Admin EventLoop, saya PIC event "${activeReservation?.eventName || 'Kegiatan Mahasiswa'}". Ingin konfirmasi status verifikasi pembayaran & jadwal pengambilan perlengkapan.`
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full btn-secondary text-xs !py-2.5 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Hubungi Admin Escrow (WhatsApp)</span>
+                </a>
               </div>
             )}
           </div>

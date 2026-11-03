@@ -9,7 +9,10 @@ import {
   AlertCircle,
   Clock,
   PlusCircle,
-  ClipboardList
+  ClipboardList,
+  AlertTriangle,
+  ShieldCheck,
+  MessageSquare
 } from 'lucide-react'
 
 // Fungsi Kompresi Foto
@@ -58,6 +61,20 @@ export default function ReturnPage() {
 
   const currentItem = rentedItems.find(i => i.id === selectedItemId) || rentedItems[0]
   const currentOriginLocation = currentItem?.lastLocation || currentItem?.initialLocation || 'Warehouse Kampus Gedung C (Rak B-04)'
+
+  const calculateOverdueDays = () => {
+    const endStr = activeReservation?.endDateLabel || activeReservation?.endDate
+    if (!endStr) return 0
+    const d = new Date(endStr)
+    if (isNaN(d.getTime())) return 0
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    d.setHours(0, 0, 0, 0)
+    const diff = Math.round((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
+    return Math.max(0, diff)
+  }
+
+  const overdueDays = calculateOverdueDays()
 
   const [conditionPhoto, setConditionPhoto] = useState(null)
   const [conditionTime, setConditionTime] = useState('')
@@ -143,6 +160,42 @@ export default function ReturnPage() {
           Kembalikan setiap perlengkapan ke tempat pengambilan asalnya dan lampirkan dua foto dokumentasi ber-timestamp.
         </p>
       </div>
+
+      {/* STATUS KETERLAMBATAN & KEBIJAKAN DENDA */}
+      {rentedItems.length > 0 && userPaymentStatus === 'approved' && (
+        <div className="card p-4 bg-emerald-50/40 border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold ${
+              overdueDays > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'
+            }`}>
+              {overdueDays > 0 ? <AlertTriangle className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+            </div>
+            <div>
+              <div className="font-bold text-slate-900">
+                {overdueDays > 0 
+                  ? `Status: Melewati Batas ${overdueDays} Hari` 
+                  : 'Status Pengembalian: Tepat Waktu (Bebas Denda)'
+                }
+              </div>
+              <div className="text-[11px] text-slate-500">
+                Batas Akhir: <strong>{activeReservation?.endDateLabel || activeReservation?.endDate || '06 Nov 2026'}</strong> · Denda Terlambat: <strong className={overdueDays > 0 ? 'text-rose-700 font-bold' : 'text-emerald-700'}>Rp{(overdueDays > 0 ? overdueDays * 25000 : 0).toLocaleString('id-ID')}</strong> (Rp25.000/hari)
+              </div>
+            </div>
+          </div>
+
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(
+              `Halo Admin Gudang EventLoop, saya PIC event "${activeReservation?.eventName}". Ingin konfirmasi jadwal serah terima pengembalian perlengkapan ke rak gudang.`
+            )}`}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-secondary !py-2 !px-3 text-[11px] flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Kontak Admin Gudang (WhatsApp)</span>
+          </a>
+        </div>
+      )}
 
       {/* KONDISI 1: PEMBAYARAN MASIH MENUNGGU VERIFIKASI ADMIN */}
       {userPaymentStatus === 'pending_admin_approval' ? (

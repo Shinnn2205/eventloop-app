@@ -11,6 +11,7 @@ import ReturnPage from './pages/ReturnPage'
 import ImpactDashboard from './pages/ImpactDashboard'
 import UploadEquipment from './pages/UploadEquipment'
 import MyEquipment from './pages/MyEquipment'
+import ProfilePage from './pages/ProfilePage'
 import AdminPanel from './pages/AdminPanel'
 import Layout from './components/Layout'
 import { AppProvider, useApp } from './context/AppContext'
@@ -105,6 +106,7 @@ function App() {
             <Route path="/reservation" element={<Reservation />} />
             <Route path="/return" element={<ReturnPage />} />
             <Route path="/impact" element={<ImpactDashboard />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/admin" element={
               <ProtectedRoute adminOnly={true}>
                 <AdminPanel />
