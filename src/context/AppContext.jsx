@@ -35,19 +35,17 @@ export const validateNimStructure = (nimStr) => {
   if (!/^\d{11}$/.test(clean)) {
     return {
       isValid: false,
-      message: 'NIM harus terdiri dari tepat 11 digit angka (3 digit Jurusan + 2 digit Angkatan + 6 digit No. Urut).'
+      message: 'NIM harus terdiri dari tepat 11 digit angka.'
     }
   }
   const prodi = clean.slice(0, 3)
-  const angkatan = clean.slice(3, 5)
-  const nomor = clean.slice(5, 11)
   
-  const angkatanNum = parseInt(angkatan, 10)
-  if (isNaN(angkatanNum) || angkatanNum < 15 || angkatanNum > 30) {
-    return {
-      isValid: false,
-      message: `Tahun angkatan (digit ke-4 & 5: "${angkatan}") tidak valid.`
-    }
+  // Deteksi angkatan: posisi 3-5 atau jika ada angka 0 di posisi ke-4, ada di posisi 4-6 (cth: 23302410001 -> 2024)
+  let angkatan = clean.slice(3, 5)
+  let nomor = clean.slice(5)
+  if (clean[3] === '0') {
+    angkatan = clean.slice(4, 6)
+    nomor = clean.slice(6)
   }
 
   return {

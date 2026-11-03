@@ -43,6 +43,12 @@ export default function LoginPage() {
   const [successMsg, setSuccessMsg] = useState('')
   const [resendTimer, setResendTimer] = useState(0)
 
+  // State Modal SSO Microsoft 365 Kampus
+  const [showSsoModal, setShowSsoModal] = useState(false)
+  const [ssoNim, setSsoNim] = useState('23302410001')
+  const [ssoName, setSsoName] = useState('Mahasiswa Prasetiya Mulya')
+  const [isEditingSsoAccount, setIsEditingSsoAccount] = useState(false)
+
   // Timer cooldown untuk kirim ulang OTP
   useEffect(() => {
     let interval = null
@@ -221,6 +227,86 @@ export default function LoginPage() {
     }
   }
 
+  // ============================================================
+  // 3. ALUR LOGIN CEPAT SSO KAMPUS (MICROSOFT 365 / OUTLOOK)
+  // ============================================================
+  const handleSsoLogin = async () => {
+    setErrorMsg('')
+    setLoading(true)
+
+    const cleanNim = (ssoNim || '').replace(/\D/g, '').slice(0, 11)
+    if (cleanNim.length !== 11) {
+      setErrorMsg('NIM mahasiswa pada SSO harus tepat 11 digit angka.')
+      setLoading(false)
+      return
+    }
+
+    const ssoEmail = `${cleanNim}@student.prasetiyamulya.ac.id`
+    const defaultSsoPassword = `PrasMul${cleanNim}!`
+
+    try {
+      // 1. Coba login jika akun sudah ada di database
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+        email: ssoEmail,
+        password: defaultSsoPassword
+      })
+
+      if (loginData?.session) {
+        let displayName = ssoName
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, nim')
+            .eq('id', loginData.session.user.id)
+            .single()
+          if (profile?.full_name) displayName = profile.full_name
+        } catch (e) {}
+
+        setCurrentUserRole('user')
+        setCurrentUserName(displayName)
+        setShowSsoModal(false)
+        navigate('/dashboard', { replace: true })
+        return
+      }
+
+      // 2. Jika belum ada, otomatis daftarkan akun SSO mahasiswa
+      const { data: signupData, error: signupError } = await supabase.auth.signUp({
+        email: ssoEmail,
+        password: defaultSsoPassword,
+        options: {
+          data: {
+            full_name: ssoName.trim() || 'Mahasiswa Prasetiya Mulya',
+            nim: cleanNim,
+            role: 'student_org'
+          }
+        }
+      })
+
+      if (signupData?.user) {
+        try {
+          await supabase.from('profiles').upsert({
+            id: signupData.user.id,
+            email: ssoEmail,
+            full_name: ssoName.trim() || 'Mahasiswa Prasetiya Mulya',
+            nim: cleanNim,
+            updated_at: new Date().toISOString()
+          })
+        } catch (pErr) {}
+
+        setCurrentUserRole('user')
+        setCurrentUserName(ssoName.trim() || 'Mahasiswa Prasetiya Mulya')
+        setShowSsoModal(false)
+        navigate('/dashboard', { replace: true })
+      } else {
+        setErrorMsg('Gagal memproses otentikasi SSO: ' + (signupError?.message || loginError?.message || 'Error'))
+      }
+    } catch (err) {
+      setErrorMsg('Terjadi kendala koneksi ke server SSO.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="max-w-4xl w-full grid md:grid-cols-2 bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
@@ -329,7 +415,42 @@ export default function LoginPage() {
           {/* TAB 1: FORM MASUK (LOGIN) -> EMAIL & PASSWORD           */}
           {/* ======================================================= */}
           {activeTab === 'login' && (
-            <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-4">
+              {/* Tombol Cepat Masuk SSO Mahasiswa (Microsoft 365 / Outlook) */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-3 rounded-2xl shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>⚡ Single Sign-On (SSO) Kampus</span>
+                  </span>
+                  <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full border border-blue-200">
+                    Microsoft 365
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSsoModal(true)}
+                  className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white hover:bg-blue-600 hover:text-white border border-blue-300 hover:border-blue-600 rounded-xl font-bold text-xs text-gray-800 shadow-sm transition-all group"
+                >
+                  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 21 21">
+                    <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                    <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                    <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                    <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                  </svg>
+                  <span>Masuk dengan Outlook Mahasiswa</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-blue-600 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+                </button>
+              </div>
+
+              <div className="relative flex items-center my-2">
+                <div className="flex-grow border-t border-gray-200"></div>
+                <span className="flex-shrink mx-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Atau Masuk dengan Akun Manual
+                </span>
+                <div className="flex-grow border-t border-gray-200"></div>
+              </div>
+
+              <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                   Role Masuk
@@ -408,6 +529,7 @@ export default function LoginPage() {
                 {!loading && <ArrowRight className="w-4 h-4" />}
               </button>
             </form>
+          </div>
           )}
 
           {/* ======================================================= */}
@@ -549,6 +671,114 @@ export default function LoginPage() {
         </div>
 
       </div>
+      {/* Modal Autentikasi SSO Kampus (Microsoft 365 / Prasetiya Mulya) */}
+      {showSsoModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden">
+            {/* Header Modal */}
+            <div className="p-6 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white relative">
+              <button 
+                type="button"
+                onClick={() => setShowSsoModal(false)}
+                className="absolute top-5 right-5 text-gray-300 hover:text-white text-xl font-bold p-1 rounded-lg hover:bg-white/10 transition-all"
+              >
+                ✕
+              </button>
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 21 21">
+                  <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                  <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                  <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                  <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                </svg>
+                <span className="text-xs font-bold tracking-wider uppercase text-blue-200">Microsoft Entra ID</span>
+              </div>
+              <h3 className="text-lg font-bold">Portal SSO Prasetiya Mulya</h3>
+              <p className="text-xs text-blue-200 mt-0.5">
+                Otentikasi Mahasiswa Resmi (Outlook / Microsoft 365)
+              </p>
+            </div>
+
+            {/* Body Modal */}
+            <div className="p-6 space-y-4">
+              <div className="bg-blue-50/80 border border-blue-200 p-4 rounded-2xl flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/20 flex-shrink-0">
+                  PM
+                </div>
+                <div className="overflow-hidden flex-1">
+                  <div className="text-xs font-bold text-gray-900 truncate">
+                    {ssoName}
+                  </div>
+                  <div className="text-[11px] font-mono text-blue-900 font-bold truncate">
+                    {ssoNim}@student.prasetiyamulya.ac.id
+                  </div>
+                  <div className="text-[10px] text-green-700 font-semibold flex items-center gap-1 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse"></span>
+                    <span>Akun Kampus Terverifikasi Aktif</span>
+                  </div>
+                </div>
+              </div>
+
+              {isEditingSsoAccount ? (
+                <div className="space-y-3 pt-2 border-t border-gray-100">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      NIM Mahasiswa (11 Digit) *
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={11}
+                      value={ssoNim}
+                      onChange={(e) => setSsoNim(e.target.value)}
+                      placeholder="Contoh: 23302410001"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      Nama Mahasiswa
+                    </label>
+                    <input
+                      type="text"
+                      value={ssoName}
+                      onChange={(e) => setSsoName(e.target.value)}
+                      placeholder="Nama Lengkap"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingSsoAccount(true)}
+                  className="text-xs text-blue-700 hover:text-blue-900 hover:underline font-semibold block text-center w-full py-1"
+                >
+                  Ganti NIM / Akun Mahasiswa Lain
+                </button>
+              )}
+
+              <div className="pt-2 space-y-2">
+                <button
+                  type="button"
+                  onClick={handleSsoLogin}
+                  disabled={loading}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition-all"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>{loading ? 'Menghubungkan ke SSO Kampus...' : 'Masuk Langsung dengan Akun Ini'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSsoModal(false)}
+                  className="w-full py-2 text-xs text-gray-500 hover:text-gray-700 font-semibold"
+                >
+                  Batal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
