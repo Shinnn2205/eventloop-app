@@ -80,17 +80,7 @@ export default function Layout() {
           </button>
         </div>
 
-        {/* ROLE INDICATOR BADGE */}
-        <div className="px-6 pt-4 pb-2">
-          <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${
-            currentUserRole === 'admin' 
-              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-              : 'bg-green-100 text-green-800 border border-green-200'
-          }`}>
-            <span className={`w-2 h-2 rounded-full ${currentUserRole === 'admin' ? 'bg-emerald-600 animate-pulse' : 'bg-green-600'}`}></span>
-            Role: {currentUserRole === 'admin' ? 'Sarpras Kampus' : 'Student Org'}
-          </div>
-        </div>
+        
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
