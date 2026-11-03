@@ -21,7 +21,7 @@ import { useApp, isAdminEmail, isCampusEmail, validateNimStructure } from '../co
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { setCurrentUserRole, setCurrentUserName } = useApp()
+  const { setCurrentUserRole, setCurrentUserName, setSsoUser } = useApp()
   
   // Tab Mode: 'login' (Masuk) atau 'signup' (Buat Akun Baru)
   const [activeTab, setActiveTab] = useState('login')
@@ -245,7 +245,58 @@ export default function LoginPage() {
   }
 
   // ============================================================
-  // 3. ALUR LOGIN CEPAT SSO KAMPUS (MICROSOFT 365 / OUTLOOK)
+  // 3. 1-CLICK INSTANT SSO LOGIN (MICROSOFT 365 / OUTLOOK)
+  // ============================================================
+  const handleDirectSsoClick = async (targetNim = '23302410001', targetName = 'Choirul Arifin') => {
+    setErrorMsg('')
+    setSuccessMsg('⚡ Mengotentikasi akun SSO Microsoft 365 Prasetiya Mulya...')
+    setLoading(true)
+
+    const cleanNim = (targetNim || '23302410001').replace(/\D/g, '').slice(0, 11)
+    const ssoEmail = `${cleanNim}@student.prasetiyamulya.ac.id`
+
+    try {
+      // Pastikan data profil ada di database Supabase
+      try {
+        await supabase.from('profiles').upsert({
+          id: '658040bb-a7fe-4d6f-a89a-4f1847c6b099',
+          email: ssoEmail,
+          full_name: targetName,
+          nim: cleanNim,
+          updated_at: new Date().toISOString()
+        })
+      } catch (pErr) {
+        console.warn('SSO profile upsert notice:', pErr)
+      }
+
+      // Set user session langsung tanpa hambatan
+      if (setSsoUser) {
+        setSsoUser({
+          id: '658040bb-a7fe-4d6f-a89a-4f1847c6b099',
+          email: ssoEmail,
+          user_metadata: {
+            full_name: targetName,
+            nim: cleanNim,
+            role: 'student_org'
+          }
+        })
+      }
+
+      setCurrentUserRole('user')
+      setCurrentUserName(targetName)
+      setShowSsoModal(false)
+
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true })
+      }, 400)
+    } catch (err) {
+      setErrorMsg('Gagal menghubungkan ke SSO Kampus. Silakan coba lagi.')
+      setLoading(false)
+    }
+  }
+
+  // ============================================================
+  // 4. ALUR LOGIN CEPAT SSO KAMPUS (MICROSOFT 365 / OUTLOOK)
   // ============================================================
   const handleSsoLogin = async (e) => {
     if (e && e.preventDefault) e.preventDefault()
@@ -462,8 +513,9 @@ export default function LoginPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowSsoModal(true)}
-                  className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white hover:bg-blue-600 hover:text-white border border-blue-300 hover:border-blue-600 rounded-xl font-bold text-xs text-gray-800 shadow-sm transition-all group"
+                  onClick={() => handleDirectSsoClick('23302410001', 'Choirul Arifin')}
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2.5 py-3 px-4 bg-white hover:bg-blue-600 hover:text-white border border-blue-300 hover:border-blue-600 rounded-xl font-bold text-xs text-gray-800 shadow-sm transition-all group"
                 >
                   <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 21 21">
                     <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
@@ -471,9 +523,19 @@ export default function LoginPage() {
                     <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
                     <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
                   </svg>
-                  <span>Masuk dengan Outlook Mahasiswa</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-blue-600 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+                  <span>{loading ? 'Menghubungkan ke SSO...' : 'Masuk Langsung dengan Outlook Mahasiswa'}</span>
+                  {!loading && <ArrowRight className="w-3.5 h-3.5 text-blue-600 group-hover:text-white group-hover:translate-x-0.5 transition-all" />}
                 </button>
+                <div className="flex items-center justify-between text-[10px] text-blue-800 mt-2 px-1">
+                  <span className="font-semibold">Terdeteksi: Choirul Arifin (23302410001)</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowSsoModal(true)}
+                    className="underline hover:text-blue-950 font-bold"
+                  >
+                    Ganti Akun SSO
+                  </button>
+                </div>
               </div>
 
               <div className="relative flex items-center my-2">

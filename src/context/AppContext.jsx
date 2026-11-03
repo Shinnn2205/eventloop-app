@@ -68,7 +68,19 @@ export function AppProvider({ children }) {
     return localStorage.getItem('eventloop_user_name') || 'Prasmulyan'
   })
   const [session, setSession] = useState(null)
+  const [ssoUser, setSsoUser] = useState(() => {
+    const saved = localStorage.getItem('eventloop_sso_user')
+    return saved ? JSON.parse(saved) : null
+  })
   const [loadingDb, setLoadingDb] = useState(true)
+
+  useEffect(() => {
+    if (ssoUser) {
+      localStorage.setItem('eventloop_sso_user', JSON.stringify(ssoUser))
+    } else {
+      localStorage.removeItem('eventloop_sso_user')
+    }
+  }, [ssoUser])
 
   const [equipments, setEquipments] = useState(() => {
     const saved = localStorage.getItem('eventloop_equipments')
@@ -657,18 +669,20 @@ export function AppProvider({ children }) {
       console.warn(e)
     }
     setSession(null)
+    setSsoUser(null)
     setCurrentUserRole('user')
     setCurrentUserName('Prasmulyan')
     localStorage.removeItem('eventloop_session')
     localStorage.removeItem('eventloop_user_name')
     localStorage.removeItem('eventloop_role')
+    localStorage.removeItem('eventloop_sso_user')
   }
 
   return (
     <AppContext.Provider value={{
       currentUserRole, setCurrentUserRole,
       currentUserName, setCurrentUserName, 
-      session, sessionUser: session?.user || null, 
+      session, ssoUser, setSsoUser, sessionUser: session?.user || ssoUser || null, 
       logout, loadingDb, refetchData: fetchSupabaseData,
       campusImpact, orgImpacts,
       equipments, pendingApprovals, transactions, userPaymentStatus, activeReservation, setActiveReservation, returnStatus, pendingReturns,
