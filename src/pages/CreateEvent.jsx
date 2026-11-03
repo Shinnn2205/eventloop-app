@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { useApp } from '../context/AppContext'
+import { useApp, formatIdDate } from '../context/AppContext'
 import { 
   CalendarPlus, 
   Sparkles, 
-  CheckCircle2, 
   ArrowRight, 
   Plus, 
   Clock, 
@@ -50,11 +49,56 @@ export default function CreateEvent() {
   const [eventName, setEventName] = useState('')
   const [orgName, setOrgName] = useState(currentUserName || 'BEM Universitas Prasetiya Mulya')
   const [eventType, setEventType] = useState('Seminar')
-  const [eventDate, setEventDate] = useState('25 Nov 2026')
-  const [durationDays, setDurationDays] = useState(1)
+  const [startDate, setStartDate] = useState('2026-11-25')
+  const [endDate, setEndDate] = useState('2026-11-27')
+  const [durationDays, setDurationDays] = useState(2)
   const [location, setLocation] = useState('Auditorium Kampus BSD')
   const [attendees, setAttendees] = useState('250')
   const [showRecommendation, setShowRecommendation] = useState(false)
+
+  // Hitung selisih hari saat tanggal mulai / selesai berubah
+  const handleStartDateChange = (val) => {
+    setStartDate(val)
+    if (val && endDate) {
+      const s = new Date(val)
+      const e = new Date(endDate)
+      if (e >= s) {
+        const diff = Math.max(1, Math.round((e - s) / (1000 * 60 * 60 * 24)) || 1)
+        setDurationDays(diff)
+      } else {
+        setEndDate(val)
+        setDurationDays(1)
+      }
+    }
+  }
+
+  const handleEndDateChange = (val) => {
+    setEndDate(val)
+    if (startDate && val) {
+      const s = new Date(startDate)
+      const e = new Date(val)
+      if (e >= s) {
+        const diff = Math.max(1, Math.round((e - s) / (1000 * 60 * 60 * 24)) || 1)
+        setDurationDays(diff)
+      }
+    }
+  }
+
+  const handleDurationChange = (daysVal) => {
+    const d = Math.max(1, parseInt(daysVal, 10) || 1)
+    setDurationDays(d)
+    if (startDate) {
+      const s = new Date(startDate)
+      if (!isNaN(s.getTime())) {
+        const e = new Date(s)
+        e.setDate(s.getDate() + d)
+        setEndDate(e.toISOString().split('T')[0])
+      }
+    }
+  }
+
+  const startDateLabel = formatIdDate(startDate) || startDate
+  const endDateLabel = formatIdDate(endDate) || endDate
 
   const handleGenerate = (e) => {
     e.preventDefault()
@@ -62,7 +106,12 @@ export default function CreateEvent() {
     updateActiveEventDetails({
       eventName: eventName || `${eventType} Kampus Prasmul`,
       org: orgName,
-      eventDate: `${eventDate} (${durationDays} Hari)`,
+      borrowerName: currentUserName || 'Prasmulyan',
+      startDate,
+      endDate,
+      startDateLabel,
+      endDateLabel,
+      eventDate: `${startDateLabel} – ${endDateLabel}`,
       durationDays: Math.max(1, Number(durationDays) || 1),
       type: eventType,
       location
@@ -110,8 +159,10 @@ export default function CreateEvent() {
               <strong className="text-slate-800">{activeReservation.org}</strong>
             </div>
             <div className="flex justify-between py-1 border-b border-emerald-100/70">
-              <span className="text-slate-500">Jadwal & Durasi Sewa</span>
-              <strong className="text-emerald-700">{activeReservation.eventDate} ({activeReservation.durationDays || 1} Hari)</strong>
+              <span className="text-slate-500">Periode Peminjaman</span>
+              <strong className="text-emerald-700">
+                {activeReservation.startDateLabel ? `${activeReservation.startDateLabel} s/d ${activeReservation.endDateLabel}` : activeReservation.eventDate} ({activeReservation.durationDays || 1} Hari)
+              </strong>
             </div>
             <div className="flex justify-between py-1">
               <span className="text-slate-500">Status Saat Ini</span>
@@ -171,7 +222,7 @@ export default function CreateEvent() {
           Buat Kegiatan Baru
         </h2>
         <p className="text-sm text-slate-500 mt-1">
-          Isi rincian acara dan lama hari peminjaman. Biaya sewa perlengkapan akan dihitung otomatis sesuai jumlah hari kegiatan.
+          Tentukan tanggal mulai dan tanggal selesai acara agar jadwal peminjaman perlengkapan tercatat transparan di Dashboard.
         </p>
       </div>
 
@@ -229,19 +280,34 @@ export default function CreateEvent() {
             <div className="grid sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Tanggal Mulai
+                  Dari Tanggal (Mulai)
                 </label>
                 <input 
-                  type="text" 
-                  value={eventDate} 
-                  onChange={(e) => setEventDate(e.target.value)}
+                  type="date" 
+                  required
+                  value={startDate} 
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  className="cozy-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Sampai Tanggal (Selesai)
+                </label>
+                <input 
+                  type="date" 
+                  required
+                  min={startDate}
+                  value={endDate} 
+                  onChange={(e) => handleEndDateChange(e.target.value)}
                   className="cozy-input"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-emerald-700 mb-1.5 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" /> Durasi Sewa (Hari)
+                  <Clock className="w-3.5 h-3.5" /> Total Durasi (Hari)
                 </label>
                 <input 
                   type="number" 
@@ -249,8 +315,22 @@ export default function CreateEvent() {
                   max="30"
                   required
                   value={durationDays} 
-                  onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value) || 1))}
+                  onChange={(e) => handleDurationChange(e.target.value)}
                   className="cozy-input font-semibold text-emerald-800 border-emerald-300 bg-emerald-50/50"
+                />
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Lokasi Pelaksanaan di Kampus
+                </label>
+                <input 
+                  type="text" 
+                  value={location} 
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="cozy-input"
                 />
               </div>
 
@@ -267,20 +347,8 @@ export default function CreateEvent() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Lokasi Pelaksanaan di Kampus
-              </label>
-              <input 
-                type="text" 
-                value={location} 
-                onChange={(e) => setLocation(e.target.value)}
-                className="cozy-input"
-              />
-            </div>
-
             <div className="p-3.5 bg-emerald-50/60 rounded-xl border border-emerald-100 text-xs text-emerald-800 leading-relaxed">
-              💡 <strong>Perhitungan Harian:</strong> Untuk durasi <strong>{durationDays} hari</strong>, tarif sewa perlengkapan akan dikalikan otomatis dengan {durationDays} hari pada halaman pembayaran.
+              📅 <strong>Jadwal Peminjaman:</strong> Perlengkapan akan tercatat dipinjam mulai <strong>{startDateLabel}</strong> sampai <strong>{endDateLabel}</strong> (<strong>{durationDays} hari</strong>) sehingga mahasiswa lain mengetahui kapan barang selesai digunakan.
             </div>
 
             <div className="pt-2">
@@ -298,7 +366,7 @@ export default function CreateEvent() {
             <div className="card p-6 space-y-5 border-emerald-200 bg-emerald-50/40">
               <div className="flex items-center justify-between">
                 <span className="badge-sage">Kegiatan Tersimpan</span>
-                <span className="text-xs font-semibold text-emerald-700">Durasi: {durationDays} Hari</span>
+                <span className="text-xs font-semibold text-emerald-700">{startDateLabel} – {endDateLabel}</span>
               </div>
 
               <div>
@@ -306,7 +374,7 @@ export default function CreateEvent() {
                   Rekomendasi Paket {eventType}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Untuk kegiatan <strong>{eventName}</strong> ({attendees} peserta):
+                  Untuk kegiatan <strong>{eventName}</strong> ({durationDays} hari):
                 </p>
               </div>
 

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { 
@@ -13,7 +14,11 @@ import {
   CheckCircle2,
   ClipboardList,
   Sparkles,
-  Award
+  Award,
+  Search,
+  MapPin,
+  User,
+  Clock
 } from 'lucide-react'
 
 export default function Dashboard() {
@@ -24,9 +29,12 @@ export default function Dashboard() {
     currentUserName, 
     equipments, 
     loadingDb, 
-    campusImpact 
+    campusImpact,
+    ongoingCampusEvents = []
   } = useApp()
   
+  const [trackingSearch, setTrackingSearch] = useState('')
+
   const hasActiveEvent = Boolean(activeReservation?.eventName)
   const displayItems = (cartItems && cartItems.length > 0) ? cartItems : (activeReservation?.items || [])
   const hasItems = displayItems.length > 0
@@ -72,6 +80,18 @@ export default function Dashboard() {
     { num: 4, title: 'Kembalikan', desc: 'Pulangkan ke lokasi asal', link: '/return' },
   ]
 
+  // Filter live tracking events berdasarkan pencarian
+  const filteredOngoingEvents = ongoingCampusEvents.filter(ev => {
+    if (!trackingSearch.trim()) return true
+    const q = trackingSearch.toLowerCase()
+    const matchEvent = (ev.eventName || '').toLowerCase().includes(q)
+    const matchOrg = (ev.org || '').toLowerCase().includes(q)
+    const matchBorrower = (ev.borrowerName || '').toLowerCase().includes(q)
+    const matchLoc = (ev.location || '').toLowerCase().includes(q)
+    const matchItems = (ev.items || []).some(it => (it.name || '').toLowerCase().includes(q))
+    return matchEvent || matchOrg || matchBorrower || matchLoc || matchItems
+  })
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Soft, Low-Contrast Renewable Green Hero Card + Integrated Stepper */}
@@ -88,7 +108,7 @@ export default function Dashboard() {
               {greeting}, <span className="text-emerald-800">{currentUserName || 'Prasmulyan'}</span> 🌿
             </h2>
             <p className="text-slate-600 text-sm max-w-xl leading-relaxed">
-              Kelola peminjaman perlengkapan acara kampus secara sirkular, hemat anggaran, dan ramah lingkungan.
+              Kelola peminjaman perlengkapan acara kampus secara sirkular, pantau lokasi barang secara *real-time*, dan jadwalkan kegiatan berikutnya dengan nyaman.
             </p>
           </div>
 
@@ -166,7 +186,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 4 Soft Sustainability Metric Cards (No Harsh Left Borders) */}
+      {/* 4 Soft Sustainability Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="card p-5 flex items-start gap-3.5">
           <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 border border-emerald-100">
@@ -221,7 +241,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Main Two Columns */}
+      {/* Main Two Columns: Event Saya & Quick Access */}
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left 2 Columns: Active Event Status */}
         <div className="lg:col-span-2 card p-6 flex flex-col justify-between">
@@ -233,7 +253,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-sm">
-                    Kegiatan & Peminjaman Aktif
+                    Kegiatan & Peminjaman Aktif Saya
                   </h3>
                   <p className="text-[11px] text-slate-400">Status event dan perlengkapan yang sedang Anda pinjam</p>
                 </div>
@@ -266,7 +286,9 @@ export default function Dashboard() {
                       {activeReservation.eventName}
                     </h4>
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 mt-1.5">
-                      <span>📅 {activeReservation.eventDate}</span>
+                      <span>
+                        📅 <strong>{activeReservation.startDateLabel ? `${activeReservation.startDateLabel} s/d ${activeReservation.endDateLabel}` : activeReservation.eventDate}</strong>
+                      </span>
                       <span>·</span>
                       <span className="font-semibold text-emerald-700">⏱️ Durasi {activeReservation.durationDays || 1} Hari</span>
                       {activeReservation.location && (
@@ -336,7 +358,7 @@ export default function Dashboard() {
                 <div>
                   <h4 className="text-sm font-bold text-slate-800">Belum Ada Kegiatan Aktif</h4>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
-                    Daftarkan kegiatan Anda terlebih dahulu untuk menentukan durasi hari peminjaman perlengkapan.
+                    Daftarkan kegiatan Anda terlebih dahulu untuk menentukan tanggal mulai dan tanggal selesai peminjaman perlengkapan.
                   </p>
                 </div>
                 <Link to="/create-event" className="btn-primary text-xs !py-2.5 !px-5 inline-flex items-center gap-1.5">
@@ -369,7 +391,7 @@ export default function Dashboard() {
               >
                 <span className="flex items-center gap-2.5">
                   <DollarSign className="w-4 h-4 text-emerald-600" />
-                  Cek Payout & Bukti Transfer
+                  Cek Barang Saya & Peminjam
                 </span>
                 <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
               </Link>
@@ -409,6 +431,138 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* LIVE TRACKING: EVENT & PEMINJAMAN BARANG YANG SEDANG BERJALAN DI KAMPUS */}
+      <div className="card p-6 space-y-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-emerald-100/80">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 border border-emerald-100 mt-0.5">
+              <Clock className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-slate-900 text-base">
+                  Live Tracking: Event & Peminjaman Barang Sedang Berjalan
+                </h3>
+                <span className="badge-sage !text-[10px]">
+                  {ongoingCampusEvents.length} Event Aktif
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Pantau barang apa saja yang sedang dipakai oleh kegiatan lain, lokasi barang saat ini, serta tanggal berakhirnya agar Anda tahu kapan barang siap dipinjam.
+              </p>
+            </div>
+          </div>
+
+          <div className="relative w-full md:w-72">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={trackingSearch}
+              onChange={(e) => setTrackingSearch(e.target.value)}
+              placeholder="Cari nama barang, event, peminjam..."
+              className="cozy-input !pl-9 !py-2 !text-xs"
+            />
+          </div>
+        </div>
+
+        {filteredOngoingEvents.length > 0 ? (
+          <div className="grid md:grid-cols-2 gap-4">
+            {filteredOngoingEvents.map((ev) => (
+              <div 
+                key={ev.id} 
+                className={`p-5 rounded-2xl border transition-all space-y-3.5 ${
+                  ev.isCurrentUser 
+                    ? 'bg-emerald-50/50 border-emerald-200' 
+                    : 'bg-slate-50/50 border-emerald-100/80 hover:bg-emerald-50/25'
+                }`}
+              >
+                {/* Header Event & Status */}
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-semibold text-emerald-700">
+                        {ev.org}
+                      </span>
+                      {ev.isCurrentUser && (
+                        <span className="text-[10px] font-bold bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+                          Event Anda
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="font-bold text-slate-900 text-sm mt-0.5">
+                      {ev.eventName}
+                    </h4>
+                  </div>
+                  <span className={ev.status.includes('Verifikasi') ? 'badge-warm' : 'badge-sage'}>
+                    {ev.status}
+                  </span>
+                </div>
+
+                {/* Info Peminjam, Tanggal Mulai - Selesai, dan Lokasi */}
+                <div className="grid sm:grid-cols-2 gap-2.5 p-3 bg-white rounded-xl border border-emerald-100/80 text-xs">
+                  <div className="flex items-start gap-2">
+                    <User className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Peminjam / PIC</span>
+                      <strong className="text-slate-800">{ev.borrowerName}</strong>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <span className="text-[10px] text-slate-400 block">Lokasi Event Saat Ini</span>
+                      <strong className="text-slate-800 truncate block" title={ev.location}>{ev.location}</strong>
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2 pt-2 border-t border-emerald-50 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-slate-500">Periode Pinjam:</span>
+                      <strong className="text-emerald-800">{ev.startDate} s/d {ev.endDate}</strong>
+                      <span className="text-[11px] text-slate-400">({ev.durationDays} hari)</span>
+                    </div>
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                      Bisa dipinjam lagi setelah: {ev.endDate}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Daftar Barang yang Sedang Dipinjam */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold text-slate-500 block">
+                    Barang yang Sedang Dipinjam ({ev.items?.length || 0} jenis):
+                  </span>
+                  {ev.items && ev.items.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {ev.items.map((it, idx) => (
+                        <div 
+                          key={idx}
+                          className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-emerald-100 text-xs text-slate-700 shadow-2xs"
+                        >
+                          <span>{it.image || '📦'}</span>
+                          <span className="font-medium text-slate-800">{it.name}</span>
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md">
+                            {it.qty} unit
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">Sedang memilih perlengkapan di katalog</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 bg-emerald-50/20 rounded-2xl border border-dashed border-emerald-200 text-xs text-slate-500">
+            Tidak ditemukan event atau barang yang sesuai dengan kata kunci <strong>"{trackingSearch}"</strong>.
+          </div>
+        )}
       </div>
     </div>
   )

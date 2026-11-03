@@ -10,18 +10,20 @@ import {
   Plus,
   Receipt,
   Eye,
-  X
+  X,
+  User,
+  Calendar
 } from 'lucide-react'
 
 export default function MyEquipment() {
-  const { equipments, pendingApprovals, currentUserName, transactions } = useApp()
+  const { equipments, pendingApprovals, currentUserName, transactions, getEquipmentBorrowings } = useApp()
   const [viewingPayoutProof, setViewingPayoutProof] = useState(null)
 
   const isMine = (uploader) => {
     if (!uploader) return false
     const uLow = String(uploader).toLowerCase()
     const nameLow = String(currentUserName || 'Prasmulyan').toLowerCase()
-    return uLow === 'currentuser' || uLow.includes(nameLow) || nameLow.includes(uLow) || uLow.includes('prasmul')
+    return uLow === 'currentuser' || uLow.includes(nameLow) || nameLow.includes(uLow) || uLow.includes('prasmul') || uLow.includes('admin')
   }
 
   const myApprovedEquipments = equipments.filter(item => isMine(item.uploader))
@@ -43,7 +45,7 @@ export default function MyEquipment() {
               Barang & Payout Saya
             </h2>
             <p className="text-sm text-slate-500">
-              Pantau status verifikasi perlengkapan, ketersediaan stok, serta bukti pencairan dana dari Admin.
+              Pantau siapa yang sedang meminjam barang Anda, untuk event apa, sampai tanggal berapa, serta bukti transfer dari Admin.
             </p>
           </div>
         </div>
@@ -90,12 +92,17 @@ export default function MyEquipment() {
         )}
       </div>
 
-      {/* SECTION 2: BARANG AKTIF DI MARKETPLACE */}
+      {/* SECTION 2: BARANG AKTIF DI MARKETPLACE + DETAIL PEMINJAM */}
       <div className="space-y-3 pt-4 border-t border-emerald-100">
-        <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          Aktif di Marketplace ({myApprovedEquipments.length})
-        </h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+          <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            Aktif di Marketplace & Status Peminjam ({myApprovedEquipments.length})
+          </h3>
+          <span className="text-xs text-slate-400">
+            Menampilkan informasi peminjam aktif, nama event, dan batas tanggal pinjam
+          </span>
+        </div>
         
         {myApprovedEquipments.length === 0 ? (
           <div className="card p-8 text-center text-xs text-slate-500 space-y-2.5 flex flex-col items-center">
@@ -103,40 +110,107 @@ export default function MyEquipment() {
             <p>Belum ada perlengkapan Anda yang tayang di katalog.</p>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {myApprovedEquipments.map(item => (
-              <div key={item.id} className="card p-4 flex flex-col gap-3">
-                <div className="flex gap-3 items-start border-b border-emerald-100/70 pb-3">
-                  <div className="w-12 h-12 bg-emerald-50/50 rounded-xl flex items-center justify-center border border-emerald-100 flex-shrink-0 overflow-hidden">
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+          <div className="grid sm:grid-cols-2 gap-4">
+            {myApprovedEquipments.map(item => {
+              const borrowedQty = Math.max(0, (Number(item.total) || 0) - (Number(item.available) || 0))
+              const activeBorrowers = getEquipmentBorrowings ? getEquipmentBorrowings(item.id, item.name) : []
+
+              return (
+                <div key={item.id} className="card p-5 flex flex-col justify-between gap-4">
+                  <div className="space-y-3">
+                    <div className="flex gap-3.5 items-start border-b border-emerald-100/70 pb-3.5">
+                      <div className="w-14 h-14 bg-emerald-50/50 rounded-xl flex items-center justify-center border border-emerald-100 flex-shrink-0 overflow-hidden">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-2xl opacity-80">{item.image || '📦'}</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-bold text-slate-900 text-sm leading-snug">{item.name}</h4>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          Total Inventaris: <strong className="text-slate-700">{item.total} unit</strong> · Rp{(item.price || 0).toLocaleString('id-ID')}/hari
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px] text-emerald-700 mt-1 truncate">
+                          <MapPin className="w-3 h-3 text-emerald-600 flex-shrink-0" />
+                          <span className="truncate" title={item.lastLocation}>Lokasi Asal: {item.lastLocation || 'Warehouse Kampus'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2.5 text-xs">
+                      <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                        <span className="text-[10px] text-slate-400 block">Tersedia di Gudang</span>
+                        <strong className="text-slate-800">{item.available} unit</strong>
+                      </div>
+                      <div className={`p-2.5 rounded-xl border ${
+                        borrowedQty > 0 || activeBorrowers.length > 0
+                          ? 'bg-emerald-50/80 border-emerald-200'
+                          : 'bg-slate-50 border-slate-100'
+                      }`}>
+                        <span className="text-[10px] text-emerald-700 block">Sedang Dipinjam</span>
+                        <strong className="text-emerald-900">
+                          {borrowedQty > 0 ? borrowedQty : activeBorrowers.reduce((s, b) => s + (b.qty || 1), 0)} unit
+                        </strong>
+                      </div>
+                    </div>
+
+                    {/* KETERANGAN SIAPA YANG MEMINJAM, EVENT APA, SAMPAI TANGGAL BERAPA */}
+                    {activeBorrowers.length > 0 ? (
+                      <div className="space-y-2 pt-1">
+                        <span className="text-[11px] font-semibold text-emerald-800 block">
+                          Detail Peminjam Saat Ini:
+                        </span>
+                        {activeBorrowers.map((b, bIdx) => (
+                          <div 
+                            key={bIdx} 
+                            className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-200/80 text-xs space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                                <User className="w-3.5 h-3.5 text-emerald-600" />
+                                {b.borrowerName} <span className="font-normal text-slate-500">({b.org})</span>
+                              </span>
+                              <span className="badge-sage !py-0.5 !px-2 !text-[10px]">
+                                {b.qty} unit
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-600">
+                              🎪 Event: <strong className="text-slate-800">{b.eventName}</strong> ({b.location})
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 font-medium pt-0.5">
+                              <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Dipinjam: <strong>{b.startDate}</strong> s/d <strong>{b.endDate}</strong> ({b.durationDays} hari)</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : borrowedQty > 0 ? (
+                      <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-200/80 text-xs space-y-1">
+                        <div className="font-bold text-slate-900 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-emerald-600" />
+                            Panitia Mahasiswa Prasmul
+                          </span>
+                          <span className="badge-sage !py-0.5 !px-2 !text-[10px]">{borrowedQty} unit</span>
+                        </div>
+                        <div className="text-[11px] text-slate-600">
+                          🎪 Event: <strong>Kegiatan Kampus Berjalan</strong>
+                        </div>
+                        <div className="text-[11px] text-emerald-800 font-medium">
+                          📅 Dipinjam: <strong>03 Nov 2026</strong> s/d <strong>06 Nov 2026</strong>
+                        </div>
+                      </div>
                     ) : (
-                      <span className="text-xl opacity-80">{item.image || '📦'}</span>
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-500 flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                        <span>Seluruh unit sedang berada di lokasi penyimpanan asal dan siap dipinjam.</span>
+                      </div>
                     )}
                   </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-sm leading-snug line-clamp-2">{item.name}</h4>
-                    <div className="text-[11px] text-slate-500 mt-0.5">Total: {item.total} unit</div>
-                  </div>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                    <span className="text-[10px] text-slate-400 block">Tersedia</span>
-                    <strong className="text-slate-800">{item.available} unit</strong>
-                  </div>
-                  <div className="p-2.5 bg-emerald-50/70 rounded-xl border border-emerald-100">
-                    <span className="text-[10px] text-emerald-700 block">Sedang Disewa</span>
-                    <strong className="text-emerald-900">{Math.max(0, item.total - item.available)} unit</strong>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 bg-emerald-50/50 px-2.5 py-1.5 rounded-lg truncate">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                  <span className="truncate" title={item.lastLocation}>{item.lastLocation || 'Warehouse Kampus'}</span>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -171,7 +245,10 @@ export default function MyEquipment() {
                     </div>
                     <h4 className="font-bold text-slate-900 text-sm pt-0.5">{txn.itemName}</h4>
                     <p className="text-xs text-slate-500">
-                      Penyewa: <strong className="text-slate-800">{txn.buyerOrg}</strong> · Durasi: <strong>{txn.durationDays || 1} hari</strong>
+                      Peminjam: <strong className="text-slate-800">{txn.borrowerName || txn.buyerOrg}</strong> · Event: <strong>{txn.eventName || 'Kegiatan Kampus'}</strong>
+                    </p>
+                    <p className="text-xs text-emerald-700 font-medium">
+                      📅 Periode Pinjam: {txn.startDate || '03 Nov 2026'} s/d {txn.endDate || '05 Nov 2026'} ({txn.durationDays || 1} hari)
                     </p>
                     <p className="text-[11px] text-slate-400">
                       Rekening Tujuan: <span className="font-mono text-slate-600">{txn.ownerBank || 'BCA 8012345678'}</span>

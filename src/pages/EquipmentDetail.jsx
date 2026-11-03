@@ -7,13 +7,15 @@ import {
   Building,
   Image as ImageIcon,
   History,
-  Lock
+  Lock,
+  User,
+  Calendar
 } from 'lucide-react'
 
 export default function EquipmentDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { equipments, cartItems, addToCart, removeFromCart, userPaymentStatus, currentUserRole } = useApp()
+  const { equipments, cartItems, addToCart, removeFromCart, userPaymentStatus, currentUserRole, getEquipmentBorrowings } = useApp()
 
   const item = equipments.find(eq => eq.id.toString() === id)
   const isLockedByActivePayment = currentUserRole === 'user' && userPaymentStatus !== 'idle'
@@ -29,6 +31,7 @@ export default function EquipmentDetail() {
   }
 
   const isReserved = cartItems.some(cartItem => cartItem.id === item.id)
+  const activeBorrowings = getEquipmentBorrowings ? getEquipmentBorrowings(item.id, item.name) : []
 
   const toggleReserve = () => {
     if (isLockedByActivePayment) return
@@ -169,6 +172,33 @@ export default function EquipmentDetail() {
                 </strong>
               </div>
             </div>
+
+            {/* Info Peminjam Aktif pada Barang Ini */}
+            {activeBorrowings.length > 0 && (
+              <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200/80 space-y-2">
+                <span className="text-xs font-bold text-emerald-900 block">
+                  📍 Status Unit yang Sedang Dipinjam Saat Ini:
+                </span>
+                {activeBorrowings.map((b, idx) => (
+                  <div key={idx} className="p-3 bg-white rounded-xl border border-emerald-100 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-emerald-600" />
+                        {b.borrowerName} ({b.org})
+                      </span>
+                      <span className="badge-sage !py-0.5 !px-2 !text-[10px]">{b.qty} unit</span>
+                    </div>
+                    <div className="text-[11px] text-slate-600">
+                      Event: <strong>{b.eventName}</strong> · Lokasi: {b.location}
+                    </div>
+                    <div className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      <span>Periode: <strong>{b.startDate}</strong> s/d <strong>{b.endDate}</strong></span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {currentUserRole === 'user' && (
               <div className="pt-2">
