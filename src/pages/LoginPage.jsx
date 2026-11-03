@@ -6,14 +6,11 @@ import { useApp } from '../context/AppContext'
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { setCurrentUserRole } = useApp()
+  const { setCurrentUserRole, setCurrentUserName } = useApp()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  
-  // State untuk Nama dan NIM
   const [fullName, setFullName] = useState('') 
   const [nim, setNim] = useState('') 
-  
   const [role, setRole] = useState('student_org')
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -23,7 +20,6 @@ export default function LoginPage() {
     setLoading(true)
 
     if (isSignUp) {
-      // Proses Pendaftaran: Simpan user baru ke Supabase Auth + Trigger profiles
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -38,22 +34,24 @@ export default function LoginPage() {
       if (error) {
         alert('Gagal mendaftar: ' + error.message)
       } else {
-        // Jika sukses mendaftar, juga masukkan secara manual ke tabel profiles sebagai cadangan aman
-        if (data?.user) {
-          await supabase.from('profiles').upsert({
-            id: data.user.id,
-            full_name: fullName || 'Prasmulyan',
-            nim: nim || '00000000',
-            email: email,
-            updated_at: new Date()
-          })
+        // Simpan langsung data profil ke tabel 'profiles' di Supabase
+        if (data?.user?.id) {
+          try {
+            await supabase.from('profiles').upsert({
+              id: data.user.id,
+              email: email,
+              full_name: fullName || 'Prasmulyan',
+              nim: nim || '00000000',
+              updated_at: new Date().toISOString()
+            })
+          } catch (profileErr) {
+            console.warn('Gagal simpan profil:', profileErr)
+          }
         }
-
-        alert('Pendaftaran berhasil! Akun dengan NIM ' + nim + ' telah dibuat. Silakan masuk.')
+        alert('Pendaftaran berhasil! Akun Anda telah siap. Silakan masuk.')
         setIsSignUp(false)
       }
     } else {
-      // Validasi Login
       if (role === 'sarpras') {
         if (!email.includes('admin') && !email.includes('sarpras')) {
           alert('Akses ditolak: Email ini bukan akun Administrator Sarpras!')
@@ -67,11 +65,28 @@ export default function LoginPage() {
       if (error) {
         alert('Gagal masuk: ' + error.message)
       } else if (data?.session) {
+        let userDisplayName = data.session.user.user_metadata?.full_name || 'Prasmulyan'
+        
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, nim')
+            .eq('id', data.session.user.id)
+            .single()
+          if (profile?.full_name) {
+            userDisplayName = profile.full_name
+          }
+        } catch (fetchErr) {
+          console.warn('Gagal ambil data profil:', fetchErr)
+        }
+
         if (role === 'sarpras') {
           setCurrentUserRole('admin')
+          setCurrentUserName('Admin Sarpras')
           navigate('/admin', { replace: true })
         } else {
           setCurrentUserRole('user')
+          setCurrentUserName(userDisplayName)
           navigate('/dashboard', { replace: true })
         }
       }
@@ -83,7 +98,6 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="max-w-4xl w-full grid md:grid-cols-2 bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
         
-        {/* Left Info Panel */}
         <div className="bg-gradient-to-br from-green-700 via-emerald-700 to-teal-800 text-white p-8 md:p-12 flex flex-col justify-between relative overflow-hidden">
           <div className="absolute top-0 right-0 -mr-16 -mt-16 w-56 h-56 bg-white/10 rounded-full blur-2xl pointer-events-none" />
           
@@ -119,7 +133,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Right Form */}
         <div className="p-8 md:p-12 flex flex-col justify-center">
           <div className="mb-6">
             <h3 className="text-2xl font-bold text-gray-900">
@@ -161,7 +174,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Kolom Nama & NIM Hanya Muncul Saat Daftar Akun Mahasiswa */}
             {isSignUp && role === 'student_org' && (
               <div className="grid grid-cols-2 gap-4">
                 <div>

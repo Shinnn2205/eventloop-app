@@ -57,13 +57,12 @@ export default function AdminPanel() {
     setTimeout(() => setTransferSuccessMsg(''), 5000)
   }
 
-  // Total dana di escrow yang siap ditransfer (setelah lunas & status payout masih pending)
   const totalFundsInEscrow = transactions
-    .filter(t => t.qrisStatus?.includes('Lunas') && t.payoutStatus === 'Pending Transfer')
+    .filter(t => t.payoutStatus === 'Pending Transfer')
     .reduce((sum, t) => sum + (t.payoutAmount || 0), 0)
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto animate-fade-in-up pb-12">
+    <div className="space-y-8 max-w-7xl mx-auto">
       {/* Admin Header */}
       <div className="bg-gradient-to-r from-slate-900 via-gray-900 to-emerald-950 text-white p-6 sm:p-8 rounded-3xl relative overflow-hidden shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -80,15 +79,15 @@ export default function AdminPanel() {
             </p>
           </div>
 
-          <div className="bg-white/15 backdrop-blur-md p-4 rounded-2xl border border-white/20 text-left shadow-inner">
-            <span className="text-[11px] text-gray-200 uppercase font-semibold block">
+          <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 text-left">
+            <span className="text-[11px] text-gray-300 uppercase font-semibold block">
               Dana Rekber Pending Payout
             </span>
             <span className="text-2xl sm:text-3xl font-black text-emerald-400">
               Rp{totalFundsInEscrow.toLocaleString('id-ID')}
             </span>
-            <span className="text-[10px] text-gray-300 block mt-0.5">
-              Siap di-transfer ke rekening organisasi pemilik (Net -5% Fee)
+            <span className="text-[10px] text-gray-400 block mt-0.5">
+              Siap di-transfer ke rekening organisasi pemilik
             </span>
           </div>
         </div>
@@ -150,7 +149,7 @@ export default function AdminPanel() {
                   Daftar Transaksi QRIS & Penerusan Dana ke Owner
                 </h3>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Uang masuk ke Bank Admin via QRIS → Admin transfer ke rekening organisasi pemilik barang (setelah potong fee admin kampus 5%).
+                  Uang masuk ke Bank Admin via QRIS → Admin transfer ke rekening organisasi pemilik barang.
                 </p>
               </div>
               <span className="text-xs font-bold text-gray-600 bg-white px-3 py-1 rounded-xl border border-gray-200">
@@ -166,7 +165,7 @@ export default function AdminPanel() {
                     <th className="p-4">Barang & Pembeli</th>
                     <th className="p-4 text-right">Uang Masuk (QRIS)</th>
                     <th className="p-4">Rekening Owner (Tujuan Payout)</th>
-                    <th className="p-4 text-right">Net Payout (-5% Fee)</th>
+                    <th className="p-4 text-right">Net Payout</th>
                     <th className="p-4 text-center">Status & Aksi Admin</th>
                   </tr>
                 </thead>
@@ -175,11 +174,9 @@ export default function AdminPanel() {
                     <tr key={txn.id} className="hover:bg-gray-50/60 transition-colors">
                       <td className="p-4">
                         <div className="font-mono font-bold text-gray-900 text-xs">{txn.id}</div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">{txn.paidAt || 'Baru saja'}</div>
-                        <span className={`inline-block mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                          txn.qrisStatus?.includes('Lunas') ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {txn.qrisStatus}
+                        <div className="text-[10px] text-gray-400 mt-0.5">{txn.paidAt}</div>
+                        <span className="inline-block mt-1 text-[9px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.2 rounded-full">
+                          ✓ {txn.qrisStatus}
                         </span>
                       </td>
 
@@ -191,22 +188,22 @@ export default function AdminPanel() {
                       </td>
 
                       <td className="p-4 text-right font-black text-gray-900 text-sm">
-                        Rp{(txn.amount || 0).toLocaleString('id-ID')}
+                        Rp{txn.amount?.toLocaleString('id-ID')}
                       </td>
 
                       <td className="p-4">
-                        <div className="font-bold text-gray-800 text-xs">{txn.ownerOrg || 'Organisasi Kampus'}</div>
+                        <div className="font-bold text-gray-800 text-xs">{txn.ownerOrg}</div>
                         <div className="text-[11px] font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded-md mt-1 inline-block">
-                          {txn.ownerBank || 'BCA 8012345678 a.n Owner'}
+                          {txn.ownerBank}
                         </div>
                       </td>
 
                       <td className="p-4 text-right">
                         <div className="font-black text-emerald-700 text-sm">
-                          Rp{(txn.payoutAmount || (txn.amount * 0.95) || 0).toLocaleString('id-ID')}
+                          Rp{txn.payoutAmount?.toLocaleString('id-ID')}
                         </div>
                         <div className="text-[10px] text-gray-400">
-                          (Fee kampus 5%: Rp{(txn.adminFee || (txn.amount * 0.05) || 0).toLocaleString('id-ID')})
+                          (Fee kampus: Rp{txn.adminFee?.toLocaleString('id-ID')})
                         </div>
                       </td>
 
@@ -244,12 +241,6 @@ export default function AdminPanel() {
                 </tbody>
               </table>
             </div>
-
-            {transactions.length === 0 && (
-              <div className="p-8 text-center text-gray-400 text-xs">
-                Belum ada transaksi QRIS masuk.
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -280,12 +271,10 @@ export default function AdminPanel() {
                           {item.listingType === 'sale' ? '🏷️ Dijual Preloved' : '🔄 Disewakan'}
                         </span>
                         <h4 className="font-extrabold text-gray-900 text-base mt-1.5">{item.name}</h4>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          Pemilik: <strong>{item.owner || item.ownerOrg}</strong> • Qty: <strong>{item.qty} unit</strong>
-                        </p>
+                        <p className="text-xs text-gray-500">Pemilik: <strong>{item.owner || item.ownerOrg}</strong> • Qty: {item.qty} unit</p>
                       </div>
                       <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-xl">
-                        Score {item.circularScore || 88}/100
+                        Score {item.circularScore}/100
                       </span>
                     </div>
 
@@ -296,11 +285,11 @@ export default function AdminPanel() {
                       </div>
                       <div>
                         <span className="text-gray-400 text-[10px] block">Kondisi Fisik</span>
-                        <span className="font-bold text-emerald-700">{item.condition || 'Baik'}</span>
+                        <span className="font-bold text-emerald-700">{item.condition}</span>
                       </div>
                       <div className="col-span-2 pt-1 border-t border-gray-100">
                         <span className="text-gray-400 text-[10px] block">Info Rekening Pencairan</span>
-                        <span className="font-mono font-semibold text-gray-800">{item.bankAccount || item.bankInfo || 'BCA 8012345678'}</span>
+                        <span className="font-mono font-semibold text-gray-800">{item.bankInfo}</span>
                       </div>
                     </div>
 
@@ -349,7 +338,7 @@ export default function AdminPanel() {
                     <div className="flex justify-between items-start">
                       <div>
                         <span className="text-[10px] font-black uppercase text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
-                          {ret.itemCode || 'RET-ITEM'}
+                          {ret.itemCode}
                         </span>
                         <h4 className="font-extrabold text-gray-900 text-base mt-1.5">{ret.itemName}</h4>
                         <p className="text-xs text-gray-500">Peminjam: <strong>{ret.borrower}</strong></p>
@@ -405,7 +394,7 @@ export default function AdminPanel() {
           </div>
           <div className="p-3 bg-white rounded-xl border border-blue-100 shadow-sm">
             <span className="font-bold block text-blue-700 mb-1">3. Admin Transfer Dana</span>
-            Admin menekan tombol "Transfer ke Owner" untuk meneruskan dana bersih ke rekening pemilik (setelah dipotong fee 5%).
+            Admin menekan tombol "Transfer ke Owner" untuk meneruskan dana bersih ke rekening pemilik.
           </div>
           <div className="p-3 bg-white rounded-xl border border-blue-100 shadow-sm">
             <span className="font-bold block text-blue-700 mb-1">4. Aman & Bebas Penipuan</span>

@@ -1,44 +1,10 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
-import { Recycle, ArrowRight, Package, BarChart3, Shield, Zap, Sparkles, CheckCircle2 } from 'lucide-react'
+import { Recycle, ArrowRight, Package, BarChart3, Shield, Zap, Sparkles, CheckCircle2, ChevronRight, Layers } from 'lucide-react'
 
 export default function LandingPage() {
-  const [impactData, setImpactData] = useState({
-    itemsReused: 0,
-    wasteAvoided: 0,
-    eventsSupported: 0
-  })
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchGlobalImpact = async () => {
-      try {
-        setLoading(true)
-        const { data, error } = await supabase
-          .from('global_impact')
-          .select('*')
-          .eq('id', 1)
-          .single()
-        
-        if (!error && data) {
-          setImpactData({
-            itemsReused: data.total_items_reused,
-            wasteAvoided: data.total_waste_avoided,
-            eventsSupported: data.total_events
-          })
-        }
-      } catch (error) {
-        console.error('Error fetching global impact:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchGlobalImpact()
-  }, [])
-
   return (
     <div className="min-h-screen bg-white text-gray-900 selection:bg-green-100 selection:text-green-800">
+      {/* Navbar */}
       <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-xl border-b border-gray-100 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
@@ -71,6 +37,7 @@ export default function LandingPage() {
         </div>
       </nav>
 
+      {/* Hero Section */}
       <section className="pt-32 pb-20 px-6 relative overflow-hidden bg-gradient-to-b from-green-50/50 via-white to-white">
         <div className="absolute top-20 left-1/4 w-96 h-96 bg-green-200/40 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-emerald-200/30 rounded-full blur-3xl pointer-events-none" />
@@ -103,28 +70,23 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-16 max-w-3xl mx-auto animate-fade-in-up">
+          {/* Impact Stats Highlight */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-16 max-w-3xl mx-auto">
             <div className="card p-6 border-green-100/80 bg-white/80 backdrop-blur">
               <div className="text-3xl mb-1">♻️</div>
-              <div className="text-3xl font-black text-gray-900">
-                {loading ? '...' : impactData.itemsReused.toLocaleString('id-ID')}
-              </div>
+              <div className="text-3xl font-black text-gray-900">1,284</div>
               <div className="text-xs text-green-700 font-bold uppercase tracking-wider mt-1">Items Reused</div>
               <div className="text-xs text-gray-500 mt-1">Peralatan digunakan berulang</div>
             </div>
             <div className="card p-6 border-green-100/80 bg-white/80 backdrop-blur">
               <div className="text-3xl mb-1">🌱</div>
-              <div className="text-3xl font-black text-gray-900">
-                {loading ? '...' : `${impactData.wasteAvoided} kg`}
-              </div>
+              <div className="text-3xl font-black text-gray-900">186.5 kg</div>
               <div className="text-xs text-emerald-700 font-bold uppercase tracking-wider mt-1">Material Waste Avoided</div>
               <div className="text-xs text-gray-500 mt-1">Limbah material dicegah</div>
             </div>
             <div className="card p-6 border-green-100/80 bg-white/80 backdrop-blur">
               <div className="text-3xl mb-1">🎪</div>
-              <div className="text-3xl font-black text-gray-900">
-                {loading ? '...' : impactData.eventsSupported}
-              </div>
+              <div className="text-3xl font-black text-gray-900">42</div>
               <div className="text-xs text-blue-700 font-bold uppercase tracking-wider mt-1">Events Supported</div>
               <div className="text-xs text-gray-500 mt-1">Seminar, Expo, Lomba & UKM</div>
             </div>
@@ -132,6 +94,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Problem & Circular Paradigm */}
       <section id="masalah" className="py-20 px-6 bg-gray-50 border-y border-gray-100">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -143,6 +106,7 @@ export default function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
+            {/* Linear Old Way */}
             <div className="bg-red-50/60 border border-red-200 rounded-3xl p-8 relative">
               <div className="inline-flex items-center gap-2 bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-full mb-4">
                 Pola Lama (Linier)
@@ -159,6 +123,7 @@ export default function LandingPage() {
               </div>
             </div>
 
+            {/* Circular EventLoop Way */}
             <div className="bg-green-50/80 border-2 border-green-300 rounded-3xl p-8 relative shadow-lg shadow-green-600/5">
               <div className="inline-flex items-center gap-2 bg-green-200 text-green-900 text-xs font-bold px-3 py-1 rounded-full mb-4">
                 Pola Baru (EventLoop)
@@ -178,6 +143,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* 3 Core Components */}
       <section className="py-20 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -206,10 +172,10 @@ export default function LandingPage() {
               </div>
               <h4 className="text-xl font-bold text-gray-900 mb-3">2. Campus Inventory</h4>
               <p className="text-sm text-gray-600 leading-relaxed mb-4">
-                Sistem tracking real-time 3 sumber barang: Campus Inventory, BEM/UKM Organization Inventory, dan Partner Vendor dengan verifikasi foto fisik.
+                Sistem tracking real-time 3 sumber barang: Campus Inventory, BEM/UKM Organization Inventory, dan Partner Vendor dengan QR Code tracking.
               </p>
               <div className="text-xs font-semibold text-blue-700 bg-blue-50 py-1.5 px-3 rounded-lg inline-block">
-                Photo Inspection & Timestamp Check
+                QR Inspection & Status Check
               </div>
             </div>
 
@@ -229,6 +195,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Circular Score Feature Deep Dive */}
       <section id="circular-score" className="py-20 px-6 bg-gradient-to-br from-emerald-900 via-green-900 to-teal-950 text-white">
         <div className="max-w-6xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -263,6 +230,7 @@ export default function LandingPage() {
               </div>
             </div>
 
+            {/* Live Comparison Card */}
             <div className="space-y-4">
               <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-6">
                 <div className="flex items-start justify-between mb-4">
@@ -311,6 +279,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Flow Diagram */}
       <section id="flow" className="py-20 px-6 bg-gray-50 border-t border-gray-100">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -325,9 +294,9 @@ export default function LandingPage() {
               { step: '02', title: 'Create Event', desc: 'Tentukan nama acara, tanggal, kuota, & kebutuhan.', icon: '📅' },
               { step: '03', title: 'Pilih Equipment', desc: 'Filter barang berdasarkan Circular Score & kuota.', icon: '🛒' },
               { step: '04', title: 'Reserve & Checkout', desc: 'Konfirmasi sewa dengan estimasi penghematan biaya.', icon: '📝' },
-              { step: '05', title: 'Pick Up & Verifikasi', desc: 'Ambil di storage kampus dan pastikan kelengkapan fisik.', icon: '📦' },
+              { step: '05', title: 'Pick Up & Scan', desc: 'Ambil di storage kampus dengan verifikasi QR code.', icon: '📦' },
               { step: '06', title: 'Use at Event', desc: 'Perlengkapan aktif digunakan selama kegiatan.', icon: '🎪' },
-              { step: '07', title: 'Return & Inspect', desc: 'Kembalikan barang, upload foto kondisi & rak penempatan.', icon: '🔄' },
+              { step: '07', title: 'Return & Inspect', desc: 'Kembalikan barang, check kondisi & kebersihan.', icon: '🔄' },
               { step: '08', title: 'Impact Recorded', desc: 'Metrik limbah & circular score otomatis bertambah!', icon: '🌱' },
             ].map((f, idx) => (
               <div key={idx} className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow">
@@ -343,6 +312,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Business Model & Sustainability */}
       <section id="business-model" className="py-20 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -394,6 +364,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* CTA Footer */}
       <section className="py-20 px-6 bg-gradient-to-br from-green-600 to-emerald-700 text-white text-center">
         <div className="max-w-3xl mx-auto">
           <h3 className="text-3xl sm:text-4xl font-extrabold mb-4">
@@ -413,6 +384,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Bottom Bar */}
       <footer className="bg-gray-950 text-gray-400 py-10 px-6 text-sm">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
