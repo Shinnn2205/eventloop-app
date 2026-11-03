@@ -30,6 +30,35 @@ export const isCampusEmail = (emailStr) => {
   )
 }
 
+export const validateNimStructure = (nimStr) => {
+  const clean = (nimStr || '').toString().trim()
+  if (!/^\d{11}$/.test(clean)) {
+    return {
+      isValid: false,
+      message: 'NIM harus terdiri dari tepat 11 digit angka (3 digit Jurusan + 2 digit Angkatan + 6 digit No. Urut).'
+    }
+  }
+  const prodi = clean.slice(0, 3)
+  const angkatan = clean.slice(3, 5)
+  const nomor = clean.slice(5, 11)
+  
+  const angkatanNum = parseInt(angkatan, 10)
+  if (isNaN(angkatanNum) || angkatanNum < 15 || angkatanNum > 30) {
+    return {
+      isValid: false,
+      message: `Tahun angkatan (digit ke-4 & 5: "${angkatan}") tidak valid.`
+    }
+  }
+
+  return {
+    isValid: true,
+    prodi,
+    angkatan: `20${angkatan}`,
+    nomor,
+    generatedEmail: `${clean}@student.prasetiyamulya.ac.id`
+  }
+}
+
 export function AppProvider({ children }) {
   // STATE ROLE (Admin vs User)
   const [currentUserRole, setCurrentUserRole] = useState(() => {
