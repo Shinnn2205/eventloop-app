@@ -322,85 +322,94 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full grid md:grid-cols-2 bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+    <div className="min-h-screen bg-[#F6FBF8] text-slate-800 flex items-center justify-center p-4 selection:bg-emerald-100 selection:text-emerald-800">
+      <div className="max-w-4xl w-full grid md:grid-cols-2 bg-white rounded-3xl shadow-sm overflow-hidden border border-emerald-100/90">
         
-        {/* Kolom Kiri: Branding & Informasi */}
-        <div className="bg-gradient-to-br from-green-700 via-emerald-700 to-teal-800 text-white p-8 md:p-12 flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-56 h-56 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        {/* Kolom Kiri: Branding & Nilai Sirkular Kampus (Tema Cozy Renewable) */}
+        <div className="bg-gradient-to-br from-emerald-50/90 via-teal-50/70 to-green-50/80 p-8 md:p-12 flex flex-col justify-between relative overflow-hidden border-b md:border-b-0 md:border-r border-emerald-100/80">
+          <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-emerald-200/35 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-52 h-52 bg-teal-200/25 rounded-full blur-2xl pointer-events-none" />
           
-          <div>
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-                <Recycle className="w-6 h-6 text-white" />
+          <div className="relative z-10">
+            <Link to="/" className="inline-flex items-center gap-3 mb-8 group">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white shadow-sm shadow-emerald-600/20 group-hover:scale-105 transition-transform">
+                <Recycle className="w-6 h-6" />
               </div>
-              <span className="text-xl font-bold tracking-tight">EventLoop</span>
+              <div>
+                <span className="text-xl font-bold tracking-tight text-slate-900 block leading-tight">
+                  Event<span className="text-emerald-600">Loop</span>
+                </span>
+                <span className="text-[10px] text-emerald-700/90 font-semibold uppercase tracking-wider block">
+                  Circular Campus Platform
+                </span>
+              </div>
+            </Link>
+
+            <div className="inline-flex items-center gap-2 bg-white/90 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full border border-emerald-200/70 mb-4 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Ekosistem Peminjaman Berkelanjutan</span>
             </div>
 
-            <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-xs font-medium text-green-200 mb-4">
-              <Sparkles className="w-3.5 h-3.5" /> Platform Sirkular Kampus
-            </div>
-
-            <h2 className="text-2xl md:text-3xl font-extrabold leading-tight mb-4">
-              Kurangi Limbah Event Kampus, Hemat Biaya Bersama
+            <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 leading-snug mb-3">
+              Kurangi Limbah Event Kampus, Hemat Anggaran Bersama
             </h2>
-            <p className="text-green-100 text-sm leading-relaxed">
-              Pinjam dan kelola perlengkapan kegiatan kampus dengan mudah, transparan, dan terverifikasi secara resmi.
+            <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">
+              Pinjam dan kelola perlengkapan kegiatan mahasiswa secara transparan, mudah dilacak, dan diverifikasi resmi.
             </p>
           </div>
 
-          <div className="pt-8 border-t border-white/20 space-y-3 text-xs text-green-100">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-green-300" />
-              <span>Pendaftaran Baru Wajib Verifikasi Kode OTP Email</span>
+          <div className="pt-8 border-t border-emerald-100/80 space-y-2.5 text-xs text-slate-600 relative z-10">
+            <div className="flex items-center gap-2.5 bg-white/80 p-2.5 rounded-xl border border-emerald-100/70 shadow-2xs">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span>Pendaftaran Resmi Mahasiswa Wajib Verifikasi OTP Outlook</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-green-300" />
-              <span>Ekosistem Peminjaman & Inventarisasi Perlengkapan Kampus</span>
+            <div className="flex items-center gap-2.5 bg-white/80 p-2.5 rounded-xl border border-emerald-100/70 shadow-2xs">
+              <Building2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span>Inventarisasi Terpadu Ormawa & Gudang Kampus</span>
             </div>
           </div>
         </div>
 
-        {/* Kolom Kanan: Form Masuk vs Buat Akun */}
-        <div className="p-8 md:p-12 flex flex-col justify-center">
+        {/* Kolom Kanan: Form Masuk vs Buat Akun (Tema Cozy & Bersih) */}
+        <div className="p-8 md:p-12 flex flex-col justify-center bg-white">
           
           {/* TAB SWITCHER: MASUK vs BUAT AKUN */}
-          <div className="flex p-1 bg-gray-100 rounded-2xl mb-6">
+          <div className="flex p-1 bg-emerald-50/50 border border-emerald-100/80 rounded-2xl mb-6">
             <button
               type="button"
               onClick={() => handleTabChange('login')}
-              className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all ${
+              className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 activeTab === 'login'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-900'
+                  ? 'bg-white text-emerald-900 shadow-2xs border border-emerald-200/60'
+                  : 'text-slate-500 hover:text-emerald-800'
               }`}
             >
-              <LogIn className="w-3.5 h-3.5" />
+              <LogIn className="w-3.5 h-3.5 text-emerald-600" />
               <span>Masuk (Login)</span>
             </button>
             <button
               type="button"
               onClick={() => handleTabChange('signup')}
-              className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all ${
+              className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 activeTab === 'signup'
-                  ? 'bg-green-700 text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-900'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-emerald-800'
               }`}
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span>Daftar Akun Mahasiswa</span>
+              <span>Daftar Akun Baru</span>
             </button>
           </div>
 
           {/* Header Title */}
           <div className="mb-5">
-            <h3 className="text-2xl font-bold text-gray-900">
+            <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
               {activeTab === 'login' 
                 ? 'Selamat Datang Kembali 👋' 
-                : (signUpStep === 'otp' ? 'Verifikasi Kode OTP Outlook' : 'Daftar Akun Mahasiswa Resmi')
+                : (signUpStep === 'otp' ? 'Verifikasi Kode OTP Outlook' : 'Daftar Akun Mahasiswa')
               }
             </h3>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               {activeTab === 'login'
                 ? 'Masukkan NIM/email dan password akun Anda untuk masuk'
                 : (signUpStep === 'otp'
@@ -412,15 +421,15 @@ export default function LoginPage() {
 
           {/* Alert Error / Success */}
           {errorMsg && (
-            <div className="mb-4 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2 animate-fade-in">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <div className="mb-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-700 text-xs flex items-start gap-2 animate-fade-in">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-600" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="mb-4 p-3.5 rounded-xl bg-green-50 border border-green-200 text-green-800 text-xs flex items-start gap-2 animate-fade-in">
-              <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+            <div className="mb-4 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs flex items-start gap-2 animate-fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
               <span>{successMsg}</span>
             </div>
           )}
@@ -431,38 +440,38 @@ export default function LoginPage() {
           {activeTab === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   NIM (11 Digit) atau Email Akun *
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Contoh: 23302410001 atau nim@student... / email admin"
-                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
                   />
                 </div>
-                <p className="text-[11px] text-gray-500 mt-1">
+                <p className="text-[11px] text-slate-500 mt-1">
                   💡 Masukkan 11 digit NIM atau email kampus terdaftar (atau email administrator).
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
                   />
                 </div>
               </div>
@@ -470,7 +479,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 mt-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold shadow-md shadow-green-600/20 transition-all"
+                className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 mt-2 cursor-pointer"
               >
                 <span>{loading ? 'Sedang Masuk...' : 'Masuk ke Dashboard'}</span>
                 {!loading && <ArrowRight className="w-4 h-4" />}
@@ -485,20 +494,20 @@ export default function LoginPage() {
             signUpStep === 'form' ? (
               // STEP 1: INPUT DATA MAHASISWA & KIRIM KODE OTP
               <form onSubmit={handleSignUpRequestOtp} className="space-y-3.5">
-                <div className="bg-green-50 border border-green-200 p-3 rounded-2xl flex items-start gap-2.5 text-[11px] text-green-950 font-medium leading-relaxed">
-                  <ShieldCheck className="w-5 h-5 text-green-700 flex-shrink-0 mt-0.5" />
+                <div className="bg-emerald-50/70 border border-emerald-200/80 p-3 rounded-2xl flex items-start gap-2.5 text-[11px] text-emerald-950 font-medium leading-relaxed">
+                  <ShieldCheck className="w-5 h-5 text-emerald-700 flex-shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold text-green-900 block mb-0.5">Verifikasi Kode OTP Outlook Kampus</span>
-                    Sistem akan mengirimkan 6-digit kode verifikasi ke email Outlook mahasiswa resmi Anda.
+                    <span className="font-bold text-emerald-900 block mb-0.5">Verifikasi Kode OTP Outlook Kampus</span>
+                    Sistem akan mengirimkan kode verifikasi resmi ke inbox email Outlook mahasiswa Anda.
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     NIM Mahasiswa (11 Digit Angka) *
                   </label>
                   <div className="relative">
-                    <Hash className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Hash className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       maxLength={11}
@@ -506,7 +515,7 @@ export default function LoginPage() {
                       value={nim}
                       onChange={(e) => handleNimChange(e.target.value)}
                       placeholder="Contoh: 23302410001"
-                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all tracking-wider"
+                      className="w-full pl-9 pr-3 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all tracking-wider"
                     />
                   </div>
 
@@ -518,13 +527,13 @@ export default function LoginPage() {
                           ⏳ {nim.length}/11 digit (Ketik {11 - nim.length} digit lagi)
                         </span>
                       ) : nimInfo.isValid ? (
-                        <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl text-emerald-950 space-y-1.5">
+                        <div className="bg-emerald-50/80 border border-emerald-200 p-2.5 rounded-xl text-emerald-950 space-y-1.5">
                           <div className="font-bold flex items-center justify-between text-emerald-800">
                             <div className="flex items-center gap-1.5">
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                               <span>Format NIM Terverifikasi</span>
                             </div>
-                            <span className="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full font-bold">
+                            <span className="text-[10px] bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full font-bold">
                               {nimInfo.shortSchool}
                             </span>
                           </div>
@@ -537,7 +546,7 @@ export default function LoginPage() {
                           </div>
                         </div>
                       ) : (
-                        <span className="text-red-600 font-medium flex items-center gap-1">
+                        <span className="text-rose-600 font-medium flex items-center gap-1">
                           <AlertCircle className="w-3.5 h-3.5" />
                           {nimInfo.message}
                         </span>
@@ -547,55 +556,55 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Nama Lengkap Mahasiswa *
                   </label>
                   <div className="relative">
-                    <User className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       required
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="Nama Lengkap Sesuai KTM"
-                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                      className="w-full pl-9 pr-3 py-2 bg-emerald-50/30 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
                     />
                   </div>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                       Email Kampus Resmi
                     </label>
-                    <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> Terkunci Otomatis Sesuai NIM
+                    <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Terisi Otomatis Sesuai NIM
                     </span>
                   </div>
                   <div className="relative">
-                    <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       readOnly
                       value={nim.length === 11 ? `${nim}@student.prasetiyamulya.ac.id` : 'Otomatis terisi saat 11 digit NIM dimasukkan...'}
-                      className="w-full pl-9 pr-3 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-600 font-mono cursor-not-allowed select-none"
+                      className="w-full pl-9 pr-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-600 font-mono cursor-not-allowed select-none"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Buat Password Akun *
                   </label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="password"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Minimal 6 karakter"
-                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                      className="w-full pl-9 pr-3 py-2 bg-emerald-50/30 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
                     />
                   </div>
                 </div>
@@ -604,43 +613,43 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={loading || nim.length !== 11 || !nimInfo.isValid}
-                    className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-semibold shadow-md shadow-green-700/20 transition-all"
+                    className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 cursor-pointer shadow-sm shadow-emerald-600/15"
                   >
                     <Mail className="w-4 h-4" />
                     <span>{loading ? 'Mengirim Kode OTP...' : 'Kirim Kode OTP ke Outlook Kampus'}</span>
                   </button>
-                  <p className="text-[10px] text-gray-400 text-center mt-2">
-                    Kode verifikasi 6 digit akan dikirimkan langsung ke email resmi Outlook Anda.
+                  <p className="text-[10px] text-slate-400 text-center mt-2">
+                    Kode verifikasi akan dikirimkan langsung ke inbox resmi Outlook kampus Anda.
                   </p>
                 </div>
               </form>
             ) : (
               // STEP 2: FORM INPUT KODE OTP DARI EMAIL OUTLOOK (MENDUKUNG 6 ATAU 8 DIGIT)
               <form onSubmit={handleSignUpVerifyOtp} className="space-y-4 py-1 animate-fade-in text-center">
-                <div className="w-14 h-14 bg-green-100 text-green-700 rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+                <div className="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mx-auto shadow-2xs border border-emerald-200/60">
                   <KeyRound className="w-7 h-7" />
                 </div>
 
                 <div>
-                  <h4 className="text-base font-bold text-gray-900">Verifikasi Kode OTP</h4>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <h4 className="text-base font-bold text-slate-900">Verifikasi Kode OTP</h4>
+                  <p className="text-xs text-slate-500 mt-1">
                     Masukkan kode verifikasi yang kami kirimkan ke email Outlook:
                   </p>
-                  <div className="inline-block bg-green-50 border border-green-200 text-green-950 font-bold font-mono px-3 py-1 rounded-xl text-xs mt-1.5">
+                  <div className="inline-block bg-emerald-50 border border-emerald-200 text-emerald-950 font-bold font-mono px-3 py-1 rounded-xl text-xs mt-1.5">
                     {nim}@student.prasetiyamulya.ac.id
                   </div>
                 </div>
 
-                <div className="bg-blue-50/80 border border-blue-200 p-3 rounded-2xl text-left text-[11px] text-blue-950 space-y-1">
-                  <div className="font-bold flex items-center gap-1.5 text-blue-900">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                <div className="bg-teal-50/70 border border-teal-200/70 p-3 rounded-2xl text-left text-[11px] text-teal-950 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5 text-teal-900">
+                    <Sparkles className="w-3.5 h-3.5 text-teal-600" />
                     <span>Buka Tab Outlook Mahasiswa Anda:</span>
                   </div>
-                  <p>Salin kode verifikasi dari email <strong>EventLoop Prasetiya Mulya</strong>, lalu ketik di kotak bawah ini:</p>
+                  <p className="text-slate-600">Salin kode verifikasi dari email <strong>EventLoop Prasetiya Mulya</strong>, lalu ketik di kotak bawah ini:</p>
                 </div>
 
                 <div className="space-y-1 text-left">
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider text-center">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider text-center">
                     Kode OTP Verifikasi
                   </label>
                   <div className="relative max-w-xs mx-auto">
@@ -652,10 +661,10 @@ export default function LoginPage() {
                       value={otpCode}
                       onChange={(e) => setOtpCode(e.target.value.trim().slice(0, 8))}
                       placeholder="12345678"
-                      className="w-full text-center tracking-[0.25em] text-2xl font-black font-mono py-2.5 bg-gray-50 border-2 border-green-500/50 rounded-2xl focus:outline-none focus:ring-4 focus:ring-green-500/20 focus:border-green-600 transition-all text-green-950"
+                      className="w-full text-center tracking-[0.25em] text-2xl font-black font-mono py-2.5 bg-emerald-50/30 border-2 border-emerald-300 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/15 rounded-2xl text-emerald-950 transition-all"
                     />
                   </div>
-                  <p className="text-[11px] text-gray-400 text-center mt-1">
+                  <p className="text-[11px] text-slate-400 text-center mt-1">
                     {otpCode.length}/8 digit
                   </p>
                 </div>
@@ -664,7 +673,7 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={loading || otpCode.trim().length < 6}
-                    className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-semibold shadow-md shadow-green-700/20 transition-all"
+                    className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 cursor-pointer shadow-sm shadow-emerald-600/15"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>{loading ? 'Memverifikasi...' : 'Verifikasi Kode & Selesaikan Pendaftaran'}</span>
@@ -679,7 +688,7 @@ export default function LoginPage() {
                         setOtpCode('')
                         setErrorMsg('')
                       }}
-                      className="text-gray-500 hover:text-gray-700 underline"
+                      className="text-slate-500 hover:text-emerald-700 underline cursor-pointer"
                     >
                       ← Ubah Data Pendaftaran
                     </button>
@@ -688,10 +697,10 @@ export default function LoginPage() {
                       type="button"
                       disabled={resendTimer > 0 || loading}
                       onClick={handleSignUpRequestOtp}
-                      className={`font-semibold ${
+                      className={`font-semibold cursor-pointer ${
                         resendTimer > 0 
-                          ? 'text-gray-400 cursor-not-allowed' 
-                          : 'text-green-700 hover:underline'
+                          ? 'text-slate-400 cursor-not-allowed' 
+                          : 'text-emerald-700 hover:underline'
                       }`}
                     >
                       {resendTimer > 0 ? `Kirim ulang (${resendTimer}s)` : 'Kirim Ulang Kode'}
@@ -703,8 +712,8 @@ export default function LoginPage() {
           )}
 
           {/* Footer Link ke Beranda */}
-          <div className="mt-6 pt-4 border-t border-gray-100 text-center">
-            <Link to="/" className="text-xs text-gray-400 hover:text-gray-600">
+          <div className="mt-6 pt-4 border-t border-emerald-100/70 text-center">
+            <Link to="/" className="text-xs text-slate-400 hover:text-emerald-700 transition-colors">
               ← Kembali ke Beranda
             </Link>
           </div>
