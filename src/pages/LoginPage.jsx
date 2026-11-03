@@ -208,6 +208,7 @@ export default function LoginPage() {
         email: studentEmail,
         options: {
           shouldCreateUser: true,
+          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/dashboard` : undefined,
           data: {
             full_name: fullName.trim(),
             nim: nim.trim(),
