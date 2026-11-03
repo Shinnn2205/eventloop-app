@@ -385,7 +385,7 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={role === 'sarpras' ? 'ac523634@gmail.com' : 'student@prasetiyamulya.ac.id'}
+                    placeholder={role === 'sarpras' ? 'gabrieljason47@gmail.com / ac523634@gmail.com' : 'student@prasetiyamulya.ac.id'}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
                   />
                 </div>

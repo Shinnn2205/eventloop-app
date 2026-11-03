@@ -3,10 +3,17 @@ import { supabase } from '../lib/supabaseClient'
 
 const AppContext = createContext()
 
+export const ADMIN_EMAILS = [
+  'gabrieljason47@gmail.com',
+  'sherren1999@gmail.com',
+  'ac523634@gmail.com',
+  'admin@gmail.com'
+]
+
 export const isAdminEmail = (emailStr) => {
   const lower = (emailStr || '').toLowerCase().trim()
   return (
-    lower === 'ac523634@gmail.com' ||
+    ADMIN_EMAILS.includes(lower) ||
     lower.includes('admin') ||
     lower.includes('sarpras')
   )
