@@ -162,15 +162,15 @@ export default function LoginPage() {
   }
 
   // ============================================================
-  // 2. ALUR DAFTAR AKUN MAHASISWA (VALIDASI NIM 11 DIGIT + SSO)
+  // 2. ALUR DAFTAR AKUN MAHASISWA - STEP 1: KIRIM OTP KE EMAIL OUTLOOK
   // ============================================================
-  const handleRegisterStudent = async (e) => {
+  const handleSignUpRequestOtp = async (e) => {
     if (e && e.preventDefault) e.preventDefault()
     setErrorMsg('')
     setSuccessMsg('')
 
     if (!fullName.trim()) {
-      setErrorMsg('Mohon lengkapi Nama Lengkap Anda.')
+      setErrorMsg('Mohon lengkapi Nama Lengkap Anda sesuai identitas kampus.')
       return
     }
 
@@ -187,28 +187,27 @@ export default function LoginPage() {
     }
 
     setLoading(true)
-
     const studentEmail = nimValidation.generatedEmail
 
     try {
       // 1. Cek duplikasi NIM di database Supabase agar tidak ada NIM ganda
-      const { data: existingUser, error: checkErr } = await supabase
+      const { data: existingUser } = await supabase
         .from('profiles')
         .select('id, nim')
         .eq('nim', nim.trim())
         .maybeSingle()
 
       if (existingUser) {
-        setErrorMsg(`NIM ${nim.trim()} sudah terdaftar dalam sistem. Silakan langsung masuk pada tab 'Masuk Akun'.`)
+        setErrorMsg(`NIM ${nim.trim()} sudah terdaftar dalam sistem. Silakan langsung login pada tab 'Masuk Akun'.`)
         setLoading(false)
         return
       }
 
-      // 2. Mendaftarkan akun mahasiswa
-      const { data, error } = await supabase.auth.signUp({
+      // 2. Kirim kode OTP via Gmail SMTP Supabase ke Outlook mahasiswa
+      const { error } = await supabase.auth.signInWithOtp({
         email: studentEmail,
-        password,
         options: {
+          shouldCreateUser: true,
           data: {
             full_name: fullName.trim(),
             nim: nim.trim(),
@@ -218,19 +217,73 @@ export default function LoginPage() {
       })
 
       if (error) {
-        setErrorMsg('Gagal mendaftarkan akun: ' + error.message)
-      } else if (data?.user) {
-        // 3. Simpan data lengkap ke tabel 'profiles' di Supabase
-        try {
-          await supabase.from('profiles').upsert({
-            id: data.user.id,
-            email: studentEmail,
-            full_name: fullName.trim(),
-            nim: nim.trim(),
-            updated_at: new Date().toISOString()
-          })
-        } catch (profileErr) {
-          console.warn('Gagal simpan profil:', profileErr)
+        setErrorMsg('Gagal mengirim kode verifikasi: ' + error.message)
+      } else {
+        setSignUpStep('otp')
+        setResendTimer(60)
+        setSuccessMsg(`Kode OTP 6-digit berhasil dikirim ke ${studentEmail}. Silakan periksa inbox Outlook kampus Anda!`)
+      }
+    } catch (err) {
+      setErrorMsg('Terjadi kesalahan koneksi saat mengirim kode verifikasi.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ============================================================
+  // 2. ALUR DAFTAR AKUN MAHASISWA - STEP 2: VERIFIKASI KODE OTP
+  // ============================================================
+  const handleSignUpVerifyOtp = async (e) => {
+    if (e && e.preventDefault) e.preventDefault()
+    setErrorMsg('')
+    setSuccessMsg('')
+
+    if (!otpCode || otpCode.trim().length < 6) {
+      setErrorMsg('Silakan masukkan 6 digit kode OTP yang diterima di email Outlook.')
+      return
+    }
+
+    setLoading(true)
+    const nimValidation = validateNimStructure(nim)
+    const studentEmail = nimValidation.generatedEmail
+
+    try {
+      // 1. Verifikasi kode OTP
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: studentEmail,
+        token: otpCode.trim(),
+        type: 'email'
+      })
+
+      if (error) {
+        setErrorMsg('Kode verifikasi salah atau sudah kadaluarsa. Silakan periksa kembali email Anda.')
+        setLoading(false)
+        return
+      }
+
+      if (data?.session) {
+        // 2. Set password akun yang dipilih user agar selanjutnya bisa login langsung
+        if (password) {
+          try {
+            await supabase.auth.updateUser({ password })
+          } catch (pwdErr) {
+            console.warn('Set password err:', pwdErr)
+          }
+        }
+
+        // 3. Simpan data lengkap ke tabel 'profiles'
+        if (data.session.user?.id) {
+          try {
+            await supabase.from('profiles').upsert({
+              id: data.session.user.id,
+              email: studentEmail,
+              full_name: fullName.trim(),
+              nim: nim.trim(),
+              updated_at: new Date().toISOString()
+            })
+          } catch (pErr) {
+            console.warn('Profile upsert err:', pErr)
+          }
         }
 
         setCurrentUserRole('user')
@@ -238,7 +291,7 @@ export default function LoginPage() {
         navigate('/dashboard', { replace: true })
       }
     } catch (err) {
-      setErrorMsg('Terjadi kesalahan koneksi. Silakan coba lagi.')
+      setErrorMsg('Gagal memverifikasi pendaftaran. Silakan coba lagi.')
     } finally {
       setLoading(false)
     }
@@ -629,132 +682,205 @@ export default function LoginPage() {
           )}
 
           {/* ======================================================= */}
-          {/* TAB 2: BUAT AKUN BARU -> SSO KAMPUS (NIM 11 DIGIT)      */}
+          {/* TAB 2: BUAT AKUN BARU -> VERIFIKASI OTP RESMI EMAIL     */}
           {/* ======================================================= */}
           {activeTab === 'signup' && (
-            <form onSubmit={handleRegisterStudent} className="space-y-3.5">
-              <div className="bg-green-50 border border-green-200 p-3 rounded-2xl flex items-start gap-2.5 text-[11px] text-green-950 font-medium leading-relaxed">
-                <ShieldCheck className="w-5 h-5 text-green-700 flex-shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-bold text-green-900 block mb-0.5">Akun Resmi Mahasiswa (SSO Kampus)</span>
-                  Pendaftaran diverifikasi langsung berdasarkan <strong>11 digit NIM resmi</strong> Prasetiya Mulya. Email SSO terkunci otomatis sesuai identitas kampus Anda.
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                  NIM Mahasiswa (11 Digit Angka) *
-                </label>
-                <div className="relative">
-                  <Hash className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    maxLength={11}
-                    required
-                    value={nim}
-                    onChange={(e) => handleNimChange(e.target.value)}
-                    placeholder="Contoh: 23324000123"
-                    className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all tracking-wider"
-                  />
-                </div>
-
-                {/* Live Badge Rincian NIM */}
-                {nim.length > 0 && (
-                  <div className="mt-1.5 text-[11px]">
-                    {nim.length < 11 ? (
-                      <span className="text-amber-700 font-medium">
-                        ⏳ {nim.length}/11 digit (Ketik {11 - nim.length} digit lagi)
-                      </span>
-                    ) : nimInfo.isValid ? (
-                      <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl text-emerald-950 space-y-1">
-                        <div className="font-bold flex items-center gap-1.5 text-emerald-800">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Format NIM Terverifikasi</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1.5 text-[10px] font-semibold text-emerald-900 pt-0.5">
-                          <div>Jurusan: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">{nimInfo.prodi}</span></div>
-                          <div>Angkatan: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">{nimInfo.angkatan}</span></div>
-                          <div>No. Urut: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">#{nimInfo.nomor}</span></div>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-red-600 font-medium flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        {nimInfo.message}
-                      </span>
-                    )}
+            signUpStep === 'form' ? (
+              // STEP 1: INPUT DATA & KIRIM OTP
+              <form onSubmit={handleSignUpRequestOtp} className="space-y-3.5">
+                <div className="bg-green-50 border border-green-200 p-3 rounded-2xl flex items-start gap-2.5 text-[11px] text-green-950 font-medium leading-relaxed">
+                  <ShieldCheck className="w-5 h-5 text-green-700 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-green-900 block mb-0.5">Pendaftaran Resmi Mahasiswa Prasetiya Mulya</span>
+                    Kode verifikasi OTP 6-digit akan dikirimkan langsung ke inbox email Outlook resmi kampus Anda untuk membuktikan keaslian akun.
                   </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                  Nama Lengkap Mahasiswa *
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Nama Lengkap Sesuai KTM"
-                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
-                  />
                 </div>
-              </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Email SSO Kampus Resmi
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    NIM Mahasiswa (11 Digit Angka) *
                   </label>
-                  <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
-                    <Lock className="w-2.5 h-2.5" /> Terkunci Otomatis Sesuai NIM
-                  </span>
+                  <div className="relative">
+                    <Hash className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      maxLength={11}
+                      required
+                      value={nim}
+                      onChange={(e) => handleNimChange(e.target.value)}
+                      placeholder="Contoh: 23324000123"
+                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all tracking-wider"
+                    />
+                  </div>
+
+                  {/* Live Badge Rincian NIM */}
+                  {nim.length > 0 && (
+                    <div className="mt-1.5 text-[11px]">
+                      {nim.length < 11 ? (
+                        <span className="text-amber-700 font-medium">
+                          ⏳ {nim.length}/11 digit (Ketik {11 - nim.length} digit lagi)
+                        </span>
+                      ) : nimInfo.isValid ? (
+                        <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl text-emerald-950 space-y-1">
+                          <div className="font-bold flex items-center gap-1.5 text-emerald-800">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Format NIM Terverifikasi</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5 text-[10px] font-semibold text-emerald-900 pt-0.5">
+                            <div>Jurusan: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">{nimInfo.prodi}</span></div>
+                            <div>Angkatan: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">{nimInfo.angkatan}</span></div>
+                            <div>No. Urut: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">#{nimInfo.nomor}</span></div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-red-600 font-medium flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          {nimInfo.message}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    Nama Lengkap Mahasiswa *
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Nama Lengkap Sesuai KTM"
+                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      Email SSO Kampus Resmi
+                    </label>
+                    <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Terkunci Otomatis
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      readOnly
+                      value={nim.length === 11 ? `${nim}@student.prasetiyamulya.ac.id` : 'Otomatis terisi saat 11 digit NIM dimasukkan...'}
+                      className="w-full pl-9 pr-3 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-600 font-mono cursor-not-allowed select-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    Buat Password Akun *
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Minimal 6 karakter"
+                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading || nim.length !== 11 || !nimInfo.isValid}
+                    className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-semibold shadow-md shadow-green-700/20 transition-all"
+                  >
+                    <Mail className="w-4 h-4" />
+                    <span>{loading ? 'Mengirim Kode OTP...' : 'Kirim Kode Verifikasi ke Outlook Kampus'}</span>
+                  </button>
+                  <p className="text-[10px] text-gray-400 text-center mt-2">
+                    Kode 6 digit akan dikirimkan ke kotak masuk Outlook mahasiswa Anda.
+                  </p>
+                </div>
+              </form>
+            ) : (
+              // STEP 2: VERIFIKASI KODE OTP
+              <form onSubmit={handleSignUpVerifyOtp} className="space-y-4 animate-fade-in-up">
+                <div className="bg-green-50/80 p-3.5 rounded-2xl border border-green-200 text-center text-xs">
+                  <div className="text-gray-500">Kode verifikasi pendaftaran telah dikirim ke:</div>
+                  <div className="font-bold text-green-950 text-sm mt-0.5">{nim}@student.prasetiyamulya.ac.id</div>
+                </div>
+
+                <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-200 text-[11px] text-blue-900 leading-relaxed text-left space-y-1">
+                  <div className="font-bold flex items-center gap-1 text-blue-950">
+                    <span>💡 Periksa Inbox Outlook Kampus:</span>
+                  </div>
+                  <p>Buka <strong>Outlook / Webmail Mahasiswa Prasetiya Mulya</strong> di tab browser Anda, salin 6 digit kode OTP yang dikirimkan oleh sistem.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2 text-center">
+                    Masukkan 6 Digit Kode OTP
+                  </label>
                   <input
                     type="text"
-                    readOnly
-                    value={nim.length === 11 ? `${nim}@student.prasetiyamulya.ac.id` : 'Otomatis terisi saat 11 digit NIM dimasukkan...'}
-                    className="w-full pl-9 pr-3 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-600 font-mono cursor-not-allowed select-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                  Buat Password Akun *
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
+                    maxLength={8}
                     required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Minimal 6 karakter"
-                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                    autoFocus
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value)}
+                    placeholder="123456"
+                    className="w-full text-center tracking-[0.4em] text-2xl font-black font-mono py-2.5 bg-gray-50 border-2 border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-600 transition-all"
                   />
+                  <p className="text-[11px] text-gray-400 text-center mt-1.5">
+                    Pastikan kode yang dimasukkan persis sama dengan yang ada di email.
+                  </p>
                 </div>
-              </div>
 
-              <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={loading || nim.length !== 11 || !nimInfo.isValid}
-                  className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-semibold shadow-md shadow-green-700/20 transition-all"
+                  disabled={loading || otpCode.trim().length < 6}
+                  className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-semibold shadow-md shadow-green-700/20 transition-all"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>{loading ? 'Mendaftarkan Akun...' : 'Daftar Akun Mahasiswa Resmi'}</span>
+                  <span>{loading ? 'Memverifikasi...' : 'Verifikasi Kode & Selesaikan Pendaftaran'}</span>
                 </button>
-                <p className="text-[10px] text-gray-400 text-center mt-2">
-                  Dengan mendaftar, akun Anda terikat secara resmi dengan NIM dan domain mahasiswa Universitas Prasetiya Mulya.
-                </p>
-              </div>
-            </form>
+
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSignUpStep('form')
+                      setOtpCode('')
+                      setErrorMsg('')
+                    }}
+                    className="text-gray-500 hover:text-gray-700 underline"
+                  >
+                    ← Ubah Data Pendaftaran
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={resendTimer > 0 || loading}
+                    onClick={handleSignUpRequestOtp}
+                    className={`font-semibold ${
+                      resendTimer > 0 
+                        ? 'text-gray-400 cursor-not-allowed' 
+                        : 'text-green-700 hover:underline'
+                    }`}
+                  >
+                    {resendTimer > 0 ? `Kirim ulang (${resendTimer}s)` : 'Kirim Ulang Kode'}
+                  </button>
+                </div>
+              </form>
+            )
           )}
 
           {/* Footer Link ke Beranda */}
