@@ -30,6 +30,31 @@ export const isCampusEmail = (emailStr) => {
   )
 }
 
+export const PRASMUL_PRODI_MAP = {
+  // STEM (School of Applied STEM)
+  '2310': { school: 'School of Applied STEM', shortSchool: 'STEM', name: 'Business Mathematics', code: 'BM' },
+  '2320': { school: 'School of Applied STEM', shortSchool: 'STEM', name: 'Food Business Technology', code: 'FBT' },
+  '2330': { school: 'School of Applied STEM', shortSchool: 'STEM', name: 'Renewable Energy Engineering', code: 'REE' },
+  '2340': { school: 'School of Applied STEM', shortSchool: 'STEM', name: 'Applied AI & Robotics', code: 'AIR' },
+  '2350': { school: 'School of Applied STEM', shortSchool: 'STEM', name: 'Digital Business Technology', code: 'DBT' },
+  '2360': { school: 'School of Applied STEM', shortSchool: 'STEM', name: 'Product Design Engineering', code: 'PDI' },
+
+  // SBE (School of Business and Economics)
+  '1316': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Financial Technology (Fintech)', code: 'Fintech' },
+  '1311': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'S1 Business', code: 'Business' },
+  '1312': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'International Marketing', code: 'Marketing' },
+  '1313': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Finance & Banking', code: 'Finance' },
+  '1314': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Branding', code: 'Branding' },
+  '1315': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Hospitality Business', code: 'Hospitality' },
+  '1317': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Event Management', code: 'Event' },
+  '1318': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Business Economics', code: 'Economics' },
+  '1319': { school: 'School of Business and Economics', shortSchool: 'SBE', name: 'Accounting', code: 'Accounting' },
+
+  // SLIS (School of Law and International Studies)
+  '3310': { school: 'School of Law and International Studies', shortSchool: 'SLIS', name: 'International Business Law', code: 'Law' },
+  '3311': { school: 'School of Law and International Studies', shortSchool: 'SLIS', name: 'International Business Law', code: 'Law' },
+}
+
 export const validateNimStructure = (nimStr) => {
   const clean = (nimStr || '').toString().trim()
   if (!/^\d{11}$/.test(clean)) {
@@ -38,21 +63,34 @@ export const validateNimStructure = (nimStr) => {
       message: 'NIM harus terdiri dari tepat 11 digit angka.'
     }
   }
-  const prodi = clean.slice(0, 3)
-  
-  // Deteksi angkatan: posisi 3-5 atau jika ada angka 0 di posisi ke-4, ada di posisi 4-6 (cth: 23302410001 -> 2024)
-  let angkatan = clean.slice(3, 5)
-  let nomor = clean.slice(5)
-  if (clean[3] === '0') {
-    angkatan = clean.slice(4, 6)
-    nomor = clean.slice(6)
+
+  const prodiPrefix = clean.slice(0, 4)
+  const angkatanDigits = clean.slice(4, 6)
+  const rawNomor = clean.slice(6)
+  // Nomor urut tanpa awalan kampus (contoh 10001 -> 1, 10032 -> 32)
+  const nomorUrut = parseInt(rawNomor.slice(1), 10) || rawNomor
+
+  const prodiInfo = PRASMUL_PRODI_MAP[prodiPrefix] || {
+    school: clean.startsWith('1')
+      ? 'School of Business and Economics'
+      : clean.startsWith('2')
+      ? 'School of Applied STEM'
+      : 'School of Law and International Studies',
+    shortSchool: clean.startsWith('1') ? 'SBE' : clean.startsWith('2') ? 'STEM' : 'SLIS',
+    name: `Prodi (${prodiPrefix})`,
+    code: prodiPrefix
   }
 
   return {
     isValid: true,
-    prodi,
-    angkatan: `20${angkatan}`,
-    nomor,
+    prodi: prodiPrefix,
+    prodiCode: prodiInfo.code,
+    prodiName: prodiInfo.name,
+    schoolName: prodiInfo.school,
+    shortSchool: prodiInfo.shortSchool,
+    angkatan: `20${angkatanDigits}`,
+    nomor: nomorUrut,
+    rawNomor,
     generatedEmail: `${clean}@student.prasetiyamulya.ac.id`
   }
 }
@@ -339,11 +377,14 @@ export function AppProvider({ children }) {
 
         // Sinkronisasi data profil mahasiswa secara otomatis
         try {
+          const parsedNim = validateNimStructure(nim)
           await supabase.from('profiles').upsert({
             id: newSession.user.id,
             email: userEmail,
             full_name: name,
             nim: nim,
+            prodi: parsedNim.isValid ? parsedNim.prodiName : (meta.prodi_name || null),
+            school: parsedNim.isValid ? parsedNim.schoolName : (meta.school || null),
             updated_at: new Date().toISOString()
           })
         } catch (e) {

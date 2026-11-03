@@ -187,6 +187,9 @@ export default function LoginPage() {
           data: {
             full_name: fullName.trim(),
             nim: nim.trim(),
+            prodi_code: nimValidation.prodiCode,
+            prodi_name: nimValidation.prodiName,
+            school: nimValidation.schoolName,
             role: 'student_org'
           }
         }
@@ -435,15 +438,22 @@ export default function LoginPage() {
                           ⏳ {nim.length}/11 digit (Ketik {11 - nim.length} digit lagi)
                         </span>
                       ) : nimInfo.isValid ? (
-                        <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl text-emerald-950 space-y-1">
-                          <div className="font-bold flex items-center gap-1.5 text-emerald-800">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Format NIM Terverifikasi</span>
+                        <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl text-emerald-950 space-y-1.5">
+                          <div className="font-bold flex items-center justify-between text-emerald-800">
+                            <div className="flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Format NIM Terverifikasi</span>
+                            </div>
+                            <span className="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full font-bold">
+                              {nimInfo.shortSchool}
+                            </span>
                           </div>
-                          <div className="grid grid-cols-3 gap-1.5 text-[10px] font-semibold text-emerald-900 pt-0.5">
-                            <div>Jurusan: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">{nimInfo.prodi}</span></div>
-                            <div>Angkatan: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">{nimInfo.angkatan}</span></div>
-                            <div>No. Urut: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">#{nimInfo.nomor}</span></div>
+                          <div className="text-[11px] text-emerald-900 font-bold">
+                            {nimInfo.prodiName}
+                          </div>
+                          <div className="grid grid-cols-2 gap-1 text-[10px] text-emerald-800 font-medium pt-1 border-t border-emerald-200/60">
+                            <div>Angkatan: <span className="font-semibold">{nimInfo.angkatan}</span></div>
+                            <div>No. Urut: <span className="font-mono font-bold">#{nimInfo.nomor}</span></div>
                           </div>
                         </div>
                       ) : (
