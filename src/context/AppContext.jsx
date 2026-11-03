@@ -19,6 +19,16 @@ export const isAdminEmail = (emailStr) => {
   )
 }
 
+export const isCampusEmail = (emailStr) => {
+  const lower = (emailStr || '').toLowerCase().trim()
+  return (
+    lower.endsWith('@prasetiyamulya.ac.id') ||
+    lower.endsWith('@student.prasetiyamulya.ac.id') ||
+    lower.endsWith('.prasetiyamulya.ac.id') ||
+    isAdminEmail(lower)
+  )
+}
+
 export function AppProvider({ children }) {
   // STATE ROLE (Admin vs User)
   const [currentUserRole, setCurrentUserRole] = useState(() => {

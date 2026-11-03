@@ -17,7 +17,7 @@ import {
   UserPlus
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
-import { useApp, isAdminEmail } from '../context/AppContext'
+import { useApp, isAdminEmail, isCampusEmail } from '../context/AppContext'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -136,6 +136,11 @@ export default function LoginPage() {
 
     if (!email.trim()) {
       setErrorMsg('Mohon masukkan email mahasiswa kampus Anda.')
+      return
+    }
+
+    if (!isCampusEmail(email)) {
+      setErrorMsg('Pendaftaran akun mahasiswa WAJIB menggunakan email resmi kampus Prasetiya Mulya (@student.prasetiyamulya.ac.id atau @prasetiyamulya.ac.id) agar terverifikasi dan trusted!')
       return
     }
 
@@ -496,6 +501,11 @@ export default function LoginPage() {
             signUpStep === 'form' ? (
               // Step 1: Input Data & Kirim OTP
               <form onSubmit={handleSignUpRequestOtp} className="space-y-3.5">
+                <div className="bg-green-50 border border-green-200 p-2.5 rounded-xl flex items-center gap-2 text-[11px] text-green-900 font-semibold">
+                  <ShieldCheck className="w-4 h-4 text-green-700 flex-shrink-0" />
+                  <span>Trusted Campus Account: Wajib menggunakan email resmi mahasiswa Prasetiya Mulya (@student.prasetiyamulya.ac.id).</span>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
@@ -595,6 +605,13 @@ export default function LoginPage() {
                 <div className="bg-green-50/70 p-3.5 rounded-2xl border border-green-200 text-center text-xs">
                   <div className="text-gray-500">Kode verifikasi pendaftaran telah dikirim ke:</div>
                   <div className="font-bold text-gray-900 mt-0.5">{email}</div>
+                </div>
+
+                <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-200 text-[11px] text-blue-900 leading-relaxed text-left space-y-1">
+                  <div className="font-bold flex items-center gap-1 text-blue-950">
+                    <span>💡 Tips Email SSO Mahasiswa:</span>
+                  </div>
+                  <p>Jika kode belum muncul di tab <strong>Focused/Utama</strong>, mohon periksa tab <strong>'Other'</strong> atau folder <strong>'Junk Email / Spam'</strong> pada Outlook/Webmail kampus Anda.</p>
                 </div>
 
                 <div>
