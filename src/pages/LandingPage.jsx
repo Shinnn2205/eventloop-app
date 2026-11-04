@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Spinner from '../components/Spinner'
 import { useApp } from '../context/AppContext'
@@ -11,11 +12,75 @@ export default function LandingPage() {
 
   const targetDashboard = currentUserRole === 'admin' ? '/admin' : '/dashboard'
 
+  // State untuk melacak section yang sedang dilihat (ScrollSpy)
+  const [activeSection, setActiveSection] = useState('home')
+
+  // State untuk efek cahaya hijau interaktif mengikuti arah pandangan kursor
+  const [mousePosition, setMousePosition] = useState({ x: -1000, y: -1000 })
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      setMousePosition({ x: e.clientX, y: e.clientY })
+    }
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [])
+
+  useEffect(() => {
+    const sectionIds = ['masalah', 'circular-score', 'flow', 'business-model']
+
+    const handleScroll = () => {
+      const scrollPos = window.scrollY + 180
+
+      if (window.scrollY < 200) {
+        setActiveSection('home')
+        return
+      }
+
+      let current = ''
+      for (const id of sectionIds) {
+        const el = document.getElementById(id)
+        if (el) {
+          const top = el.offsetTop
+          const height = el.offsetHeight
+          if (scrollPos >= top && scrollPos < top + height) {
+            current = id
+            break
+          }
+        }
+      }
+      if (current) setActiveSection(current)
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll()
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const scrollToSection = (e, id) => {
+    e.preventDefault()
+    const el = document.getElementById(id)
+    if (el) {
+      const yOffset = -75
+      const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset
+      window.scrollTo({ top: y, behavior: 'smooth' })
+      setActiveSection(id)
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-[#F6FBF8] text-slate-800 selection:bg-emerald-100 selection:text-emerald-800 font-sans">
-      {/* Navbar */}
-      <nav className="fixed top-0 w-full bg-white/85 backdrop-blur-xl border-b border-emerald-100/80 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-3.5 flex items-center justify-between">
+    <div className="min-h-screen bg-[#F6FBF8] text-slate-800 selection:bg-emerald-100 selection:text-emerald-800 font-sans relative overflow-x-hidden">
+      {/* Efek Cahaya Hijau Mengikuti Gerakan / Arah Pandangan Kursor */}
+      <div 
+        className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-300"
+        style={{
+          background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(16, 185, 129, 0.12), transparent 75%)`
+        }}
+      />
+
+      {/* Navbar dengan Indikator Hijau Menyesuaikan Posisi yang Sedang Dilihat */}
+      <nav className="fixed top-0 w-full bg-white/85 backdrop-blur-xl border-b border-emerald-100/80 z-50 transition-all">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 group">
             <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center text-white shadow-sm shadow-emerald-600/20 group-hover:scale-105 transition-transform">
               <Recycle className="w-6 h-6" />
@@ -28,12 +93,56 @@ export default function LandingPage() {
             </div>
           </Link>
           
-          <div className="hidden md:flex items-center gap-7">
-            <a href="#masalah" className="text-xs font-semibold text-slate-600 hover:text-emerald-700 transition-colors">Masalah & Solusi</a>
-            <a href="#flow" className="text-xs font-semibold text-slate-600 hover:text-emerald-700 transition-colors">Alur Aplikasi</a>
-            <a href="#circular-score" className="text-xs font-semibold text-slate-600 hover:text-emerald-700 transition-colors">Circular Score</a>
-            <a href="#business-model" className="text-xs font-semibold text-slate-600 hover:text-emerald-700 transition-colors">Model Bisnis</a>
-            <Link to={sessionUser ? "/marketplace" : "/login"} className="text-xs text-emerald-700 font-bold hover:text-emerald-800 transition-colors bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200/60">
+          {/* MENU NAVIGASI DENGAN INDIKATOR HIJAU INTERAKTIF */}
+          <div className="hidden md:flex items-center gap-1 bg-emerald-50/70 p-1 rounded-full border border-emerald-100/90 shadow-2xs">
+            <a 
+              href="#masalah" 
+              onClick={(e) => scrollToSection(e, 'masalah')}
+              className={`text-xs px-3.5 py-1.5 rounded-full transition-all duration-200 cursor-pointer ${
+                activeSection === 'masalah'
+                  ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                  : 'font-semibold text-slate-600 hover:text-emerald-800 hover:bg-emerald-100/60'
+              }`}
+            >
+              Masalah & Solusi
+            </a>
+            <a 
+              href="#circular-score" 
+              onClick={(e) => scrollToSection(e, 'circular-score')}
+              className={`text-xs px-3.5 py-1.5 rounded-full transition-all duration-200 cursor-pointer ${
+                activeSection === 'circular-score'
+                  ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                  : 'font-semibold text-slate-600 hover:text-emerald-800 hover:bg-emerald-100/60'
+              }`}
+            >
+              Circular Score
+            </a>
+            <a 
+              href="#flow" 
+              onClick={(e) => scrollToSection(e, 'flow')}
+              className={`text-xs px-3.5 py-1.5 rounded-full transition-all duration-200 cursor-pointer ${
+                activeSection === 'flow'
+                  ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                  : 'font-semibold text-slate-600 hover:text-emerald-800 hover:bg-emerald-100/60'
+              }`}
+            >
+              Alur Aplikasi
+            </a>
+            <a 
+              href="#business-model" 
+              onClick={(e) => scrollToSection(e, 'business-model')}
+              className={`text-xs px-3.5 py-1.5 rounded-full transition-all duration-200 cursor-pointer ${
+                activeSection === 'business-model'
+                  ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                  : 'font-semibold text-slate-600 hover:text-emerald-800 hover:bg-emerald-100/60'
+              }`}
+            >
+              Model Bisnis
+            </a>
+            <Link 
+              to={sessionUser ? "/marketplace" : "/login"} 
+              className="text-xs text-emerald-800 font-bold hover:text-emerald-950 transition-all bg-emerald-100/90 hover:bg-emerald-200 px-3.5 py-1.5 rounded-full border border-emerald-300/80 shadow-2xs ml-0.5"
+            >
               Marketplace
             </Link>
           </div>
