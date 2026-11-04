@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import Spinner from '../components/Spinner'
 import { useApp } from '../context/AppContext'
@@ -12,56 +12,126 @@ export default function LandingPage() {
 
   const targetDashboard = currentUserRole === 'admin' ? '/admin' : '/dashboard'
 
+  // Daftar item navigasi
+  const navSections = [
+    { id: 'masalah', label: 'Masalah & Solusi' },
+    { id: 'circular-score', label: 'Circular Score' },
+    { id: 'flow', label: 'Alur Aplikasi' },
+    { id: 'business-model', label: 'Model Bisnis' },
+  ]
+
   // State untuk melacak section yang sedang dilihat (ScrollSpy)
   const [activeSection, setActiveSection] = useState('home')
+  
+  // Style pill hijau meluncur mulus (Sliding Pill Indicator)
+  const [pillStyle, setPillStyle] = useState({ left: 0, width: 0, opacity: 0 })
+  const itemRefs = useRef({})
+  const navContainerRef = useRef(null)
 
-  // State untuk efek cahaya hijau interaktif mengikuti arah pandangan kursor
-  const [mousePosition, setMousePosition] = useState({ x: -1000, y: -1000 })
-
+  // Update posisi sliding pill hijau secara presisi & mulus saat section aktif berganti
   useEffect(() => {
-    const handleMouseMove = (e) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
+    const updatePill = () => {
+      if (activeSection && activeSection !== 'home' && itemRefs.current[activeSection] && navContainerRef.current) {
+        const activeEl = itemRefs.current[activeSection]
+        const containerRect = navContainerRef.current.getBoundingClientRect()
+        const activeRect = activeEl.getBoundingClientRect()
+        setPillStyle({
+          left: activeRect.left - containerRect.left,
+          width: activeRect.width,
+          opacity: 1
+        })
+      } else {
+        setPillStyle((prev) => ({ ...prev, opacity: 0 }))
+      }
     }
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
+
+    updatePill()
+    window.addEventListener('resize', updatePill)
+    return () => window.removeEventListener('resize', updatePill)
+  }, [activeSection])
+
+  // Efek ambient glow kursor hijau dengan Lerp (Linear Interpolation) fluid smoothing - 60 FPS tanpa re-render
+  useEffect(() => {
+    let animId
+    let curX = window.innerWidth / 2
+    let curY = 300
+    let tgtX = curX
+    let tgtY = curY
+    let isVisible = false
+
+    const handleMouseMove = (e) => {
+      tgtX = e.clientX
+      tgtY = e.clientY
+      isVisible = true
+    }
+
+    const loop = () => {
+      // Lerp faktor 0.1 untuk transisi gerakan kursor yang sangat halus dan organik
+      curX += (tgtX - curX) * 0.1
+      curY += (tgtY - curY) * 0.1
+
+      const glowEl = document.getElementById('ambient-cursor-glow')
+      if (glowEl) {
+        glowEl.style.transform = `translate3d(${curX}px, ${curY}px, 0) translate(-50%, -50%)`
+        if (isVisible && glowEl.style.opacity !== '1') {
+          glowEl.style.opacity = '1'
+        }
+      }
+      animId = requestAnimationFrame(loop)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove, { passive: true })
+    animId = requestAnimationFrame(loop)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      cancelAnimationFrame(animId)
+    }
   }, [])
 
+  // ScrollSpy observer untuk mendeteksi bagian yang sedang dibaca pengguna secara akurat & mulus
   useEffect(() => {
     const sectionIds = ['masalah', 'circular-score', 'flow', 'business-model']
 
     const handleScroll = () => {
-      const scrollPos = window.scrollY + 180
-
-      if (window.scrollY < 200) {
+      const scrollY = window.scrollY
+      if (scrollY < 180) {
         setActiveSection('home')
         return
       }
 
-      let current = ''
+      // Garis fokus pandangan mata (focal point ~ 32% tinggi layar)
+      const focalPoint = scrollY + (window.innerHeight * 0.32)
+
+      let matched = ''
       for (const id of sectionIds) {
         const el = document.getElementById(id)
         if (el) {
-          const top = el.offsetTop
-          const height = el.offsetHeight
-          if (scrollPos >= top && scrollPos < top + height) {
-            current = id
+          const rect = el.getBoundingClientRect()
+          const top = rect.top + scrollY
+          const bottom = top + el.offsetHeight
+          if (focalPoint >= top && focalPoint < bottom) {
+            matched = id
             break
           }
         }
       }
-      if (current) setActiveSection(current)
+
+      if (matched && matched !== activeSection) {
+        setActiveSection(matched)
+      }
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll()
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+  }, [activeSection])
 
   const scrollToSection = (e, id) => {
     e.preventDefault()
     const el = document.getElementById(id)
     if (el) {
-      const yOffset = -75
+      const yOffset = -72
       const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset
       window.scrollTo({ top: y, behavior: 'smooth' })
       setActiveSection(id)
@@ -70,11 +140,13 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#F6FBF8] text-slate-800 selection:bg-emerald-100 selection:text-emerald-800 font-sans relative overflow-x-hidden">
-      {/* Efek Cahaya Hijau Mengikuti Gerakan / Arah Pandangan Kursor */}
+      {/* Efek Cahaya Hijau Mengikuti Gerakan / Arah Pandangan Kursor Mulus (Lerp Physics) */}
       <div 
-        className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-300"
+        id="ambient-cursor-glow"
+        className="pointer-events-none fixed top-0 left-0 w-[600px] h-[600px] rounded-full blur-[80px] z-0 opacity-0 transition-opacity duration-700 will-change-transform"
         style={{
-          background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(16, 185, 129, 0.12), transparent 75%)`
+          background: 'radial-gradient(circle, rgba(16, 185, 129, 0.16) 0%, rgba(52, 211, 153, 0.08) 45%, transparent 70%)',
+          transform: 'translate3d(-500px, -500px, 0) translate(-50%, -50%)'
         }}
       />
 
@@ -93,55 +165,43 @@ export default function LandingPage() {
             </div>
           </Link>
           
-          {/* MENU NAVIGASI DENGAN INDIKATOR HIJAU INTERAKTIF */}
-          <div className="hidden md:flex items-center gap-1 bg-emerald-50/70 p-1 rounded-full border border-emerald-100/90 shadow-2xs">
-            <a 
-              href="#masalah" 
-              onClick={(e) => scrollToSection(e, 'masalah')}
-              className={`text-xs px-3.5 py-1.5 rounded-full transition-all duration-200 cursor-pointer ${
-                activeSection === 'masalah'
-                  ? 'bg-emerald-600 text-white font-bold shadow-xs'
-                  : 'font-semibold text-slate-600 hover:text-emerald-800 hover:bg-emerald-100/60'
-              }`}
-            >
-              Masalah & Solusi
-            </a>
-            <a 
-              href="#circular-score" 
-              onClick={(e) => scrollToSection(e, 'circular-score')}
-              className={`text-xs px-3.5 py-1.5 rounded-full transition-all duration-200 cursor-pointer ${
-                activeSection === 'circular-score'
-                  ? 'bg-emerald-600 text-white font-bold shadow-xs'
-                  : 'font-semibold text-slate-600 hover:text-emerald-800 hover:bg-emerald-100/60'
-              }`}
-            >
-              Circular Score
-            </a>
-            <a 
-              href="#flow" 
-              onClick={(e) => scrollToSection(e, 'flow')}
-              className={`text-xs px-3.5 py-1.5 rounded-full transition-all duration-200 cursor-pointer ${
-                activeSection === 'flow'
-                  ? 'bg-emerald-600 text-white font-bold shadow-xs'
-                  : 'font-semibold text-slate-600 hover:text-emerald-800 hover:bg-emerald-100/60'
-              }`}
-            >
-              Alur Aplikasi
-            </a>
-            <a 
-              href="#business-model" 
-              onClick={(e) => scrollToSection(e, 'business-model')}
-              className={`text-xs px-3.5 py-1.5 rounded-full transition-all duration-200 cursor-pointer ${
-                activeSection === 'business-model'
-                  ? 'bg-emerald-600 text-white font-bold shadow-xs'
-                  : 'font-semibold text-slate-600 hover:text-emerald-800 hover:bg-emerald-100/60'
-              }`}
-            >
-              Model Bisnis
-            </a>
+          {/* MENU NAVIGASI DENGAN INDIKATOR HIJAU MELUNCUR MULUS (SLIDING PILL) */}
+          <div 
+            ref={navContainerRef}
+            className="relative hidden md:flex items-center gap-1 bg-emerald-50/70 p-1 rounded-full border border-emerald-100/90 shadow-2xs backdrop-blur-sm"
+          >
+            {/* Sliding Green Pill Element */}
+            <div 
+              className="absolute top-1 bottom-1 bg-emerald-600 rounded-full shadow-xs shadow-emerald-700/25 pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
+              style={{
+                transform: `translateX(${pillStyle.left}px)`,
+                width: `${pillStyle.width}px`,
+                opacity: pillStyle.opacity
+              }}
+            />
+
+            {navSections.map((sec) => {
+              const isActive = activeSection === sec.id
+              return (
+                <a 
+                  key={sec.id}
+                  ref={(el) => (itemRefs.current[sec.id] = el)}
+                  href={`#${sec.id}`}
+                  onClick={(e) => scrollToSection(e, sec.id)}
+                  className={`relative z-10 text-xs px-3.5 py-1.5 rounded-full transition-colors duration-200 cursor-pointer select-none font-semibold ${
+                    isActive 
+                      ? 'text-white font-bold' 
+                      : 'text-slate-600 hover:text-emerald-800 hover:bg-emerald-100/40'
+                  }`}
+                >
+                  {sec.label}
+                </a>
+              )
+            })}
+
             <Link 
               to={sessionUser ? "/marketplace" : "/login"} 
-              className="text-xs text-emerald-800 font-bold hover:text-emerald-950 transition-all bg-emerald-100/90 hover:bg-emerald-200 px-3.5 py-1.5 rounded-full border border-emerald-300/80 shadow-2xs ml-0.5"
+              className="relative z-10 text-xs text-emerald-800 font-bold hover:text-emerald-950 transition-all bg-emerald-100/90 hover:bg-emerald-200 px-3.5 py-1.5 rounded-full border border-emerald-300/80 shadow-2xs ml-0.5"
             >
               Marketplace
             </Link>
