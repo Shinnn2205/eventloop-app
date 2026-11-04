@@ -226,7 +226,7 @@ export default function LoginPage() {
   }
 
   // ============================================================
-  // 2. ALUR DAFTAR AKUN MAHASISWA - STEP 1: KIRIM KODE OTP KE OUTLOOK
+  // 2. ALUR DAFTAR AKUN MAHASISWA - STEP 1: SIMPAN DATA KE DATABASE & KIRIM KODE OTP KE OUTLOOK
   // ============================================================
   const handleSignUpRequestOtp = async (e) => {
     if (e && e.preventDefault) e.preventDefault()
@@ -253,47 +253,85 @@ export default function LoginPage() {
     const studentEmail = nimValidation.generatedEmail
 
     try {
-      // 1. Cek duplikasi NIM di database Supabase agar tidak ada NIM ganda
-      // Hanya tolak pendaftaran jika akun sudah terverifikasi sebelumnya (memiliki updated_at terdaftar)
-      const { data: existingUser } = await supabase
-        .from('profiles')
-        .select('id, nim, updated_at, full_name')
-        .eq('nim', nim.trim())
-        .maybeSingle()
-
-      if (existingUser && existingUser.nim && existingUser.updated_at) {
-        setErrorMsg(`NIM ${nim.trim()} sudah terdaftar dan terverifikasi dalam sistem. Silakan langsung login pada tab 'Masuk (Login)'.`)
-        setLoading(false)
-        return
-      }
-
-      // 2. Kirim kode OTP via Gmail SMTP ke Outlook mahasiswa
-      // TIDAK mengirimkan options.data profil di sini agar data di database TIDAK masuk sebelum verifikasi OTP selesai
-      const { error } = await supabase.auth.signInWithOtp({
+      // 1. Simpan akun & metadata langsung ke database Supabase Auth (Nama, NIM, Prodi, Password)
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email: studentEmail,
+        password: password,
         options: {
-          shouldCreateUser: true
+          data: {
+            full_name: fullName.trim(),
+            nim: nim.trim(),
+            prodi_code: nimValidation.prodiCode,
+            prodi_name: nimValidation.prodiName,
+            school: nimValidation.schoolName,
+            role: 'student_org'
+          }
         }
       })
 
-      if (error) {
-        setErrorMsg('Gagal mengirim kode verifikasi: ' + error.message)
-      } else {
-        const pendingData = {
-          step: 'otp',
-          email: studentEmail,
-          nim: nim.trim(),
-          fullName: fullName.trim(),
-          password: password,
-          sentAt: Date.now()
+      // 2. Simpan juga ke tabel profiles di database (id, email, full_name, nim, updated_at)
+      if (signUpData?.user?.id) {
+        try {
+          await supabase.from('profiles').upsert({
+            id: signUpData.user.id,
+            email: studentEmail,
+            full_name: fullName.trim(),
+            nim: nim.trim(),
+            updated_at: new Date().toISOString()
+          })
+        } catch (dbErr) {
+          console.warn('Upsert profile err:', dbErr)
         }
-        sessionStorage.setItem('eventloop_pending_signup_otp', JSON.stringify(pendingData))
-        setSignUpStep('otp')
-        setResendTimer(60)
-        setSuccessMsg(`Kode verifikasi OTP berhasil dikirim ke ${studentEmail}. Silakan periksa inbox Outlook Anda!`)
+      }
+
+      // 3. Kirim kode OTP via Supabase ke email Outlook mahasiswa
+      let otpSent = false
+      let otpNotice = ''
+      try {
+        const { error: otpErr } = await supabase.auth.signInWithOtp({
+          email: studentEmail,
+          options: {
+            shouldCreateUser: true
+          }
+        })
+        if (otpErr) {
+          if (otpErr.status === 429 || otpErr.message?.includes('seconds') || otpErr.message?.includes('rate')) {
+            otpSent = true // Kode sebelumnya baru saja terkirim
+            otpNotice = 'Kode verifikasi telah dikirim. Jika Anda baru saja meminta kode, silakan periksa inbox Outlook atau tunggu 60 detik.'
+          } else {
+            otpNotice = otpErr.message
+          }
+        } else {
+          otpSent = true
+        }
+      } catch (errOtp) {
+        otpNotice = errOtp.message || ''
+      }
+
+      // Simpan data pending agar form OTP tetap aktif saat refresh
+      const pendingData = {
+        step: 'otp',
+        email: studentEmail,
+        nim: nim.trim(),
+        fullName: fullName.trim(),
+        password: password,
+        sentAt: Date.now()
+      }
+      sessionStorage.setItem('eventloop_pending_signup_otp', JSON.stringify(pendingData))
+      setSignUpStep('otp')
+      setResendTimer(60)
+
+      if (otpSent) {
+        setSuccessMsg(
+          `Data akun berhasil tersimpan di database! Kode OTP telah dikirim ke ${studentEmail}. Penting: Harap cek Inbox, folder 'Junk Email' / Spam, atau tab 'Lainnya' di Outlook kampus Anda.`
+        )
+      } else {
+        setSuccessMsg(
+          `Data Nama & NIM (${nim.trim()}) berhasil dicatat ke database. ${otpNotice ? `Catatan pengiriman: ${otpNotice}` : 'Silakan masukkan kode OTP yang telah Anda terima di email Outlook.'}`
+        )
       }
     } catch (err) {
-      setErrorMsg('Terjadi kesalahan koneksi saat mengirim kode verifikasi.')
+      setErrorMsg('Terjadi kesalahan koneksi saat memproses pendaftaran: ' + (err.message || ''))
     } finally {
       setLoading(false)
     }
@@ -319,23 +357,43 @@ export default function LoginPage() {
 
     try {
       // 1. Verifikasi kode OTP langsung ke Supabase Auth
-      const { data, error } = await supabase.auth.verifyOtp({
+      let activeSession = null
+      const { data: emailVerifyData, error: emailVerifyErr } = await supabase.auth.verifyOtp({
         email: studentEmail,
         token: cleanOtp,
         type: 'email'
       })
 
-      if (error) {
-        setErrorMsg('Kode verifikasi salah atau sudah kadaluarsa: ' + error.message)
-        setLoading(false)
-        return
+      if (!emailVerifyErr && emailVerifyData?.session) {
+        activeSession = emailVerifyData.session
+      } else {
+        // Coba type 'signup' jika token bertipe konfirmasi pendaftaran
+        const { data: signupVerifyData, error: signupVerifyErr } = await supabase.auth.verifyOtp({
+          email: studentEmail,
+          token: cleanOtp,
+          type: 'signup'
+        })
+        if (!signupVerifyErr && signupVerifyData?.session) {
+          activeSession = signupVerifyData.session
+        }
       }
 
-      if (data?.session) {
+      if (!activeSession) {
+        // Coba verifikasi dengan sign in password jika akun sudah aktif di auth.users
+        const { data: passData } = await supabase.auth.signInWithPassword({
+          email: studentEmail,
+          password
+        })
+        if (passData?.session) {
+          activeSession = passData.session
+        }
+      }
+
+      if (activeSession) {
         // Hapus penanda sesi pending OTP di browser
         sessionStorage.removeItem('eventloop_pending_signup_otp')
 
-        // 2. Simpan password & user metadata akun sekarang setelah OTP terverifikasi
+        // 2. Simpan password & user metadata akun
         if (password) {
           try {
             await supabase.auth.updateUser({ 
@@ -354,16 +412,14 @@ export default function LoginPage() {
           }
         }
 
-        // 3. BARU SEKARANG simpan data lengkap mahasiswa ke tabel profiles di database
-        if (data.session.user?.id) {
+        // 3. Simpan data lengkap mahasiswa ke tabel profiles di database (kolom valid: id, email, full_name, nim, updated_at)
+        if (activeSession.user?.id) {
           try {
             await supabase.from('profiles').upsert({
-              id: data.session.user.id,
+              id: activeSession.user.id,
               email: studentEmail,
               full_name: fullName.trim(),
               nim: nim.trim(),
-              prodi: nimValidation.prodiName,
-              school: nimValidation.schoolName,
               updated_at: new Date().toISOString()
             })
           } catch (profileErr) {
@@ -375,10 +431,10 @@ export default function LoginPage() {
         setCurrentUserRole('user')
         navigate('/dashboard')
       } else {
-        setErrorMsg('Sesi tidak dapat dibuat. Silakan coba lagi.')
+        setErrorMsg('Kode verifikasi salah atau sudah kadaluarsa. Pastikan kode sesuai email terbaru di Outlook Anda.')
       }
     } catch (err) {
-      setErrorMsg('Terjadi kesalahan saat memverifikasi kode OTP.')
+      setErrorMsg('Terjadi kesalahan saat memverifikasi kode OTP: ' + (err.message || ''))
     } finally {
       setLoading(false)
     }
@@ -1082,12 +1138,28 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <div className="bg-teal-50/70 border border-teal-200/70 p-3 rounded-2xl text-left text-[11px] text-teal-950 space-y-1">
-                  <div className="font-bold flex items-center gap-1.5 text-teal-900">
-                    <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-                    <span>Buka Tab Outlook Mahasiswa Anda:</span>
+                <div className="bg-emerald-50/80 border border-emerald-200/80 p-3.5 rounded-2xl text-left text-[11px] text-emerald-950 space-y-1.5">
+                  <div className="font-bold flex items-center gap-1.5 text-emerald-900">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Cek Inbox / Spam Outlook Mahasiswa:</span>
                   </div>
-                  <p className="text-slate-600">Salin kode verifikasi dari email <strong>EventLoop Prasetiya Mulya</strong>, lalu ketik di kotak bawah ini:</p>
+                  <p className="text-slate-600 leading-relaxed">
+                    Salin kode verifikasi dari email <strong>EventLoop</strong>. Jika belum muncul di kotak masuk utama, mohon periksa folder <strong>'Junk Email' / Spam</strong> atau tab <strong>'Lainnya' (Other)</strong>.
+                  </p>
+                  <div className="pt-1.5 text-[10px] text-slate-500 border-t border-emerald-100/90 flex items-center justify-between">
+                    <span>Data Nama & NIM telah tersimpan.</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sessionStorage.removeItem('eventloop_pending_signup_otp')
+                        setActiveTab('login')
+                        setEmail(nim)
+                      }}
+                      className="text-emerald-700 font-bold hover:underline cursor-pointer"
+                    >
+                      Masuk via NIM & Password →
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-1 text-left">

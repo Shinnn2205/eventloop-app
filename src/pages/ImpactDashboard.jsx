@@ -332,7 +332,7 @@ export default function ImpactDashboard() {
               <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200/70 text-xs grid grid-cols-2 gap-3">
                 <div>
                   <span className="text-[10px] text-slate-400 block uppercase">Organisasi / Pemohon:</span>
-                  <strong className="text-slate-900 font-bold">{currentUserName || 'BEM Universitas Prasetiya Mulya'}</strong>
+                  <strong className="text-slate-900 font-bold">{localStorage.getItem('eventloop_user_org') || (currentUserName !== 'Prasmulyan' ? currentUserName : '') || 'Organisasi Mahasiswa'}</strong>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 block uppercase">Kampus / Lokasi:</span>

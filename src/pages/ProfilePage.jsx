@@ -31,41 +31,49 @@ export default function ProfilePage() {
     transactions = []
   } = useApp()
 
-  // Form states
-  const [fullName, setFullName] = useState(currentUserName || '')
-  const [orgName, setOrgName] = useState(() => localStorage.getItem('eventloop_user_org') || 'BEM Universitas Prasetiya Mulya')
-  const [prodi, setProdi] = useState(currentUserStudyProgram || '')
+  // Form states - Dikosongkan secara default sebelum diisi dan disimpan pengguna
+  const [fullName, setFullName] = useState(currentUserName !== 'Prasmulyan' ? (currentUserName || '') : '')
+  const [orgName, setOrgName] = useState(() => localStorage.getItem('eventloop_user_org') || '')
+  const [prodi, setProdi] = useState(currentUserStudyProgram !== 'Prasetiya Mulya' ? (currentUserStudyProgram || '') : '')
   const [nim, setNim] = useState(() => localStorage.getItem('eventloop_user_nim') || '')
-  const [phone, setPhone] = useState(() => localStorage.getItem('eventloop_user_phone') || '081298765432')
+  const [phone, setPhone] = useState(() => localStorage.getItem('eventloop_user_phone') || '')
   
-  // Payout bank account
-  const [bankName, setBankName] = useState(() => localStorage.getItem('eventloop_payout_bank') || 'BCA')
-  const [accountNumber, setAccountNumber] = useState(() => localStorage.getItem('eventloop_payout_acc_number') || '8012345678')
-  const [accountHolder, setAccountHolder] = useState(() => localStorage.getItem('eventloop_payout_acc_holder') || (currentUserName || 'Bendahara Organisasi'))
+  // Payout bank account - Kosong secara default sebelum diatur
+  const [bankName, setBankName] = useState(() => localStorage.getItem('eventloop_payout_bank') || '')
+  const [accountNumber, setAccountNumber] = useState(() => localStorage.getItem('eventloop_payout_acc_number') || '')
+  const [accountHolder, setAccountHolder] = useState(() => localStorage.getItem('eventloop_payout_acc_holder') || '')
 
   const [saving, setSaving] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
-  // Load existing profile from Supabase if possible
+  // Muat data profil resmi pengguna dari Supabase database
   useEffect(() => {
     async function loadDbProfile() {
       if (sessionUser?.id) {
         try {
           const { data } = await supabase
             .from('profiles')
-            .select('*')
+            .select('id, full_name, nim, email')
             .eq('id', sessionUser.id)
             .single()
+
+          const meta = sessionUser.user_metadata || {}
 
           if (data) {
             if (data.full_name) setFullName(data.full_name)
             if (data.nim) setNim(data.nim)
-            if (data.prodi) setProdi(data.prodi)
-            if (data.phone) setPhone(data.phone)
-            if (data.bank_name) setBankName(data.bank_name)
-            if (data.bank_account) setAccountNumber(data.bank_account)
-            if (data.bank_holder) setAccountHolder(data.bank_holder)
+          }
+
+          if (meta) {
+            if (meta.full_name && !data?.full_name) setFullName(meta.full_name)
+            if (meta.nim && !data?.nim) setNim(meta.nim)
+            if (meta.prodi_name) setProdi(meta.prodi_name)
+            if (meta.org_name) setOrgName(meta.org_name)
+            if (meta.phone) setPhone(meta.phone)
+            if (meta.bank_name) setBankName(meta.bank_name)
+            if (meta.bank_account) setAccountNumber(meta.bank_account)
+            if (meta.bank_holder) setAccountHolder(meta.bank_holder)
           }
         } catch (e) {
           console.warn('Load profile notice:', e)
@@ -75,17 +83,17 @@ export default function ProfilePage() {
     loadDbProfile()
   }, [sessionUser])
 
-  const userEmail = sessionUser?.email || `${nim ? nim + '@student.prasetiyamulya.ac.id' : 'mahasiswa@student.prasetiyamulya.ac.id'}`
+  const userEmail = sessionUser?.email || (nim ? `${nim}@student.prasetiyamulya.ac.id` : '-')
 
-  // Calculate personal org impact
+  // Hitung dampak sirkular ormawa murni dari transaksi/reservasi nyata tanpa data rekaan
   const userTxns = transactions.filter(t => 
-    (t.borrowerName && t.borrowerName.toLowerCase().includes((fullName || '').toLowerCase())) ||
-    (t.buyerOrg && t.buyerOrg.toLowerCase().includes((orgName || '').toLowerCase()))
+    (fullName && t.borrowerName && t.borrowerName.toLowerCase().includes(fullName.toLowerCase())) ||
+    (orgName && t.buyerOrg && t.buyerOrg.toLowerCase().includes(orgName.toLowerCase()))
   )
 
   const eventsCount = userTxns.length + (activeReservation?.eventName ? 1 : 0)
-  const estimatedSaved = Math.max(eventsCount * 450000, 750000)
-  const estimatedWasteAvoided = Math.max(eventsCount * 6.5, 12.5)
+  const estimatedSaved = eventsCount > 0 ? eventsCount * 450000 : 0
+  const estimatedWasteAvoided = eventsCount > 0 ? Number((eventsCount * 6.5).toFixed(1)) : 0
 
   const handleSave = async (e) => {
     e.preventDefault()
@@ -94,13 +102,16 @@ export default function ProfilePage() {
     setErrorMsg('')
 
     try {
-      setCurrentUserName(fullName.trim())
-      if (setCurrentUserStudyProgram && prodi) {
+      if (fullName.trim()) {
+        setCurrentUserName(fullName.trim())
+        sessionStorage.setItem('eventloop_user_name', fullName.trim())
+        localStorage.setItem('eventloop_user_name', fullName.trim())
+      }
+      if (setCurrentUserStudyProgram && prodi.trim()) {
         setCurrentUserStudyProgram(prodi.trim())
+        sessionStorage.setItem('eventloop_user_prodi', prodi.trim())
       }
 
-      sessionStorage.setItem('eventloop_user_name', fullName.trim())
-      localStorage.setItem('eventloop_user_name', fullName.trim())
       localStorage.setItem('eventloop_user_org', orgName.trim())
       localStorage.setItem('eventloop_user_nim', nim.trim())
       localStorage.setItem('eventloop_user_phone', phone.trim())
@@ -109,20 +120,31 @@ export default function ProfilePage() {
       localStorage.setItem('eventloop_payout_acc_holder', accountHolder.trim())
 
       if (sessionUser?.id) {
+        // 1. Simpan ke tabel profiles (kolom valid: id, full_name, nim, email, updated_at)
         await supabase.from('profiles').upsert({
           id: sessionUser.id,
+          email: sessionUser.email || (nim ? `${nim.trim()}@student.prasetiyamulya.ac.id` : ''),
           full_name: fullName.trim(),
           nim: nim.trim(),
-          prodi: prodi.trim(),
-          phone: phone.trim(),
-          bank_name: bankName.trim(),
-          bank_account: accountNumber.trim(),
-          bank_holder: accountHolder.trim(),
           updated_at: new Date().toISOString()
+        })
+
+        // 2. Simpan metadata lengkap ke user_metadata akun Supabase Auth
+        await supabase.auth.updateUser({
+          data: {
+            full_name: fullName.trim(),
+            nim: nim.trim(),
+            prodi_name: prodi.trim(),
+            org_name: orgName.trim(),
+            phone: phone.trim(),
+            bank_name: bankName.trim(),
+            bank_account: accountNumber.trim(),
+            bank_holder: accountHolder.trim()
+          }
         })
       }
 
-      setSuccessMsg('Profil dan data rekening berhasil disimpan!')
+      setSuccessMsg('Profil dan data rekening berhasil disimpan ke database!')
       setTimeout(() => setSuccessMsg(''), 4000)
     } catch (err) {
       setErrorMsg('Gagal menyimpan profil: ' + (err.message || ''))
@@ -149,7 +171,7 @@ export default function ProfilePage() {
                 {fullName || 'Mahasiswa Prasetiya Mulya'}
               </h1>
               <p className="text-xs sm:text-sm text-slate-600">
-                {orgName} · {prodi || 'Universitas Prasetiya Mulya'}
+                {orgName ? `${orgName} · ` : ''}{prodi || 'Universitas Prasetiya Mulya'}
               </p>
             </div>
           </div>
@@ -159,7 +181,7 @@ export default function ProfilePage() {
               Role: {currentUserRole === 'admin' ? 'Administrator' : 'Ormawa / Mahasiswa'}
             </span>
             <span className="text-slate-500 text-[11px]">
-              ID NIM: <strong>{nim || '23302410001'}</strong>
+              ID NIM: <strong>{nim || '-'}</strong>
             </span>
           </div>
         </div>
@@ -346,6 +368,7 @@ export default function ProfilePage() {
                 onChange={(e) => setBankName(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-emerald-50/25 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500"
               >
+                <option value="">-- Belum Diatur / Pilih Bank --</option>
                 <option value="BCA">BCA (Bank Central Asia)</option>
                 <option value="Bank Mandiri">Bank Mandiri</option>
                 <option value="BNI">BNI (Bank Negara Indonesia)</option>

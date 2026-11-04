@@ -37,22 +37,28 @@ export default function UploadEquipment() {
   const appContext = useApp() || {}
   const uploadEquipmentByUser = appContext.uploadEquipmentByUser || (() => `APV-${Math.floor(Math.random() * 9999)}`)
   
-  const [name, setName] = useState('Standing Banner Frame Aluminium')
+  const [name, setName] = useState('')
   const [category, setCategory] = useState('Signage')
-  const [qty, setQty] = useState('3')
-  const [size, setSize] = useState('60 × 160 cm')
-  const [material, setMaterial] = useState('Aluminium')
-  const [maxReuse, setMaxReuse] = useState('50')
+  const [qty, setQty] = useState('1')
+  const [size, setSize] = useState('')
+  const [material, setMaterial] = useState('')
+  const [maxReuse, setMaxReuse] = useState('30')
   const [pricingType, setPricingType] = useState('rental')
-  const [price, setPrice] = useState('15000')
-  const [salePrice, setSalePrice] = useState('120000')
-  const [bankAccount, setBankAccount] = useState('BCA 8012345678 a.n BEM Prasmul')
+  const [price, setPrice] = useState('')
+  const [salePrice, setSalePrice] = useState('')
+  const [bankAccount, setBankAccount] = useState(() => {
+    const b = localStorage.getItem('eventloop_payout_bank')
+    const a = localStorage.getItem('eventloop_payout_acc_number')
+    const h = localStorage.getItem('eventloop_payout_acc_holder')
+    if (b && a) return `${b} ${a} a.n ${h || ''}`.trim()
+    return ''
+  })
   const [condition, setCondition] = useState('Excellent')
-  const [description, setDescription] = useState('Frame banner milik BEM Prasmul yang sedang tidak terpakai semester ini. Cocok untuk display pintu masuk seminar / workshop.')
+  const [description, setDescription] = useState('')
   const [imagePreview, setImagePreview] = useState(null)
   const [imageFileName, setImageFileName] = useState('')
   
-  const [initialLocation, setInitialLocation] = useState('Warehouse Kampus Gedung C (Rak A-01)')
+  const [initialLocation, setInitialLocation] = useState('')
   const [storagePhotoPreview, setStoragePhotoPreview] = useState(null)
   const [storageFileName, setStorageFileName] = useState('')
 

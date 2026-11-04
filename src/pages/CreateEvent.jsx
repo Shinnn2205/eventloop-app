@@ -38,7 +38,7 @@ export default function CreateEvent() {
   )
 
   const [eventName, setEventName] = useState(() => activeReservation?.eventName || '')
-  const [orgName, setOrgName] = useState(() => activeReservation?.org || currentUserName || 'BEM Universitas Prasetiya Mulya')
+  const [orgName, setOrgName] = useState(() => activeReservation?.org || localStorage.getItem('eventloop_user_org') || (currentUserName !== 'Prasmulyan' ? currentUserName : '') || '')
   const [eventType, setEventType] = useState(() => activeReservation?.type || 'Seminar')
   const [startDate, setStartDate] = useState(() => activeReservation?.startDate || '2026-11-25')
   const [endDate, setEndDate] = useState(() => activeReservation?.endDate || '2026-11-27')
