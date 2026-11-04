@@ -45,7 +45,8 @@ export default function Layout() {
     userPaymentStatus,
     transactions = [],
     pendingApprovals = [],
-    pendingReturns = []
+    pendingReturns = [],
+    logout
   } = useApp()
 
   const rentedItemsCount = activeReservation?.items?.filter(i => i.listingType !== 'sale')?.length || 0
@@ -56,8 +57,11 @@ export default function Layout() {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut()
-      localStorage.removeItem('eventloop_mock_user')
+      if (logout) {
+        await logout()
+      } else {
+        await supabase.auth.signOut()
+      }
       navigate('/login')
     } catch (e) {
       console.error('Logout error:', e)

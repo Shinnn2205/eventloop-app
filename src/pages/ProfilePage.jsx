@@ -99,6 +99,7 @@ export default function ProfilePage() {
         setCurrentUserStudyProgram(prodi.trim())
       }
 
+      sessionStorage.setItem('eventloop_user_name', fullName.trim())
       localStorage.setItem('eventloop_user_name', fullName.trim())
       localStorage.setItem('eventloop_user_org', orgName.trim())
       localStorage.setItem('eventloop_user_nim', nim.trim())

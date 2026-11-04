@@ -111,32 +111,119 @@ export const formatIdDate = (dateObjOrStr) => {
 }
 
 export function AppProvider({ children }) {
-  // STATE ROLE (Admin vs User)
+  // Bersihkan sesi autentikasi permanen lama di localStorage agar sesi login murni mengikuti tab/browser (sessionStorage)
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem('eventloop_sso_user')
+      localStorage.removeItem('eventloop_session')
+      localStorage.removeItem('eventloop_role')
+      localStorage.removeItem('eventloop_user_name')
+      localStorage.removeItem('eventloop_user_prodi')
+      localStorage.removeItem('eventloop_mock_user')
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i)
+        if (k && k.startsWith('sb-') && k.endsWith('-auth-token')) {
+          localStorage.removeItem(k)
+        }
+      }
+    } catch (e) {}
+  }
+
+  // STATE ROLE (Admin vs User) - Disimpan di sessionStorage agar otomatis reset saat tab/browser ditutup
   const [currentUserRole, setCurrentUserRole] = useState(() => {
-    return localStorage.getItem('eventloop_role') || 'user'
+    return (typeof window !== 'undefined' ? sessionStorage.getItem('eventloop_role') : null) || 'user'
   })
 
-  // STATE USER PROFILE & SESSION
+  // STATE USER PROFILE & SESSION - Disimpan di sessionStorage (tetap ada saat refresh, hilang saat tab ditutup)
   const [currentUserName, setCurrentUserName] = useState(() => {
-    return localStorage.getItem('eventloop_user_name') || 'Prasmulyan'
+    return (typeof window !== 'undefined' ? sessionStorage.getItem('eventloop_user_name') : null) || 'Prasmulyan'
   })
   const [currentUserStudyProgram, setCurrentUserStudyProgram] = useState(() => {
-    return localStorage.getItem('eventloop_user_prodi') || 'Prasetiya Mulya'
+    return (typeof window !== 'undefined' ? sessionStorage.getItem('eventloop_user_prodi') : null) || 'Prasetiya Mulya'
   })
   const [session, setSession] = useState(null)
   const [ssoUser, setSsoUser] = useState(() => {
-    const saved = localStorage.getItem('eventloop_sso_user')
+    if (typeof window === 'undefined') return null
+    const saved = sessionStorage.getItem('eventloop_sso_user')
     return saved ? JSON.parse(saved) : null
   })
   const [loadingDb, setLoadingDb] = useState(true)
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
     if (ssoUser) {
-      localStorage.setItem('eventloop_sso_user', JSON.stringify(ssoUser))
+      sessionStorage.setItem('eventloop_sso_user', JSON.stringify(ssoUser))
     } else {
-      localStorage.removeItem('eventloop_sso_user')
+      sessionStorage.removeItem('eventloop_sso_user')
     }
   }, [ssoUser])
+
+  // Sinkronisasi status autentikasi ke sessionStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('eventloop_role', currentUserRole)
+    }
+  }, [currentUserRole])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('eventloop_user_name', currentUserName)
+    }
+  }, [currentUserName])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('eventloop_user_prodi', currentUserStudyProgram)
+    }
+  }, [currentUserStudyProgram])
+
+  // Monitor aktivitas pengguna: Jika tab ditinggal di latar belakang tanpa aktivitas selama 30 menit, sesi berakhir otomatis
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 menit
+
+    const updateLastActive = () => {
+      try {
+        sessionStorage.setItem('eventloop_last_active', Date.now().toString())
+      } catch (e) {}
+    }
+
+    const checkInactivity = () => {
+      try {
+        const last = sessionStorage.getItem('eventloop_last_active')
+        if (last && (session || ssoUser)) {
+          const diff = Date.now() - parseInt(last, 10)
+          if (diff > INACTIVITY_TIMEOUT) {
+            console.log('Sesi login telah kedaluwarsa karena tidak ada aktivitas di latar belakang.')
+            logout()
+          }
+        }
+      } catch (e) {}
+    }
+
+    updateLastActive()
+
+    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart']
+    const handleActivity = () => updateLastActive()
+
+    activityEvents.forEach(evt => window.addEventListener(evt, handleActivity, { passive: true }))
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkInactivity()
+        updateLastActive()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    const interval = setInterval(checkInactivity, 60 * 1000)
+
+    return () => {
+      activityEvents.forEach(evt => window.removeEventListener(evt, handleActivity))
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      clearInterval(interval)
+    }
+  }, [session, ssoUser])
 
   // One-time cleanup for active borrowings and reservations cache
   if (typeof window !== 'undefined' && localStorage.getItem('eventloop_borrowing_cleaned_v3') !== 'true') {
@@ -198,10 +285,7 @@ export function AppProvider({ children }) {
     return saved ? JSON.parse(saved) : []
   })
 
-  // Sinkronisasi otomatis ke Local Storage
-  useEffect(() => { localStorage.setItem('eventloop_role', currentUserRole) }, [currentUserRole])
-  useEffect(() => { localStorage.setItem('eventloop_user_name', currentUserName) }, [currentUserName])
-  useEffect(() => { localStorage.setItem('eventloop_user_prodi', currentUserStudyProgram) }, [currentUserStudyProgram])
+  // Sinkronisasi data perlengkapan & transaksi ke Local Storage
   useEffect(() => { localStorage.setItem('eventloop_equipments', JSON.stringify(equipments)) }, [equipments])
   useEffect(() => { localStorage.setItem('eventloop_pending_approvals', JSON.stringify(pendingApprovals)) }, [pendingApprovals])
   useEffect(() => { localStorage.setItem('eventloop_transactions', JSON.stringify(transactions)) }, [transactions])
@@ -917,9 +1001,16 @@ export function AppProvider({ children }) {
     setSsoUser(null)
     setCurrentUserRole('user')
     setCurrentUserName('Prasmulyan')
+    sessionStorage.removeItem('eventloop_session')
+    sessionStorage.removeItem('eventloop_user_name')
+    sessionStorage.removeItem('eventloop_role')
+    sessionStorage.removeItem('eventloop_user_prodi')
+    sessionStorage.removeItem('eventloop_sso_user')
+    sessionStorage.removeItem('eventloop_last_active')
     localStorage.removeItem('eventloop_session')
     localStorage.removeItem('eventloop_user_name')
     localStorage.removeItem('eventloop_role')
+    localStorage.removeItem('eventloop_user_prodi')
     localStorage.removeItem('eventloop_sso_user')
   }
 
