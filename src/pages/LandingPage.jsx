@@ -28,7 +28,7 @@ export default function LandingPage() {
   const itemRefs = useRef({})
   const navContainerRef = useRef(null)
 
-  // Update posisi sliding pill hijau secara presisi & mulus saat section aktif berganti
+  // Update posisi sliding pill hijau secara presisi saat section aktif berganti
   useEffect(() => {
     const updatePill = () => {
       if (activeSection && activeSection !== 'home' && itemRefs.current[activeSection] && navContainerRef.current) {
@@ -50,82 +50,60 @@ export default function LandingPage() {
     return () => window.removeEventListener('resize', updatePill)
   }, [activeSection])
 
-  // Efek ambient glow kursor hijau dengan Lerp (Linear Interpolation) fluid smoothing - 60 FPS tanpa re-render
+  // Efek ambient glow kursor hijau super ringan via CSS Variables (Nol Reflow & Nol Render Lag saat scrolling)
   useEffect(() => {
-    let animId
-    let curX = window.innerWidth / 2
-    let curY = 300
-    let tgtX = curX
-    let tgtY = curY
-    let isVisible = false
-
+    let ticking = false
     const handleMouseMove = (e) => {
-      tgtX = e.clientX
-      tgtY = e.clientY
-      isVisible = true
-    }
-
-    const loop = () => {
-      // Lerp faktor 0.1 untuk transisi gerakan kursor yang sangat halus dan organik
-      curX += (tgtX - curX) * 0.1
-      curY += (tgtY - curY) * 0.1
-
-      const glowEl = document.getElementById('ambient-cursor-glow')
-      if (glowEl) {
-        glowEl.style.transform = `translate3d(${curX}px, ${curY}px, 0) translate(-50%, -50%)`
-        if (isVisible && glowEl.style.opacity !== '1') {
-          glowEl.style.opacity = '1'
-        }
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          document.documentElement.style.setProperty('--cursor-x', `${e.clientX}px`)
+          document.documentElement.style.setProperty('--cursor-y', `${e.clientY}px`)
+          ticking = false
+        })
+        ticking = true
       }
-      animId = requestAnimationFrame(loop)
     }
 
     window.addEventListener('mousemove', handleMouseMove, { passive: true })
-    animId = requestAnimationFrame(loop)
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      cancelAnimationFrame(animId)
-    }
+    return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [])
 
-  // ScrollSpy observer untuk mendeteksi bagian yang sedang dibaca pengguna secara akurat & mulus
+  // ScrollSpy menggunakan IntersectionObserver modern (Nol Lag, Nol Forced Reflow pada saat scroll)
   useEffect(() => {
     const sectionIds = ['masalah', 'circular-score', 'flow', 'business-model']
 
-    const handleScroll = () => {
-      const scrollY = window.scrollY
-      if (scrollY < 180) {
-        setActiveSection('home')
-        return
-      }
-
-      // Garis fokus pandangan mata (focal point ~ 32% tinggi layar)
-      const focalPoint = scrollY + (window.innerHeight * 0.32)
-
-      let matched = ''
-      for (const id of sectionIds) {
-        const el = document.getElementById(id)
-        if (el) {
-          const rect = el.getBoundingClientRect()
-          const top = rect.top + scrollY
-          const bottom = top + el.offsetHeight
-          if (focalPoint >= top && focalPoint < bottom) {
-            matched = id
-            break
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id)
           }
-        }
+        })
+      },
+      {
+        rootMargin: '-15% 0px -55% 0px',
+        threshold: 0
       }
+    )
 
-      if (matched && matched !== activeSection) {
-        setActiveSection(matched)
+    sectionIds.forEach((id) => {
+      const el = document.getElementById(id)
+      if (el) observer.observe(el)
+    })
+
+    const handleScrollTop = () => {
+      if (window.scrollY < 120) {
+        setActiveSection('home')
       }
     }
 
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    handleScroll()
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [activeSection])
+    window.addEventListener('scroll', handleScrollTop, { passive: true })
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('scroll', handleScrollTop)
+    }
+  }, [])
 
   const scrollToSection = (e, id) => {
     e.preventDefault()
@@ -140,13 +118,11 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#F6FBF8] text-slate-800 selection:bg-emerald-100 selection:text-emerald-800 font-sans relative overflow-x-hidden">
-      {/* Efek Cahaya Hijau Mengikuti Gerakan / Arah Pandangan Kursor Mulus (Lerp Physics) */}
+      {/* Efek Cahaya Hijau Mengikuti Gerakan Kursor - GPU Accelerated Tanpa Beban Blur Lag */}
       <div 
-        id="ambient-cursor-glow"
-        className="pointer-events-none fixed top-0 left-0 w-[600px] h-[600px] rounded-full blur-[80px] z-0 opacity-0 transition-opacity duration-700 will-change-transform"
+        className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-500"
         style={{
-          background: 'radial-gradient(circle, rgba(16, 185, 129, 0.16) 0%, rgba(52, 211, 153, 0.08) 45%, transparent 70%)',
-          transform: 'translate3d(-500px, -500px, 0) translate(-50%, -50%)'
+          background: 'radial-gradient(650px circle at var(--cursor-x, -1000px) var(--cursor-y, -1000px), rgba(16, 185, 129, 0.09) 0%, rgba(5, 150, 105, 0.03) 40%, transparent 70%)'
         }}
       />
 

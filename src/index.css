@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     background-color: #F6FBF8;
     @apply text-slate-800 antialiased;
