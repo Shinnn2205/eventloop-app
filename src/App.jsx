@@ -90,6 +90,8 @@ function App() {
           {/* Rute Publik */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<Navigate to="/login?tab=signup" replace />} />
+          <Route path="/signup" element={<Navigate to="/login?tab=signup" replace />} />
 
           {/* Rute Aplikasi yang Diproteksi (Wajib Login) */}
           <Route element={

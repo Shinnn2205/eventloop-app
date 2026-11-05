@@ -434,10 +434,6 @@ export default function CreateEvent() {
               </div>
             </div>
 
-            <div className="p-3.5 bg-emerald-50/60 rounded-xl border border-emerald-100 text-xs text-emerald-800 leading-relaxed">
-              📅 <strong>Jadwal Peminjaman:</strong> Perlengkapan akan tercatat dipinjam mulai <strong>{startDateLabel}</strong> sampai <strong>{endDateLabel}</strong> (<strong>{durationDays} hari</strong>).
-            </div>
-
             <div className="pt-2 space-y-2">
               <button type="submit" className="btn-primary w-full text-sm flex items-center justify-center gap-2 cursor-pointer shadow-xs">
                 <Sparkles className="w-4 h-4" />

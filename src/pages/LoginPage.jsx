@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { 
   Recycle, 
   Mail, 
@@ -24,10 +24,19 @@ import { useApp, isAdminEmail, isCampusEmail, validateNimStructure, getAdminDisp
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { setCurrentUserRole, setCurrentUserName } = useApp()
   
   // Tab Mode: 'login' (Masuk), 'signup' (Buat Akun Baru), atau 'forgot' (Lupa Password)
-  const [activeTab, setActiveTab] = useState('login')
+  const tabParam = searchParams.get('tab')
+  const [activeTab, setActiveTab] = useState(() => (tabParam === 'signup' ? 'signup' : tabParam === 'forgot' ? 'forgot' : 'login'))
+
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t === 'signup' || t === 'login' || t === 'forgot') {
+      setActiveTab(t)
+    }
+  }, [searchParams])
   
   // State verifikasi pendaftaran: 'form' (isi data akun) atau 'otp' (input 6-digit kode OTP)
   const [signUpStep, setSignUpStep] = useState('form')
@@ -146,9 +155,10 @@ export default function LoginPage() {
     return target
   }
 
-  // Reset pesan saat ganti tab
+  // Reset pesan & update query URL saat ganti tab
   const handleTabChange = (tab) => {
     setActiveTab(tab)
+    setSearchParams({ tab })
     if (tab === 'login') {
       sessionStorage.removeItem('eventloop_pending_signup_otp')
       sessionStorage.removeItem('eventloop_pending_forgot_otp')
@@ -821,17 +831,9 @@ export default function LoginPage() {
             forgotStep === 'request' ? (
               // STEP 1: Masukkan NIM / Email Terdaftar
               <form onSubmit={handleForgotRequestOtp} className="space-y-4">
-                <div className="bg-emerald-50/70 border border-emerald-200/80 p-3 rounded-2xl flex items-start gap-2.5 text-[11px] text-emerald-950 font-medium leading-relaxed">
-                  <KeyRound className="w-5 h-5 text-emerald-700 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-emerald-900 block mb-0.5">Pemulihan Akun via OTP Outlook</span>
-                    Masukkan 11 digit NIM atau email kampus/admin yang terdaftar. Kami akan mengirimkan kode OTP verifikasi ke email resmi Anda.
-                  </div>
-                </div>
-
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    NIM (11 Digit) atau Email Akun Terdaftar *
+                    NIM (11 Digit) atau Email Terdaftar *
                   </label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -844,9 +846,6 @@ export default function LoginPage() {
                       className="w-full pl-10 pr-4 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
                     />
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    💡 Jika memasukkan 11 digit NIM, sistem akan otomatis mengirim OTP ke email SSO Outlook resmi Anda.
-                  </p>
                 </div>
 
                 <button
@@ -872,15 +871,9 @@ export default function LoginPage() {
             ) : (
               // STEP 2: Masukkan Kode OTP & Password Baru
               <form onSubmit={handleForgotSubmitNewPassword} className="space-y-3.5">
-                <div className="bg-emerald-50/80 border border-emerald-200/80 p-3 rounded-2xl flex items-start gap-2.5 text-xs text-emerald-950 font-medium">
-                  <Mail className="w-4 h-4 text-emerald-700 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <div>Kode OTP pemulihan telah dikirimkan ke:</div>
-                    <div className="font-mono font-bold text-emerald-900 mt-0.5">
-                      {resolveEmailFromIdentifier(forgotIdentifier)}
-                    </div>
-                  </div>
-                </div>
+                <p className="text-xs text-slate-500">
+                  Kode OTP pemulihan dikirim ke <strong className="text-slate-800 font-mono">{resolveEmailFromIdentifier(forgotIdentifier)}</strong>.
+                </p>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
@@ -991,21 +984,13 @@ export default function LoginPage() {
           {activeTab === 'signup' && (
             signUpStep === 'form' ? (
               // STEP 1: INPUT DATA MAHASISWA & KIRIM KODE OTP
-              <form onSubmit={handleSignUpRequestOtp} className="space-y-3.5">
-                <div className="bg-emerald-50/70 border border-emerald-200/80 p-3 rounded-2xl flex items-start gap-2.5 text-[11px] text-emerald-950 font-medium leading-relaxed">
-                  <ShieldCheck className="w-5 h-5 text-emerald-700 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-emerald-900 block mb-0.5">Verifikasi Kode OTP Outlook Kampus</span>
-                    Sistem akan mengirimkan kode verifikasi resmi ke inbox email Outlook mahasiswa Anda.
-                  </div>
-                </div>
-
+              <form onSubmit={handleSignUpRequestOtp} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     NIM Mahasiswa (11 Digit Angka) *
                   </label>
                   <div className="relative">
-                    <Hash className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Hash className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       maxLength={11}
@@ -1013,96 +998,53 @@ export default function LoginPage() {
                       value={nim}
                       onChange={(e) => handleNimChange(e.target.value)}
                       placeholder="Contoh: 23302410001"
-                      className="w-full pl-9 pr-3 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all tracking-wider"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all tracking-wider"
                     />
                   </div>
-
-                  {/* Live Badge Rincian NIM */}
-                  {nim.length > 0 && (
-                    <div className="mt-1.5 text-[11px]">
-                      {nim.length < 11 ? (
-                        <span className="text-amber-700 font-medium">
-                          ⏳ {nim.length}/11 digit (Ketik {11 - nim.length} digit lagi)
-                        </span>
-                      ) : nimInfo.isValid ? (
-                        <div className="bg-emerald-50/80 border border-emerald-200 p-2.5 rounded-xl text-emerald-950 space-y-1.5">
-                          <div className="font-bold flex items-center justify-between text-emerald-800">
-                            <div className="flex items-center gap-1.5">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Format NIM Terverifikasi</span>
-                            </div>
-                            <span className="text-[10px] bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full font-bold">
-                              {nimInfo.shortSchool}
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-emerald-900 font-bold">
-                            {nimInfo.prodiName}
-                          </div>
-                          <div className="grid grid-cols-2 gap-1 text-[10px] text-emerald-800 font-medium pt-1 border-t border-emerald-200/60">
-                            <div>Angkatan: <span className="font-semibold">{nimInfo.angkatan}</span></div>
-                            <div>No. Urut: <span className="font-mono font-bold">#{nimInfo.nomor}</span></div>
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-rose-600 font-medium flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5" />
-                          {nimInfo.message}
-                        </span>
-                      )}
-                    </div>
+                  {nim.length === 11 && nimInfo.isValid && (
+                    <p className="mt-1 text-[11px] text-emerald-700 font-medium flex items-center gap-1 animate-fade-in">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>{nimInfo.prodiName} ({nimInfo.shortSchool} · Angkatan {nimInfo.angkatan})</span>
+                    </p>
+                  )}
+                  {nim.length === 11 && !nimInfo.isValid && (
+                    <p className="mt-1 text-[11px] text-rose-600 font-medium flex items-center gap-1 animate-fade-in">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{nimInfo.message}</span>
+                    </p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Nama Lengkap Mahasiswa *
                   </label>
                   <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       required
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="Nama Lengkap Sesuai KTM"
-                      className="w-full pl-9 pr-3 py-2 bg-emerald-50/30 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Email Kampus Resmi
-                    </label>
-                    <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> Terisi Otomatis Sesuai NIM
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      readOnly
-                      value={nim.length === 11 ? `${nim}@student.prasetiyamulya.ac.id` : 'Otomatis terisi saat 11 digit NIM dimasukkan...'}
-                      className="w-full pl-9 pr-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-600 font-mono cursor-not-allowed select-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Buat Password Akun *
                   </label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="password"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Minimal 6 karakter"
-                      className="w-full pl-9 pr-3 py-2 bg-emerald-50/30 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
                     />
                   </div>
                 </div>
@@ -1114,55 +1056,25 @@ export default function LoginPage() {
                     className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 cursor-pointer shadow-sm shadow-emerald-600/15"
                   >
                     <Mail className="w-4 h-4" />
-                    <span>{loading ? 'Mengirim Kode OTP...' : 'Kirim Kode OTP ke Outlook Kampus'}</span>
+                    <span>{loading ? 'Mengirim Kode OTP...' : 'Daftar & Kirim Kode OTP ke Outlook'}</span>
                   </button>
-                  <p className="text-[10px] text-slate-400 text-center mt-2">
-                    Kode verifikasi akan dikirimkan langsung ke inbox resmi Outlook kampus Anda.
-                  </p>
                 </div>
               </form>
             ) : (
               // STEP 2: FORM INPUT KODE OTP DARI EMAIL OUTLOOK (MENDUKUNG 6 ATAU 8 DIGIT)
-              <form onSubmit={handleSignUpVerifyOtp} className="space-y-4 py-1 animate-fade-in text-center">
-                <div className="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mx-auto shadow-2xs border border-emerald-200/60">
-                  <KeyRound className="w-7 h-7" />
+              <form onSubmit={handleSignUpVerifyOtp} className="space-y-4 py-2 animate-fade-in text-center">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mx-auto border border-emerald-200/60 shadow-2xs">
+                  <KeyRound className="w-6 h-6" />
                 </div>
 
                 <div>
                   <h4 className="text-base font-bold text-slate-900">Verifikasi Kode OTP</h4>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Masukkan kode verifikasi yang kami kirimkan ke email Outlook:
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
+                    Masukkan kode verifikasi yang dikirim ke <strong className="text-slate-800 font-mono">{nim}@student.prasetiyamulya.ac.id</strong>. Mohon periksa juga folder <em>Junk / Spam</em> Outlook.
                   </p>
-                  <div className="inline-block bg-emerald-50 border border-emerald-200 text-emerald-950 font-bold font-mono px-3 py-1 rounded-xl text-xs mt-1.5">
-                    {nim}@student.prasetiyamulya.ac.id
-                  </div>
                 </div>
 
-                <div className="bg-emerald-50/80 border border-emerald-200/80 p-3.5 rounded-2xl text-left text-[11px] text-emerald-950 space-y-1.5">
-                  <div className="font-bold flex items-center gap-1.5 text-emerald-900">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Cek Inbox / Spam Outlook Mahasiswa:</span>
-                  </div>
-                  <p className="text-slate-600 leading-relaxed">
-                    Salin kode verifikasi dari email <strong>EventLoop</strong>. Jika belum muncul di kotak masuk utama, mohon periksa folder <strong>'Junk Email' / Spam</strong> atau tab <strong>'Lainnya' (Other)</strong>.
-                  </p>
-                  <div className="pt-1.5 text-[10px] text-slate-500 border-t border-emerald-100/90 flex items-center justify-between">
-                    <span>Data Nama & NIM telah tersimpan.</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        sessionStorage.removeItem('eventloop_pending_signup_otp')
-                        setActiveTab('login')
-                        setEmail(nim)
-                      }}
-                      className="text-emerald-700 font-bold hover:underline cursor-pointer"
-                    >
-                      Masuk via NIM & Password →
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1 text-left">
+                <div className="space-y-1 text-left pt-2">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider text-center">
                     Kode OTP Verifikasi
                   </label>
@@ -1190,7 +1102,7 @@ export default function LoginPage() {
                     className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 cursor-pointer shadow-sm shadow-emerald-600/15"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>{loading ? 'Memverifikasi...' : 'Verifikasi Kode & Selesaikan Pendaftaran'}</span>
+                    <span>{loading ? 'Memverifikasi...' : 'Verifikasi Kode & Selesaikan'}</span>
                   </button>
 
                   <div className="flex items-center justify-between text-xs pt-1">

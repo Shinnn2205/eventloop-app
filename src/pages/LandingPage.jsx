@@ -194,7 +194,7 @@ export default function LandingPage() {
                 <Link to="/login" className="text-xs font-bold text-slate-700 hover:text-emerald-700 px-3 py-2 transition-colors">
                   Masuk
                 </Link>
-                <Link to="/login" className="btn-primary text-xs !py-2.5 !px-5 flex items-center gap-2 shadow-sm shadow-emerald-600/15">
+                <Link to="/login?tab=signup" className="btn-primary text-xs !py-2.5 !px-5 flex items-center gap-2 shadow-sm shadow-emerald-600/15">
                   <span>Mulai / Buat Akun</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
@@ -235,7 +235,7 @@ export default function LandingPage() {
               <span>Jelajahi Katalog Barang</span>
             </Link>
             <Link 
-              to={sessionUser ? "/create-event" : "/login"} 
+              to={sessionUser ? "/create-event" : "/login?tab=signup"} 
               className="btn-secondary text-sm !py-3.5 !px-8 flex items-center justify-center gap-2 w-full sm:w-auto"
             >
               <span>{sessionUser ? 'Buat Rencana Event' : 'Daftar Akun Mahasiswa'}</span>
@@ -568,7 +568,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
               <Link 
-                to={sessionUser ? targetDashboard : "/login"} 
+                to={sessionUser ? targetDashboard : "/login?tab=signup"} 
                 className="btn-primary text-xs sm:text-sm !py-3 !px-7 flex items-center justify-center gap-2 shadow-sm shadow-emerald-600/15"
               >
                 <span>{sessionUser ? 'Buka Dashboard' : 'Mulai Sekarang / Buat Akun'}</span>

@@ -322,7 +322,7 @@ export default function ProfilePage() {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Nomor WhatsApp PIC (Untuk Serah Terima) *
+              Nomor WhatsApp PIC *
             </label>
             <div className="relative">
               <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -335,9 +335,6 @@ export default function ProfilePage() {
                 className="w-full pl-10 pr-3.5 py-2.5 bg-emerald-50/25 border border-slate-200 rounded-xl text-xs font-mono font-medium text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500"
               />
             </div>
-            <span className="text-[10px] text-slate-400 mt-1 block">
-              Digunakan peminjam/pemilik lain untuk koordinasi serah terima via WhatsApp.
-            </span>
           </div>
         </div>
 
@@ -347,16 +344,8 @@ export default function ProfilePage() {
             <div className="border-b border-emerald-100/80 pb-3">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-emerald-600" />
-                Rekening Pencairan Dana Kas (Bagi Hasil 95%)
+                Rekening Pencairan Dana Kas
               </h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Rekening bank organisasi untuk menerima transfer bagi hasil sewa barang Anda.
-              </p>
-            </div>
-
-            <div className="bg-emerald-50/70 border border-emerald-200/80 p-3.5 rounded-2xl text-[11px] text-emerald-950 leading-relaxed">
-              <span className="font-bold text-emerald-900 block mb-0.5">🛡️ Rekening Escrow Terjamin:</span>
-              Setiap kali barang inventaris organisasi Anda disewa oleh kepanitiaan lain, pengelola EventLoop akan mencairkan <strong>95% dana sewa</strong> ke nomor rekening ini setelah verifikasi.
             </div>
 
             <div>

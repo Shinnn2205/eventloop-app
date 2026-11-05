@@ -213,71 +213,56 @@ export default function UploadEquipment() {
                 </div>
               </div>
 
-              <div className="p-4 bg-emerald-50/60 rounded-xl border border-emerald-100 space-y-3.5">
-                <div className="flex items-center gap-2 text-xs font-bold text-emerald-900">
-                  <Star className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Karakteristik Sirkular</span>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Material Utama</label>
+                  <select value={material} onChange={(e) => setMaterial(e.target.value)} className="cozy-input">
+                    <option value="Aluminium">Aluminium</option>
+                    <option value="Steel Frame">Steel Frame</option>
+                    <option value="Fabric / Polyester">Kain / Fabric Reusable</option>
+                    <option value="Wood / Plywood">Kayu / Multiplex</option>
+                    <option value="Plastic BPA-Free">Plastik Reusable</option>
+                  </select>
                 </div>
-                <div className="grid sm:grid-cols-2 gap-3.5">
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Material Utama</label>
-                    <select value={material} onChange={(e) => setMaterial(e.target.value)} className="cozy-input !bg-white !py-2 !text-xs">
-                      <option value="Aluminium">Aluminium</option>
-                      <option value="Steel Frame">Steel Frame</option>
-                      <option value="Fabric / Polyester">Kain / Fabric Reusable</option>
-                      <option value="Wood / Plywood">Kayu / Multiplex</option>
-                      <option value="Plastic BPA-Free">Plastik Reusable</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Estimasi Daya Tahan</label>
-                    <select value={maxReuse} onChange={(e) => setMaxReuse(e.target.value)} className="cozy-input !bg-white !py-2 !text-xs">
-                      <option value="100">100+ Kali Pakai</option>
-                      <option value="50">50+ Kali Pakai</option>
-                      <option value="30">30+ Kali Pakai</option>
-                      <option value="15">15+ Kali Pakai</option>
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Estimasi Daya Tahan</label>
+                  <select value={maxReuse} onChange={(e) => setMaxReuse(e.target.value)} className="cozy-input">
+                    <option value="100">100+ Kali Pakai</option>
+                    <option value="50">50+ Kali Pakai</option>
+                    <option value="30">30+ Kali Pakai</option>
+                    <option value="15">15+ Kali Pakai</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="p-4 bg-emerald-50/30 rounded-xl border border-emerald-100 space-y-3.5">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Lokasi Pengambilan & Pengembalian Asal</span>
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Lokasi Rak / Gudang Asal</label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={initialLocation} 
+                    onChange={(e) => setInitialLocation(e.target.value)} 
+                    placeholder="cth. Warehouse Kampus Gedung C (Rak A-01)"
+                    className="cozy-input" 
+                  />
                 </div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Detail Lokasi Simpan (Gudang / Rak)</label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={initialLocation} 
-                      onChange={(e) => setInitialLocation(e.target.value)} 
-                      placeholder="cth. Warehouse Kampus Gedung C (Rak A-01)"
-                      className="cozy-input !bg-white" 
-                    />
+                {!storagePhotoPreview ? (
+                  <label className="flex items-center justify-center gap-2 border border-dashed border-slate-300 hover:border-emerald-500 rounded-xl p-3 bg-slate-50/50 hover:bg-emerald-50/20 cursor-pointer transition-colors">
+                    <MapPin className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-semibold text-slate-700">Upload Foto Rak / Tempat Simpan (Opsional)</span>
+                    <input type="file" accept="image/*" onChange={handleStoragePhotoChange} className="hidden" />
+                  </label>
+                ) : (
+                  <div className="rounded-xl border border-emerald-200 bg-white p-2 flex items-center gap-3">
+                    <img src={storagePhotoPreview} alt="Rak" className="w-12 h-12 object-cover rounded-lg border border-emerald-100" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-emerald-700">✓ Foto Lokasi Tersimpan</p>
+                      <p className="text-[11px] text-slate-400 truncate">{storageFileName}</p>
+                    </div>
+                    <button type="button" onClick={() => setStoragePhotoPreview(null)} className="p-1.5 text-slate-400 hover:text-red-500"><X className="w-4 h-4" /></button>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Foto Lokasi / Rak Penyimpanan</label>
-                    {!storagePhotoPreview ? (
-                      <label className="flex items-center justify-center gap-2 border border-dashed border-emerald-300 hover:border-emerald-500 rounded-xl p-3.5 bg-white cursor-pointer transition-colors">
-                        <MapPin className="w-4 h-4 text-emerald-600" />
-                        <span className="text-xs font-semibold text-slate-700">Upload Foto Rak / Tempat Simpan</span>
-                        <input type="file" accept="image/*" onChange={handleStoragePhotoChange} className="hidden" />
-                      </label>
-                    ) : (
-                      <div className="rounded-xl border border-emerald-200 bg-white p-2 flex items-center gap-3">
-                        <img src={storagePhotoPreview} alt="Rak" className="w-14 h-14 object-cover rounded-lg border border-emerald-100" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-emerald-700">✓ Foto Lokasi Tersimpan</p>
-                          <p className="text-[11px] text-slate-400 truncate">{storageFileName}</p>
-                        </div>
-                        <button type="button" onClick={() => setStoragePhotoPreview(null)} className="p-1.5 text-slate-400 hover:text-red-500"><X className="w-4 h-4" /></button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
 
               <div>
