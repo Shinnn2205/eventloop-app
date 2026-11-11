@@ -74,7 +74,16 @@ export default function Reservation() {
     setPaymentModal(false)
   }
 
-  const latestUserTxn = transactions?.[0]
+  const orderTransactions = (transactions || []).filter(t => 
+    !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')
+  )
+  const latestUserTxn = orderTransactions[0]
+  const isTxnApproved = Boolean(
+    latestUserTxn?.qrisStatus?.toLowerCase().includes('approved') || 
+    latestUserTxn?.qrisStatus?.toLowerCase().includes('lunas') ||
+    latestUserTxn?.qrisStatus?.toLowerCase().includes('sukses')
+  )
+  const effectivePaymentStatus = (userPaymentStatus === 'approved' || isTxnApproved) ? 'approved' : userPaymentStatus
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -91,7 +100,7 @@ export default function Reservation() {
       </div>
 
       {/* Banner Status Pembayaran */}
-      {userPaymentStatus === 'pending_admin_approval' && (
+      {effectivePaymentStatus === 'pending_admin_approval' && (
         <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <div className="w-10 h-10 rounded-xl bg-white text-amber-600 flex items-center justify-center flex-shrink-0 border border-amber-200">
@@ -120,7 +129,7 @@ export default function Reservation() {
         </div>
       )}
 
-      {userPaymentStatus === 'approved' && (
+      {effectivePaymentStatus === 'approved' && (
         <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
@@ -185,7 +194,7 @@ export default function Reservation() {
                 <Clock className="w-4 h-4 text-emerald-600" />
                 <div className="text-xs">
                   <span className="text-slate-500 block text-[10px]">Durasi Sewa</span>
-                  {userPaymentStatus === 'idle' ? (
+                  {effectivePaymentStatus === 'idle' ? (
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
@@ -208,7 +217,7 @@ export default function Reservation() {
             </div>
 
             {/* Tombol Ubah / Batalkan Event Sebelum Bayar */}
-            {userPaymentStatus === 'idle' && activeReservation?.eventName && (
+            {effectivePaymentStatus === 'idle' && activeReservation?.eventName && (
               <div className="pt-2.5 border-t border-emerald-100/70 flex items-center justify-between text-xs">
                 <span className="text-slate-500 text-[11px]">Mau ganti nama atau tanggal kegiatan?</span>
                 <div className="flex items-center gap-2">
@@ -277,7 +286,7 @@ export default function Reservation() {
                       </div>
 
                       <div className="flex items-center justify-between sm:justify-end gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                        {userPaymentStatus === 'idle' ? (
+                        {effectivePaymentStatus === 'idle' ? (
                           <div className="flex items-center gap-2">
                             <button 
                               onClick={() => updateCartQty(item.id, item.qty - 1)}
@@ -308,7 +317,7 @@ export default function Reservation() {
                           )}
                         </div>
 
-                        {userPaymentStatus === 'idle' && (
+                        {effectivePaymentStatus === 'idle' && (
                           <button 
                             onClick={() => removeFromCart(item.id)}
                             className="text-slate-400 hover:text-red-500 p-1 cursor-pointer"
@@ -385,7 +394,7 @@ export default function Reservation() {
               </p>
             </div>
 
-            {userPaymentStatus === 'idle' ? (
+            {effectivePaymentStatus === 'idle' ? (
               <button
                 disabled={displayItems.length === 0}
                 onClick={() => setPaymentModal(true)}
@@ -397,7 +406,7 @@ export default function Reservation() {
             ) : (
               <div className="space-y-2">
                 <div className="p-3 rounded-xl bg-emerald-50 text-emerald-800 text-center text-xs font-semibold border border-emerald-200">
-                  {userPaymentStatus === 'approved'
+                  {effectivePaymentStatus === 'approved'
                     ? '✓ Pembayaran Telah Disetujui Admin'
                     : '⏳ Menunggu Verifikasi Admin'}
                 </div>

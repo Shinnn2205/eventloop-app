@@ -34,16 +34,28 @@ export default function Dashboard() {
     equipments, 
     loadingDb, 
     campusImpact,
-    ongoingCampusEvents = []
+    ongoingCampusEvents = [],
+    transactions = []
   } = useApp()
   
   const [trackingSearch, setTrackingSearch] = useState('')
+
+  const orderTransactions = (transactions || []).filter(t => 
+    !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')
+  )
+  const latestOrderTxn = orderTransactions[0]
+  const isTxnApproved = Boolean(
+    latestOrderTxn?.qrisStatus?.toLowerCase().includes('approved') || 
+    latestOrderTxn?.qrisStatus?.toLowerCase().includes('lunas') ||
+    latestOrderTxn?.qrisStatus?.toLowerCase().includes('sukses')
+  )
+  const effectivePaymentStatus = (userPaymentStatus === 'approved' || isTxnApproved) ? 'approved' : userPaymentStatus
 
   const hasActiveEvent = Boolean(activeReservation?.eventName)
   const displayItems = (cartItems && cartItems.length > 0) ? cartItems : (activeReservation?.items || [])
   const hasItems = displayItems.length > 0
   const remainingRentedItems = (activeReservation?.items || []).filter(item => item.listingType !== 'sale')
-  const isEventCompleted = Boolean(hasActiveEvent && userPaymentStatus === 'approved' && remainingRentedItems.length === 0)
+  const isEventCompleted = Boolean(hasActiveEvent && effectivePaymentStatus === 'approved' && remainingRentedItems.length === 0)
 
   // Sapaan waktu
   const hour = new Date().getHours()
@@ -54,9 +66,9 @@ export default function Dashboard() {
     ? 1 
     : isEventCompleted
     ? 5
-    : !hasItems && userPaymentStatus !== 'approved'
+    : !hasItems && effectivePaymentStatus !== 'approved'
     ? 2 
-    : userPaymentStatus === 'idle' 
+    : effectivePaymentStatus === 'idle' 
     ? 3 
     : 4
 
@@ -115,7 +127,7 @@ export default function Dashboard() {
 
   // Hitung status sisa hari pengembalian untuk activeReservation
   const calculateDaysLeft = () => {
-    if (!activeReservation?.eventName || userPaymentStatus !== 'approved' || remainingRentedItems.length === 0 || isEventCompleted) return null
+    if (!activeReservation?.eventName || effectivePaymentStatus !== 'approved' || remainingRentedItems.length === 0 || isEventCompleted) return null
     const endStr = activeReservation.endDateLabel || activeReservation.endDate
     if (!endStr) return null
 
@@ -275,7 +287,7 @@ export default function Dashboard() {
         <div className="relative z-10 mt-6 pt-5 border-t border-emerald-200/60">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             {steps.map((s) => {
-              const isDone = currentStep > s.num || isEventCompleted || (s.num === 4 && userPaymentStatus === 'approved' && !hasItems)
+              const isDone = currentStep > s.num || isEventCompleted || (s.num === 4 && effectivePaymentStatus === 'approved' && !hasItems)
               const isCurrent = !isEventCompleted && currentStep === s.num
               return (
                 <Link
@@ -383,15 +395,15 @@ export default function Dashboard() {
               </div>
               {hasActiveEvent && (
                 <span className={
-                  userPaymentStatus === 'approved' 
+                  effectivePaymentStatus === 'approved' 
                     ? 'badge-sage' 
-                    : userPaymentStatus === 'pending_admin_approval'
+                    : effectivePaymentStatus === 'pending_admin_approval'
                     ? 'badge-warm'
                     : 'badge-stone'
                 }>
-                  {userPaymentStatus === 'approved' 
+                  {effectivePaymentStatus === 'approved' 
                     ? 'Pembayaran Terverifikasi' 
-                    : userPaymentStatus === 'pending_admin_approval'
+                    : effectivePaymentStatus === 'pending_admin_approval'
                     ? 'Menunggu Verifikasi Admin'
                     : 'Belum Dibayar'}
                 </span>
@@ -495,15 +507,15 @@ export default function Dashboard() {
                     {!isEventCompleted && (
                       <Link to="/reservation" className="btn-primary text-xs !py-2.5 !px-4 flex items-center gap-1.5">
                         <ClipboardList className="w-3.5 h-3.5" />
-                        <span>{userPaymentStatus === 'idle' ? 'Lanjutkan Pembayaran' : 'Lihat Detail Reservasi'}</span>
+                        <span>{effectivePaymentStatus === 'idle' ? 'Lanjutkan Pembayaran' : 'Lihat Detail Reservasi'}</span>
                       </Link>
                     )}
-                    {userPaymentStatus === 'idle' && (
+                    {effectivePaymentStatus === 'idle' && (
                       <Link to="/create-event" className="btn-secondary text-xs !py-2.5 !px-3.5 flex items-center gap-1.5">
                         <span>Ubah Data Event</span>
                       </Link>
                     )}
-                    {userPaymentStatus === 'approved' && !isEventCompleted && (
+                    {effectivePaymentStatus === 'approved' && !isEventCompleted && (
                       <Link to="/return" className="btn-secondary text-xs !py-2.5 !px-4 flex items-center gap-1.5">
                         <RotateCcw className="w-3.5 h-3.5" />
                         <span>Kembalikan Barang</span>
@@ -511,7 +523,7 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  {userPaymentStatus === 'idle' && (
+                  {effectivePaymentStatus === 'idle' && (
                     <button
                       type="button"
                       onClick={() => {

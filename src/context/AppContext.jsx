@@ -496,6 +496,65 @@ export function AppProvider({ children }) {
             return normalizedTxn
           })
         }
+
+        // C. SINKRONISASI REAL-TIME: Status Pembayaran User dari Database Cloud Supabase
+        const latestOrderTxn = orderTxns[0]
+        const clearedTxnId = (typeof window !== 'undefined') ? localStorage.getItem('eventloop_cleared_txn_id') : null
+
+        if (latestOrderTxn && String(latestOrderTxn.id) !== String(clearedTxnId)) {
+          const qStatus = (latestOrderTxn.qris_status || '').toLowerCase()
+          if (qStatus.includes('approved') || qStatus.includes('lunas') || qStatus.includes('sukses')) {
+            setUserPaymentStatus('approved')
+            try { localStorage.setItem('eventloop_user_payment_status', 'approved') } catch (e) {}
+
+            // Sinkronisasi activeReservation jika data lokal hilang saat refresh
+            setActiveReservation(prev => {
+              // Jika activeReservation sudah memiliki items lengkap, pertahankan
+              if (prev && prev.items && prev.items.length > 0) {
+                return {
+                  ...prev,
+                  txnId: prev.txnId || latestOrderTxn.id,
+                  totalAmount: prev.totalAmount || latestOrderTxn.amount
+                }
+              }
+
+              // Rekonstruksi items dari catalog berdasarkan item_names di transaksi
+              const parsedItems = []
+              const rawNames = latestOrderTxn.item_names?.split(',') || []
+              rawNames.forEach(rn => {
+                const clean = rn.replace(/\(\d+x\)/, '').trim()
+                const matchEq = Array.from(catalogMap.values()).find(e => 
+                  e.name.toLowerCase().includes(clean.toLowerCase()) || 
+                  clean.toLowerCase().includes(e.name.toLowerCase())
+                )
+                if (matchEq) {
+                  const qtyMatch = rn.match(/\((\d+)x\)/)?.[1]
+                  parsedItems.push({
+                    ...matchEq,
+                    qty: qtyMatch ? parseInt(qtyMatch, 10) : 1
+                  })
+                }
+              })
+
+              return {
+                eventName: prev?.eventName || 'Kegiatan Kampus Prasmul',
+                org: prev?.org || latestOrderTxn.buyer_org || 'Prasmulyan',
+                startDateLabel: prev?.startDateLabel || '04 Nov 2026',
+                endDateLabel: prev?.endDateLabel || '06 Nov 2026',
+                eventDate: prev?.eventDate || '04 Nov 2026 – 06 Nov 2026',
+                items: parsedItems.length > 0 ? parsedItems : (prev?.items || []),
+                txnId: latestOrderTxn.id,
+                totalAmount: latestOrderTxn.amount
+              }
+            })
+          } else if (qStatus.includes('pending') || qStatus.includes('menunggu')) {
+            setUserPaymentStatus('pending_admin_approval')
+            try { localStorage.setItem('eventloop_user_payment_status', 'pending_admin_approval') } catch (e) {}
+          } else if (qStatus.includes('reject') || qStatus.includes('tolak')) {
+            setUserPaymentStatus('rejected')
+            try { localStorage.setItem('eventloop_user_payment_status', 'rejected') } catch (e) {}
+          }
+        }
       }
 
       // 4. Fetch Returns dari Supabase (Dual Source: dari Transactions & Returns Table)
@@ -991,14 +1050,20 @@ export function AppProvider({ children }) {
       adminFee: Math.round(totalAmount * 0.05),
     }
 
+    let createdTxnId = txnId
     try {
-      await supabase.from('transactions').insert([{
+      const { data: inserted, error: dbErr } = await supabase.from('transactions').insert([{
         buyer_org: newTxn.buyerOrg,
         item_names: newTxn.itemName,
         amount: newTxn.amount,
         qris_status: 'Pending Admin Verification',
         payout_status: 'Waiting Admin Approval'
-      }])
+      }]).select()
+
+      if (!dbErr && inserted?.[0]?.id) {
+        createdTxnId = inserted[0].id
+        newTxn.id = createdTxnId
+      }
     } catch (dbErr) {
       console.warn('Gagal sync transaksi ke Supabase:', dbErr)
     }
@@ -1016,7 +1081,7 @@ export function AppProvider({ children }) {
         ...item,
         lastLocation: item.lastLocation || item.initialLocation || 'Warehouse Kampus Gedung C'
       })), 
-      txnId,
+      txnId: createdTxnId,
       totalAmount,
       durationDays,
       paymentProofPhoto
@@ -1024,23 +1089,48 @@ export function AppProvider({ children }) {
     
     setCartItems([])
     setUserPaymentStatus('pending_admin_approval')
+    try {
+      localStorage.setItem('eventloop_user_payment_status', 'pending_admin_approval')
+      localStorage.removeItem('eventloop_cleared_txn_id')
+    } catch (e) {}
   }
 
   const approvePaymentByAdmin = async (txnId) => {
     try {
-      await supabase
-        .from('transactions')
-        .update({
-          qris_status: 'Payment Approved by Admin (Lunas)',
-          payout_status: 'Pending Transfer'
-        })
-        .ilike('buyer_org', '%')
+      if (txnId) {
+        const { error: updErr } = await supabase
+          .from('transactions')
+          .update({
+            qris_status: 'Payment Approved by Admin (Lunas)',
+            payout_status: 'Pending Transfer'
+          })
+          .eq('id', txnId)
+
+        if (updErr) {
+          console.warn('Update transaksi spesifik gagal, update status pending:', updErr)
+          await supabase
+            .from('transactions')
+            .update({
+              qris_status: 'Payment Approved by Admin (Lunas)',
+              payout_status: 'Pending Transfer'
+            })
+            .eq('qris_status', 'Pending Admin Verification')
+        }
+      } else {
+        await supabase
+          .from('transactions')
+          .update({
+            qris_status: 'Payment Approved by Admin (Lunas)',
+            payout_status: 'Pending Transfer'
+          })
+          .eq('qris_status', 'Pending Admin Verification')
+      }
     } catch (err) {
       console.warn('Gagal update transaksi di Supabase:', err)
     }
 
     setTransactions(prev => prev.map(t => {
-      if (t.id === txnId) {
+      if (t.id === txnId || !txnId) {
         return {
           ...t,
           qrisStatus: 'Payment Approved by Admin (Lunas)',
@@ -1050,6 +1140,7 @@ export function AppProvider({ children }) {
       return t
     }))
     setUserPaymentStatus('approved')
+    try { localStorage.setItem('eventloop_user_payment_status', 'approved') } catch (e) {}
   }
 
   const transferPayoutToOwner = async (txnId, proofPhoto = null) => {
@@ -1078,6 +1169,12 @@ export function AppProvider({ children }) {
 
   // --- BATALKAN / RESET EVENT AKTIF ---
   const clearActiveEvent = () => {
+    try {
+      const lastTxn = transactions[0]?.id
+      if (lastTxn) {
+        localStorage.setItem('eventloop_cleared_txn_id', String(lastTxn))
+      }
+    } catch (e) {}
     setActiveReservation(null)
     setUserPaymentStatus('idle')
     setCartItems([])

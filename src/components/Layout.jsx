@@ -50,6 +50,17 @@ export default function Layout() {
   } = useApp()
 
   const rentedItemsCount = activeReservation?.items?.filter(i => i.listingType !== 'sale')?.length || 0
+  const orderTransactions = (transactions || []).filter(t => 
+    !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')
+  )
+  const latestOrderTxn = orderTransactions[0]
+  const isTxnApproved = Boolean(
+    latestOrderTxn?.qrisStatus?.toLowerCase().includes('approved') || 
+    latestOrderTxn?.qrisStatus?.toLowerCase().includes('lunas') ||
+    latestOrderTxn?.qrisStatus?.toLowerCase().includes('sukses')
+  )
+  const effectivePaymentStatus = (userPaymentStatus === 'approved' || isTxnApproved) ? 'approved' : userPaymentStatus
+
   const pendingAdminTasks = 
     transactions.filter(t => !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]') && (t.qrisStatus?.includes('Pending') || t.payoutStatus === 'Pending Transfer')).length +
     pendingApprovals.length +
@@ -119,12 +130,12 @@ export default function Layout() {
                 let badgeText = null
 
                 if (item.path === '/reservation') {
-                  if (cartItems.length > 0 && userPaymentStatus === 'idle') {
+                  if (cartItems.length > 0 && effectivePaymentStatus === 'idle') {
                     badgeText = `${cartItems.length}`
-                  } else if (userPaymentStatus === 'pending_admin_approval') {
+                  } else if (effectivePaymentStatus === 'pending_admin_approval') {
                     badgeText = 'Verifikasi'
                   }
-                } else if (item.path === '/return' && userPaymentStatus === 'approved' && rentedItemsCount > 0) {
+                } else if (item.path === '/return' && effectivePaymentStatus === 'approved' && rentedItemsCount > 0) {
                   badgeText = `${rentedItemsCount}`
                 }
 

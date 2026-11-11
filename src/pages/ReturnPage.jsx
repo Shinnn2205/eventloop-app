@@ -45,9 +45,21 @@ export default function ReturnPage() {
     pendingReturns, 
     currentUserName,
     userPaymentStatus,
-    clearActiveEvent
+    clearActiveEvent,
+    transactions = []
   } = useApp()
   
+  const orderTransactions = (transactions || []).filter(t => 
+    !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')
+  )
+  const latestOrderTxn = orderTransactions[0]
+  const isTxnApproved = Boolean(
+    latestOrderTxn?.qrisStatus?.toLowerCase().includes('approved') || 
+    latestOrderTxn?.qrisStatus?.toLowerCase().includes('lunas') ||
+    latestOrderTxn?.qrisStatus?.toLowerCase().includes('sukses')
+  )
+  const effectivePaymentStatus = (userPaymentStatus === 'approved' || isTxnApproved) ? 'approved' : userPaymentStatus
+
   const rentedItems = activeReservation?.items?.filter(item => item.listingType !== 'sale') || []
   const hasActiveEvent = Boolean(activeReservation?.eventName)
   
@@ -162,7 +174,7 @@ export default function ReturnPage() {
       </div>
 
       {/* STATUS KETERLAMBATAN & KEBIJAKAN DENDA */}
-      {rentedItems.length > 0 && userPaymentStatus === 'approved' && (
+      {rentedItems.length > 0 && effectivePaymentStatus === 'approved' && (
         <div className="card p-4 bg-emerald-50/40 border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-3">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold ${
@@ -198,7 +210,7 @@ export default function ReturnPage() {
       )}
 
       {/* KONDISI 1: PEMBAYARAN MASIH MENUNGGU VERIFIKASI ADMIN */}
-      {userPaymentStatus === 'pending_admin_approval' ? (
+      {effectivePaymentStatus === 'pending_admin_approval' ? (
         <div className="card p-10 text-center space-y-4">
           <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto border border-amber-200">
             <Clock className="w-6 h-6" />
