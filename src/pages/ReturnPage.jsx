@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useApp } from '../context/AppContext'
+import { useApp, parseFlexibleDate } from '../context/AppContext'
 import { 
   RotateCcw, 
   CheckCircle2, 
@@ -77,8 +77,8 @@ export default function ReturnPage() {
   const calculateOverdueDays = () => {
     const endStr = activeReservation?.endDateLabel || activeReservation?.endDate
     if (!endStr) return 0
-    const d = new Date(endStr)
-    if (isNaN(d.getTime())) return 0
+    const d = parseFlexibleDate(endStr)
+    if (!d) return 0
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     d.setHours(0, 0, 0, 0)

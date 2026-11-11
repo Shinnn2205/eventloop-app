@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useApp } from '../context/AppContext'
+import { useApp, parseFlexibleDate } from '../context/AppContext'
 import { 
   Recycle, 
   Calendar, 
@@ -131,8 +131,8 @@ export default function Dashboard() {
     const endStr = activeReservation.endDateLabel || activeReservation.endDate
     if (!endStr) return null
 
-    const d = new Date(endStr)
-    if (isNaN(d.getTime())) return null
+    const d = parseFlexibleDate(endStr)
+    if (!d) return null
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)

@@ -103,11 +103,59 @@ export const validateNimStructure = (nimStr) => {
   }
 }
 
+// Helper parse tanggal yang mendukung teks bulan bahasa Indonesia (Okt, Des, Mei, Agu, dll)
+export const parseFlexibleDate = (input) => {
+  if (!input) return null
+  if (input instanceof Date) return isNaN(input.getTime()) ? null : input
+
+  const str = String(input).trim()
+  let d = new Date(str)
+  if (!isNaN(d.getTime())) return d
+
+  const indonesianMonths = {
+    jan: 'Jan', januari: 'January',
+    feb: 'Feb', februari: 'February',
+    mar: 'Mar', maret: 'March',
+    apr: 'Apr', april: 'April',
+    mei: 'May',
+    jun: 'Jun', juni: 'June',
+    jul: 'Jul', juli: 'July',
+    agu: 'Aug', agt: 'Aug', agustus: 'August',
+    sep: 'Sep', september: 'September',
+    okt: 'Oct', oktober: 'October',
+    nop: 'Nov', nov: 'Nov', november: 'November',
+    des: 'Dec', desember: 'December'
+  }
+
+  let normalized = str
+  for (const [idMonth, enMonth] of Object.entries(indonesianMonths)) {
+    const regex = new RegExp(`\\b${idMonth}\\b`, 'gi')
+    if (regex.test(normalized)) {
+      normalized = normalized.replace(regex, enMonth)
+      break
+    }
+  }
+
+  d = new Date(normalized)
+  if (!isNaN(d.getTime())) return d
+
+  const parts = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)
+  if (parts) {
+    const day = parseInt(parts[1], 10)
+    const month = parseInt(parts[2], 10) - 1
+    const year = parseInt(parts[3], 10)
+    const dateObj = new Date(year, month, day)
+    if (!isNaN(dateObj.getTime())) return dateObj
+  }
+
+  return null
+}
+
 // Helper format tanggal Indonesia singkat
 export const formatIdDate = (dateObjOrStr) => {
   if (!dateObjOrStr) return ''
-  const d = new Date(dateObjOrStr)
-  if (isNaN(d.getTime())) return String(dateObjOrStr)
+  const d = parseFlexibleDate(dateObjOrStr)
+  if (!d) return String(dateObjOrStr)
   return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 

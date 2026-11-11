@@ -23,6 +23,7 @@ export default function MyEquipment() {
     equipments, 
     pendingApprovals, 
     currentUserName, 
+    currentUserRole,
     transactions, 
     getEquipmentBorrowings,
     deleteEquipment,
@@ -34,9 +35,13 @@ export default function MyEquipment() {
 
   const isMine = (uploader) => {
     if (!uploader) return false
-    const uLow = String(uploader).toLowerCase()
-    const nameLow = String(currentUserName || 'Prasmulyan').toLowerCase()
-    return uLow === 'currentuser' || uLow.includes(nameLow) || nameLow.includes(uLow) || uLow.includes('prasmul') || uLow.includes('admin')
+    if (currentUserRole === 'admin') return true
+    const uLow = String(uploader).toLowerCase().trim()
+    const nameLow = String(currentUserName || '').toLowerCase().trim()
+    if (!nameLow || nameLow === 'prasmulyan') {
+      return uLow === 'currentuser' || uLow === 'prasmulyan'
+    }
+    return uLow === 'currentuser' || uLow.includes(nameLow) || nameLow.includes(uLow)
   }
 
   const myApprovedEquipments = equipments.filter(item => isMine(item.uploader))

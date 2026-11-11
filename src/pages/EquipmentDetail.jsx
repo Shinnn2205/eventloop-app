@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useApp } from '../context/AppContext'
+import { useApp, parseFlexibleDate } from '../context/AppContext'
 import { 
   ArrowLeft, 
   MapPin, 
@@ -60,10 +60,12 @@ export default function EquipmentDetail() {
     const reqEnd = new Date(futureEndDate).getTime()
 
     for (const b of activeBorrowings) {
-      const bStart = new Date(b.startDate).getTime()
-      const bEnd = new Date(b.endDate).getTime()
-      if (!isNaN(bStart) && !isNaN(bEnd)) {
-        if (reqStart <= bEnd && reqEnd >= bStart) {
+      const bStart = parseFlexibleDate(b.startDate)
+      const bEnd = parseFlexibleDate(b.endDate)
+      if (bStart && bEnd) {
+        const startMs = bStart.getTime()
+        const endMs = bEnd.getTime()
+        if (reqStart <= endMs && reqEnd >= startMs) {
           if (b.qty >= (item.total || 1)) return false
         }
       }
