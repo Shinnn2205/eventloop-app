@@ -92,9 +92,10 @@ export default function AdminPanel() {
     setTimeout(() => setTransferSuccessMsg(''), 5000)
   }
 
-  const pendingQrisCount = transactions.filter(t => t.qrisStatus?.includes('Pending')).length
-  const pendingPayoutCount = transactions.filter(t => t.payoutStatus === 'Pending Transfer').length
-  const totalFundsInEscrow = transactions
+  const validOrderTransactions = transactions.filter(t => !t.itemName?.startsWith('[RETURN_REQ]'))
+  const pendingQrisCount = validOrderTransactions.filter(t => t.qrisStatus?.includes('Pending')).length
+  const pendingPayoutCount = validOrderTransactions.filter(t => t.payoutStatus === 'Pending Transfer').length
+  const totalFundsInEscrow = validOrderTransactions
     .filter(t => t.payoutStatus === 'Pending Transfer' || t.qrisStatus?.includes('Pending'))
     .reduce((sum, t) => sum + (t.payoutAmount || 0), 0)
 
@@ -233,7 +234,7 @@ export default function AdminPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-emerald-100/60">
-                  {transactions.map((txn) => {
+                  {validOrderTransactions.map((txn) => {
                     const isPendingQris = txn.qrisStatus?.includes('Pending')
                     const isPendingTransfer = txn.payoutStatus === 'Pending Transfer'
                     return (

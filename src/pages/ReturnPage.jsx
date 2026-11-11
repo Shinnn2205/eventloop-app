@@ -89,7 +89,7 @@ export default function ReturnPage() {
 
   const selectItem = (newId) => {
     setSelectedItemId(newId)
-    const isPending = pendingReturns?.some(r => r.equipmentId === newId)
+    const isPending = pendingReturns?.some(r => String(r.equipmentId) === String(newId))
     if (isPending) {
       if (setReturnStatus) setReturnStatus('pending_admin_approval')
     } else {
@@ -265,7 +265,7 @@ export default function ReturnPage() {
 
               <div className="space-y-2">
                 {rentedItems.map(item => {
-                  const isPending = pendingReturns?.some(r => r.equipmentId === item.id)
+                  const isPending = pendingReturns?.some(r => String(r.equipmentId) === String(item.id))
                   const isSelected = currentItem?.id === item.id
                   return (
                     <button

@@ -51,7 +51,7 @@ export default function Layout() {
 
   const rentedItemsCount = activeReservation?.items?.filter(i => i.listingType !== 'sale')?.length || 0
   const pendingAdminTasks = 
-    transactions.filter(t => t.qrisStatus?.includes('Pending') || t.payoutStatus === 'Pending Transfer').length +
+    transactions.filter(t => !t.itemName?.startsWith('[RETURN_REQ]') && (t.qrisStatus?.includes('Pending') || t.payoutStatus === 'Pending Transfer')).length +
     pendingApprovals.length +
     pendingReturns.length
 

@@ -380,12 +380,15 @@ export function AppProvider({ children }) {
         .order('created_at', { ascending: false })
 
       if (!txnErr && txnData) {
-        if (txnData.length === 0) {
+        // Pisahkan transaksi umum dan transaksi permohonan return
+        const orderTxns = txnData.filter(t => !t.item_names?.startsWith('[RETURN_REQ]'))
+
+        if (orderTxns.length === 0) {
           setTransactions([])
           localStorage.removeItem('eventloop_transactions')
         } else {
           setTransactions(prevLocal => {
-            const normalizedTxn = txnData.map(t => {
+            const normalizedTxn = orderTxns.map(t => {
               const localMatch = prevLocal.find(lt => lt.id === t.id || (lt.itemName === t.item_names && lt.amount === Number(t.amount)))
               return {
                 id: t.id,
@@ -416,30 +419,77 @@ export function AppProvider({ children }) {
         }
       }
 
-      // 4. Fetch Returns dari Supabase
-      const { data: retData, error: retErr } = await supabase
-        .from('returns')
-        .select('*')
-        .order('created_at', { ascending: false })
+      // 4. Fetch Returns dari Supabase (Dual Source: dari Transactions & Returns Table)
+      const pendingReturnsMap = new Map()
 
-      if (!retErr && retData) {
-        if (retData.length === 0) {
-          setPendingReturns([])
-          localStorage.removeItem('eventloop_pending_returns')
-        } else {
-          const normalizedRet = retData.map(r => ({
-            id: r.id,
-            equipmentId: r.equipment_id,
-            conditionPhoto: r.condition_photo,
-            storagePhoto: r.storage_photo,
-            returnedQty: r.returned_qty || 1,
-            borrower: r.borrower || 'Prasmulyan',
-            status: r.status || 'Pending Admin Verification',
-            timestamp: r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : 'Baru saja'
-          }))
-          setPendingReturns(normalizedRet)
-        }
+      // A. Ambil dari transaksi dengan status 'Pending Return Verification'
+      if (!txnErr && txnData) {
+        txnData.forEach(t => {
+          if (t.qris_status === 'Pending Return Verification') {
+            try {
+              let parsed = {}
+              if (t.payout_status && t.payout_status.startsWith('{')) {
+                parsed = JSON.parse(t.payout_status)
+              }
+              const eqIdMatch = t.item_names?.match(/\[RETURN_REQ\]\s*([^:]+)/)?.[1]?.trim()
+              const retItem = {
+                id: parsed.returnId || parsed.id || t.id,
+                returnId: parsed.returnId || parsed.id || t.id,
+                dbTxnId: t.id,
+                equipmentId: parsed.equipmentId || (eqIdMatch ? (!isNaN(eqIdMatch) ? Number(eqIdMatch) : eqIdMatch) : 1),
+                itemName: parsed.itemName || t.buyer_org || 'Perlengkapan',
+                itemCode: parsed.itemCode || `ITEM-${parsed.equipmentId || eqIdMatch || ''}`,
+                returnedQty: parsed.returnedQty || t.amount || 1,
+                borrower: parsed.borrower || t.buyer_org || 'Prasmulyan',
+                returnLocation: parsed.returnLocation || 'Warehouse Kampus Gedung C',
+                conditionPhoto: parsed.conditionPhoto || null,
+                storagePhoto: parsed.storagePhoto || null,
+                status: 'Pending Admin Verification',
+                timestamp: parsed.timestamp || (t.created_at ? new Date(t.created_at).toLocaleString('id-ID') : 'Baru saja')
+              }
+              pendingReturnsMap.set(retItem.id, retItem)
+            } catch (err) {
+              console.warn('Gagal parse return transaksi:', err)
+            }
+          }
+        })
       }
+
+      // B. Ambil juga dari tabel returns jika tabel tersebut aktif
+      try {
+        const { data: retData, error: retErr } = await supabase
+          .from('returns')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (!retErr && retData && retData.length > 0) {
+          retData
+            .filter(r => (r.status || '').toLowerCase().includes('pending'))
+            .forEach(r => {
+              if (!pendingReturnsMap.has(r.id)) {
+                pendingReturnsMap.set(r.id, {
+                  id: r.id,
+                  returnId: r.id,
+                  equipmentId: !isNaN(r.equipment_id) ? Number(r.equipment_id) : r.equipment_id,
+                  itemName: r.item_name || 'Perlengkapan',
+                  itemCode: `ITEM-${r.equipment_id}`,
+                  conditionPhoto: r.condition_photo,
+                  storagePhoto: r.storage_photo,
+                  returnedQty: r.returned_qty || 1,
+                  borrower: r.borrower || 'Prasmulyan',
+                  returnLocation: r.return_location || 'Warehouse Kampus Gedung C',
+                  status: r.status || 'Pending Admin Verification',
+                  timestamp: r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : 'Baru saja'
+                })
+              }
+            })
+        }
+      } catch (retFetchErr) {
+        console.warn('Catatan tabel returns:', retFetchErr)
+      }
+
+      const mergedReturns = Array.from(pendingReturnsMap.values())
+      setPendingReturns(mergedReturns)
 
       // 5. Fetch Campus Impact dari Supabase
       try {
@@ -485,6 +535,20 @@ export function AppProvider({ children }) {
   useEffect(() => {
     fetchSupabaseData()
 
+    // Realtime channel listener untuk sinkronisasi otomatis transaksi, pengembalian, dan perlengkapan
+    const channel = supabase
+      .channel('public:eventloop_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        fetchSupabaseData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'returns' }, () => {
+        fetchSupabaseData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'equipments' }, () => {
+        fetchSupabaseData()
+      })
+      .subscribe()
+
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession)
       if (newSession?.user) {
@@ -526,6 +590,7 @@ export function AppProvider({ children }) {
 
     return () => {
       authListener?.subscription?.unsubscribe()
+      supabase.removeChannel(channel)
     }
   }, [fetchSupabaseData])
 
@@ -827,43 +892,93 @@ export function AppProvider({ children }) {
   // --- ACTIONS PENGEMBALIAN BARANG ---
   const submitUserReturnProof = async (returnData) => {
     const returnId = `RET-${Math.floor(Math.random() * 9000) + 1000}`
+    const borrowerName = returnData.borrower || currentUserName || 'Prasmulyan'
     const newReturn = {
       id: returnId,
+      returnId,
       ...returnData,
-      borrower: currentUserName || 'Prasmulyan',
-      timestamp: new Date().toLocaleString('id-ID')
+      borrower: borrowerName,
+      timestamp: returnData.timestamp || (new Date().toLocaleString('id-ID') + ' WIB')
     }
 
+    // 1. Dual-Sync ke Supabase:
+    // Sync ke tabel transactions (yang terbukti 100% didukung RLS dan terbaca di semua perangkat admin)
+    try {
+      const { error: txErr } = await supabase.from('transactions').insert([{
+        buyer_org: borrowerName,
+        item_names: `[RETURN_REQ] ${returnData.equipmentId}:::${returnData.itemName}:::${returnData.returnedQty || 1}:::${returnId}`,
+        amount: returnData.returnedQty || 1,
+        qris_status: 'Pending Return Verification',
+        payout_status: JSON.stringify({
+          ...newReturn,
+          returnId,
+          dbSyncType: 'transaction_return'
+        })
+      }])
+      if (txErr) {
+        console.warn('Gagal sync return ke transactions:', txErr)
+      }
+    } catch (txEx) {
+      console.warn('Exception sync return ke transactions:', txEx)
+    }
+
+    // 2. Sync juga ke tabel returns jika tabel tersebut aktif/sudah diperbaiki
     try {
       await supabase.from('returns').insert([{
-        equipment_id: returnData.equipmentId || 1,
+        equipment_id: String(returnData.equipmentId || ''),
         condition_photo: returnData.conditionPhoto || null,
         storage_photo: returnData.storagePhoto || null,
         status: 'Pending Admin Verification',
         returned_qty: returnData.returnedQty || 1,
-        borrower: currentUserName || 'Prasmulyan'
+        borrower: borrowerName,
+        return_location: returnData.returnLocation || null
       }])
     } catch (err) {
-      console.warn('Gagal kirim bukti return ke Supabase:', err)
+      console.warn('Gagal kirim bukti return ke tabel returns:', err)
     }
 
-    setPendingReturns(prev => [newReturn, ...prev])
+    setPendingReturns(prev => [newReturn, ...prev.filter(r => r.id !== returnId)])
     setReturnStatus('pending_admin_approval')
   }
 
   const approveReturnByAdmin = async (returnId, equipmentId, returnedQty) => {
-    const returnData = pendingReturns.find(r => r.id === returnId)
-    const targetEq = equipments.find(e => e.id === equipmentId)
+    const returnData = pendingReturns.find(r => r.id === returnId || r.returnId === returnId)
+    const targetEq = equipments.find(e => String(e.id) === String(equipmentId))
     const finalLocation = returnData?.returnLocation || targetEq?.lastLocation || targetEq?.initialLocation || 'Warehouse Kampus Gedung C'
-    
+    const qtyToAdd = Number(returnedQty) || 1
+
     try {
-      await supabase.from('returns').update({ status: 'Approved' }).ilike('borrower', '%')
+      // 1. Update di tabel transactions (tandai return sudah di-approve)
+      if (returnData?.dbTxnId) {
+        await supabase
+          .from('transactions')
+          .update({ qris_status: 'Return Approved by Admin' })
+          .eq('id', returnData.dbTxnId)
+      } else {
+        await supabase
+          .from('transactions')
+          .update({ qris_status: 'Return Approved by Admin' })
+          .ilike('item_names', `%${returnId}%`)
+      }
+
+      // 2. Update di tabel returns jika ada
+      try {
+        await supabase
+          .from('returns')
+          .update({ status: 'Approved' })
+          .eq('id', returnId)
+      } catch (e) {
+        // Abaikan jika tabel returns belum sinkron
+      }
+
+      // 3. Update stok dan lokasi perlengkapan di Supabase
       if (equipmentId && targetEq) {
         await supabase
           .from('equipments')
           .update({ 
-            available: targetEq.available + returnedQty,
-            lastLocation: finalLocation
+            available: targetEq.available + qtyToAdd,
+            lastLocation: finalLocation,
+            lastStoragePhoto: returnData?.storagePhoto || null
           })
           .eq('id', equipmentId)
       }
@@ -871,14 +986,14 @@ export function AppProvider({ children }) {
       console.warn('Gagal update return status di Supabase:', err)
     }
 
-    setPendingReturns(prev => prev.filter(r => r.id !== returnId))
+    setPendingReturns(prev => prev.filter(r => r.id !== returnId && r.returnId !== returnId))
     setReturnStatus('approved_success')
     
     setEquipments(prev => prev.map(item => {
-      if (item.id === equipmentId) {
+      if (String(item.id) === String(equipmentId)) {
         return { 
           ...item, 
-          available: item.available + returnedQty,
+          available: item.available + qtyToAdd,
           lastLocation: finalLocation,
           lastStoragePhoto: returnData?.storagePhoto || item.lastStoragePhoto,
           lastConditionPhoto: returnData?.conditionPhoto || null
@@ -889,7 +1004,7 @@ export function AppProvider({ children }) {
 
     setActiveReservation(prev => {
       if (!prev || !prev.items) return prev
-      const remainingItems = prev.items.filter(item => item.id !== equipmentId)
+      const remainingItems = prev.items.filter(item => String(item.id) !== String(equipmentId))
       return {
         ...prev,
         items: remainingItems
@@ -932,6 +1047,7 @@ export function AppProvider({ children }) {
     // 2. Dari transaksi aktual yang tercatat di database
     transactions.forEach((txn, idx) => {
       if (activeReservation?.txnId && txn.id === activeReservation.txnId) return
+      if (txn.itemName?.startsWith('[RETURN_REQ]')) return
       const parsedItems = txn.borrowedItems && txn.borrowedItems.length > 0
         ? txn.borrowedItems
         : (txn.itemName || 'Perlengkapan Event').split(',').map((part, pIdx) => {
