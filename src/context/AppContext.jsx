@@ -310,6 +310,51 @@ export function AppProvider({ children }) {
   useEffect(() => { localStorage.setItem('eventloop_pending_returns', JSON.stringify(pendingReturns)) }, [pendingReturns])
   useEffect(() => { localStorage.setItem('eventloop_cart', JSON.stringify(cartItems)) }, [cartItems])
 
+  // Sinkronisasi otomatis activeReservation ke Supabase reservations table saat ada perubahan
+  useEffect(() => {
+    const userId = session?.user?.id
+    if (!userId) return
+    if (!activeReservation || !activeReservation.eventName) return
+
+    const syncReservationToSupabase = async () => {
+      try {
+        const { data: existing } = await supabase
+          .from('reservations')
+          .select('id')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        const payload = {
+          user_id: userId,
+          item_name: JSON.stringify({
+            ...activeReservation,
+            paymentStatus: userPaymentStatus
+          }),
+          quantity: activeReservation.items?.length || 0,
+          status: userPaymentStatus || 'idle',
+          start_date: activeReservation.startDate || activeReservation.startDateLabel || new Date().toISOString()
+        }
+
+        if (existing && existing.length > 0) {
+          await supabase
+            .from('reservations')
+            .update(payload)
+            .eq('id', existing[0].id)
+        } else {
+          await supabase
+            .from('reservations')
+            .insert([payload])
+        }
+      } catch (err) {
+        console.warn('Gagal sync activeReservation ke Supabase:', err)
+      }
+    }
+
+    const timer = setTimeout(syncReservationToSupabase, 800)
+    return () => clearTimeout(timer)
+  }, [activeReservation, userPaymentStatus, session?.user?.id])
+
   // Update Active Event Details Helper
   const updateActiveEventDetails = useCallback((updates) => {
     setActiveReservation(prev => ({
@@ -323,8 +368,11 @@ export function AppProvider({ children }) {
     try {
       setLoadingDb(true)
 
-      // 1. Session Auth
+      // 1. Session Auth & User Active Reservation dari Cloud Database
       const { data: { session: currentSession } } = await supabase.auth.getSession()
+      let currentUserId = currentSession?.user?.id || session?.user?.id
+      let hasCloudReservation = false
+
       if (currentSession) {
         setSession(currentSession)
         const userEmail = currentSession.user?.email || ''
@@ -350,6 +398,47 @@ export function AppProvider({ children }) {
           if (profile?.prodi) {
             setCurrentUserStudyProgram(profile.prodi)
           }
+        }
+      }
+
+      // Ambil active reservation pengguna saat ini dari tabel reservations di Supabase
+      if (currentUserId) {
+        try {
+          const { data: userResRows, error: userResErr } = await supabase
+            .from('reservations')
+            .select('*')
+            .eq('user_id', currentUserId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+
+          if (!userResErr && userResRows && userResRows.length > 0) {
+            const userRes = userResRows[0]
+            let parsedRes = null
+            if (userRes.item_name && userRes.item_name.startsWith('{')) {
+              try {
+                parsedRes = JSON.parse(userRes.item_name)
+              } catch (parseE) {
+                console.warn('Gagal parse reservation item_name:', parseE)
+              }
+            }
+
+            if (parsedRes) {
+              hasCloudReservation = true
+              setActiveReservation(parsedRes)
+              try {
+                localStorage.setItem('eventloop_active_reservation', JSON.stringify(parsedRes))
+              } catch (e) {}
+            }
+
+            if (userRes.status) {
+              setUserPaymentStatus(userRes.status)
+              try {
+                localStorage.setItem('eventloop_user_payment_status', userRes.status)
+              } catch (e) {}
+            }
+          }
+        } catch (resErr) {
+          console.warn('Gagal fetch data reservations dari Supabase:', resErr)
         }
       }
 
@@ -501,13 +590,13 @@ export function AppProvider({ children }) {
         const latestOrderTxn = orderTxns[0]
         const clearedTxnId = (typeof window !== 'undefined') ? localStorage.getItem('eventloop_cleared_txn_id') : null
 
-        if (latestOrderTxn && String(latestOrderTxn.id) !== String(clearedTxnId)) {
+        if (!hasCloudReservation && latestOrderTxn && String(latestOrderTxn.id) !== String(clearedTxnId)) {
           const qStatus = (latestOrderTxn.qris_status || '').toLowerCase()
           if (qStatus.includes('approved') || qStatus.includes('lunas') || qStatus.includes('sukses')) {
             setUserPaymentStatus('approved')
             try { localStorage.setItem('eventloop_user_payment_status', 'approved') } catch (e) {}
 
-            // Sinkronisasi activeReservation jika data lokal hilang saat refresh
+            // Sinkronisasi activeReservation jika data lokal hilang saat refresh & belum ada di tabel reservations
             setActiveReservation(prev => {
               // Jika activeReservation sudah memiliki items lengkap, pertahankan
               if (prev && prev.items && prev.items.length > 0) {
@@ -742,7 +831,7 @@ export function AppProvider({ children }) {
   useEffect(() => {
     fetchSupabaseData()
 
-    // Realtime channel listener untuk sinkronisasi otomatis transaksi, pengembalian, dan perlengkapan
+    // Realtime channel listener untuk sinkronisasi otomatis transaksi, pengembalian, perlengkapan, dan reservasi aktif
     const channel = supabase
       .channel('public:eventloop_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
@@ -754,9 +843,12 @@ export function AppProvider({ children }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'equipments' }, () => {
         fetchSupabaseData()
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => {
+        fetchSupabaseData()
+      })
       .subscribe()
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       setSession(newSession)
       if (newSession?.user) {
         const meta = newSession.user.user_metadata || {}
@@ -791,6 +883,11 @@ export function AppProvider({ children }) {
           }
         } catch (e) {
           console.warn('Profile sync notice:', e)
+        }
+
+        // Segera mutakhirkan data peminjaman cloud untuk user saat login / refresh token
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          fetchSupabaseData()
         }
       }
     })
@@ -1070,29 +1167,62 @@ export function AppProvider({ children }) {
 
     setTransactions(prev => [newTxn, ...prev])
     
-    setActiveReservation(prev => ({ 
-      ...(prev || {}),
-      eventName: prev?.eventName || 'Kegiatan Kampus Prasmul',
-      org: prev?.org || currentUserName || 'BEM Prasetiya Mulya',
+    const activeReservationPayload = { 
+      ...(activeReservation || {}),
+      eventName: activeReservation?.eventName || 'Kegiatan Kampus Prasmul',
+      org: activeReservation?.org || currentUserName || 'BEM Prasetiya Mulya',
       startDateLabel,
       endDateLabel,
       eventDate: `${startDateLabel} – ${endDateLabel}`,
+      durationDays,
+      location: activeReservation?.location || 'Auditorium Kampus BSD',
       items: cartItems.map(item => ({
         ...item,
         lastLocation: item.lastLocation || item.initialLocation || 'Warehouse Kampus Gedung C'
       })), 
       txnId: createdTxnId,
       totalAmount,
-      durationDays,
-      paymentProofPhoto
-    }))
-    
+      paymentProofPhoto,
+      paymentStatus: 'pending_admin_approval'
+    }
+
+    setActiveReservation(activeReservationPayload)
     setCartItems([])
     setUserPaymentStatus('pending_admin_approval')
     try {
       localStorage.setItem('eventloop_user_payment_status', 'pending_admin_approval')
+      localStorage.setItem('eventloop_active_reservation', JSON.stringify(activeReservationPayload))
       localStorage.removeItem('eventloop_cleared_txn_id')
     } catch (e) {}
+
+    // Segera sinkronkan ke tabel reservations di cloud Supabase
+    const activeUserId = session?.user?.id
+    if (activeUserId) {
+      try {
+        const cloudRes = {
+          user_id: activeUserId,
+          item_name: JSON.stringify(activeReservationPayload),
+          quantity: cartItems.length,
+          status: 'pending_admin_approval',
+          start_date: activeReservation?.startDate || activeReservation?.startDateLabel || new Date().toISOString()
+        }
+
+        const { data: existing } = await supabase
+          .from('reservations')
+          .select('id')
+          .eq('user_id', activeUserId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (existing && existing.length > 0) {
+          await supabase.from('reservations').update(cloudRes).eq('id', existing[0].id)
+        } else {
+          await supabase.from('reservations').insert([cloudRes])
+        }
+      } catch (err) {
+        console.warn('Gagal sync reservation saat submit QRIS:', err)
+      }
+    }
   }
 
   const approvePaymentByAdmin = async (txnId) => {
@@ -1125,6 +1255,12 @@ export function AppProvider({ children }) {
           })
           .eq('qris_status', 'Pending Admin Verification')
       }
+
+      // Update juga status di tabel reservations cloud
+      await supabase
+        .from('reservations')
+        .update({ status: 'approved' })
+        .eq('status', 'pending_admin_approval')
     } catch (err) {
       console.warn('Gagal update transaksi di Supabase:', err)
     }
@@ -1168,7 +1304,7 @@ export function AppProvider({ children }) {
   }
 
   // --- BATALKAN / RESET EVENT AKTIF ---
-  const clearActiveEvent = () => {
+  const clearActiveEvent = async () => {
     try {
       const lastTxn = transactions[0]?.id
       if (lastTxn) {
@@ -1178,9 +1314,25 @@ export function AppProvider({ children }) {
     setActiveReservation(null)
     setUserPaymentStatus('idle')
     setCartItems([])
-    localStorage.removeItem('eventloop_active_reservation')
-    localStorage.removeItem('eventloop_user_payment_status')
-    localStorage.removeItem('eventloop_cart')
+    setReturnStatus('idle')
+    try {
+      localStorage.removeItem('eventloop_active_reservation')
+      localStorage.removeItem('eventloop_user_payment_status')
+      localStorage.removeItem('eventloop_cart')
+      localStorage.removeItem('eventloop_return_status')
+    } catch (e) {}
+
+    const uid = session?.user?.id
+    if (uid) {
+      try {
+        await supabase
+          .from('reservations')
+          .delete()
+          .eq('user_id', uid)
+      } catch (err) {
+        console.warn('Gagal menghapus reservation dari cloud:', err)
+      }
+    }
   }
 
   // --- ACTIONS ADMIN MANAGE STOK ---
@@ -1345,6 +1497,36 @@ export function AppProvider({ children }) {
             .eq('id', targetEq.dbTxnId)
         }
       }
+
+      // 4. Update tabel reservations di Supabase jika item yang dikembalikan ada di active reservation
+      try {
+        const { data: allRes } = await supabase.from('reservations').select('*')
+        if (allRes && allRes.length > 0) {
+          for (const resRow of allRes) {
+            if (resRow.item_name && resRow.item_name.startsWith('{')) {
+              try {
+                const parsed = JSON.parse(resRow.item_name)
+                const hasItem = (parsed.items || []).some(i => String(i.id) === String(equipmentId))
+                if (hasItem) {
+                  const updatedItems = (parsed.items || []).filter(i => String(i.id) !== String(equipmentId))
+                  await supabase
+                    .from('reservations')
+                    .update({
+                      item_name: JSON.stringify({
+                        ...parsed,
+                        items: updatedItems
+                      }),
+                      quantity: updatedItems.length
+                    })
+                    .eq('id', resRow.id)
+                }
+              } catch (parseErr) {}
+            }
+          }
+        }
+      } catch (resErr) {
+        console.warn('Gagal update reservations table saat approve return:', resErr)
+      }
     } catch (err) {
       console.warn('Gagal update return status di Supabase:', err)
     }
@@ -1480,6 +1662,9 @@ export function AppProvider({ children }) {
     setSsoUser(null)
     setCurrentUserRole('user')
     setCurrentUserName('Prasmulyan')
+    setActiveReservation(null)
+    setUserPaymentStatus('idle')
+    setCartItems([])
     sessionStorage.removeItem('eventloop_session')
     sessionStorage.removeItem('eventloop_user_name')
     sessionStorage.removeItem('eventloop_role')
@@ -1491,6 +1676,10 @@ export function AppProvider({ children }) {
     localStorage.removeItem('eventloop_role')
     localStorage.removeItem('eventloop_user_prodi')
     localStorage.removeItem('eventloop_sso_user')
+    localStorage.removeItem('eventloop_active_reservation')
+    localStorage.removeItem('eventloop_user_payment_status')
+    localStorage.removeItem('eventloop_cart')
+    localStorage.removeItem('eventloop_return_status')
   }
 
   return (
@@ -1499,7 +1688,7 @@ export function AppProvider({ children }) {
       currentUserName, setCurrentUserName,
       currentUserStudyProgram, setCurrentUserStudyProgram,
       session, ssoUser, setSsoUser, sessionUser: session?.user || ssoUser || null, 
-      logout, loadingDb, refetchData: fetchSupabaseData,
+      logout, loadingDb, refetchData: fetchSupabaseData, fetchSupabaseData,
       campusImpact, orgImpacts,
       equipments, pendingApprovals, transactions, userPaymentStatus, activeReservation, setActiveReservation, updateActiveEventDetails, clearActiveEvent, returnStatus, pendingReturns,
       ongoingCampusEvents, getEquipmentBorrowings,

@@ -25,7 +25,7 @@ import { useApp, isAdminEmail, isCampusEmail, validateNimStructure, getAdminDisp
 export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { setCurrentUserRole, setCurrentUserName } = useApp()
+  const { setCurrentUserRole, setCurrentUserName, refetchData } = useApp()
   
   // Tab Mode: 'login' (Masuk), 'signup' (Buat Akun Baru), atau 'forgot' (Lupa Password)
   const tabParam = searchParams.get('tab')
@@ -215,6 +215,15 @@ export default function LoginPage() {
           }
         } catch (fetchErr) {
           console.warn('Gagal ambil data profil:', fetchErr)
+        }
+
+        // Refresh data Supabase secara instan agar reservasi, event aktif, dan barang sewa sinkron antar-perangkat
+        if (refetchData) {
+          try {
+            await refetchData()
+          } catch (syncErr) {
+            console.warn('Gagal sinkron data cloud saat login:', syncErr)
+          }
         }
 
         if (isAdminEmail(loginEmail)) {
