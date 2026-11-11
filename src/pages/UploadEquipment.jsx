@@ -104,15 +104,15 @@ export default function UploadEquipment() {
 
   const circularScore = calculateCircularScore()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    const newId = uploadEquipmentByUser({
+    const newId = await uploadEquipmentByUser({
       name, category, qty, size, material, maxReuse, pricingType,
       price: pricingType === 'sale' ? parseInt(salePrice || 0) : parseInt(price || 0),
       salePrice: parseInt(salePrice || 0), bankInfo: bankAccount, condition, description, 
       imagePreview, circularScore,
       initialLocation, initialStoragePhoto: storagePhotoPreview,
-      ownerOrg: 'Prasmulyan Organization',
+      ownerOrg: appContext.currentUserName || 'Prasmulyan Organization',
       status: 'pending_approval'
     })
     setSubmittedUnitId(newId)

@@ -41,3 +41,18 @@ CREATE POLICY "Allow anon update returns" ON public.returns FOR UPDATE USING (tr
 
 DROP POLICY IF EXISTS "Allow anon delete returns" ON public.returns;
 CREATE POLICY "Allow anon delete returns" ON public.returns FOR DELETE USING (true);
+
+-- 3. Pastikan tabel equipments mengizinkan insert, update, dan delete untuk public & anon
+ALTER TABLE public.equipments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read equipments" ON public.equipments;
+CREATE POLICY "Allow public read equipments" ON public.equipments FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow anon insert equipments" ON public.equipments;
+CREATE POLICY "Allow anon insert equipments" ON public.equipments FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow anon update equipments" ON public.equipments;
+CREATE POLICY "Allow anon update equipments" ON public.equipments FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Allow anon delete equipments" ON public.equipments;
+CREATE POLICY "Allow anon delete equipments" ON public.equipments FOR DELETE USING (true);

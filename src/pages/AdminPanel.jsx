@@ -74,14 +74,14 @@ export default function AdminPanel() {
     setTimeout(() => setTransferSuccessMsg(''), 5000)
   }
 
-  const handleApproveEquipmentClick = (id) => {
-    approveEquipmentByAdmin(id)
-    setTransferSuccessMsg(`Barang #${id} disetujui dan langsung tayang di Marketplace.`)
+  const handleApproveEquipmentClick = async (id) => {
+    await approveEquipmentByAdmin(id)
+    setTransferSuccessMsg(`Barang #${id} disetujui, langsung tersimpan di database, dan tayang di Marketplace.`)
     setTimeout(() => setTransferSuccessMsg(''), 5000)
   }
 
-  const handleRejectEquipmentClick = (id) => {
-    rejectEquipmentByAdmin(id)
+  const handleRejectEquipmentClick = async (id) => {
+    await rejectEquipmentByAdmin(id)
     setTransferSuccessMsg(`Barang #${id} telah ditolak dari antrean verifikasi.`)
     setTimeout(() => setTransferSuccessMsg(''), 4000)
   }
@@ -92,7 +92,7 @@ export default function AdminPanel() {
     setTimeout(() => setTransferSuccessMsg(''), 5000)
   }
 
-  const validOrderTransactions = transactions.filter(t => !t.itemName?.startsWith('[RETURN_REQ]'))
+  const validOrderTransactions = transactions.filter(t => !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]'))
   const pendingQrisCount = validOrderTransactions.filter(t => t.qrisStatus?.includes('Pending')).length
   const pendingPayoutCount = validOrderTransactions.filter(t => t.payoutStatus === 'Pending Transfer').length
   const totalFundsInEscrow = validOrderTransactions

@@ -380,8 +380,8 @@ export function AppProvider({ children }) {
         .order('created_at', { ascending: false })
 
       if (!txnErr && txnData) {
-        // Pisahkan transaksi umum dan transaksi permohonan return
-        const orderTxns = txnData.filter(t => !t.item_names?.startsWith('[RETURN_REQ]'))
+        // Pisahkan transaksi umum, return, dan permohonan barang baru
+        const orderTxns = txnData.filter(t => !t.item_names?.startsWith('[RETURN_REQ]') && !t.item_names?.startsWith('[EQUIPMENT_UPLOAD]'))
 
         if (orderTxns.length === 0) {
           setTransactions([])
@@ -491,7 +491,35 @@ export function AppProvider({ children }) {
       const mergedReturns = Array.from(pendingReturnsMap.values())
       setPendingReturns(mergedReturns)
 
-      // 5. Fetch Campus Impact dari Supabase
+      // 5. Fetch Pending Equipment Approvals dari Supabase
+      const pendingApprovalsMap = new Map()
+      if (!txnErr && txnData) {
+        txnData.forEach(t => {
+          if (t.qris_status === 'Pending Equipment Approval') {
+            try {
+              let parsed = {}
+              if (t.payout_status && t.payout_status.startsWith('{')) {
+                parsed = JSON.parse(t.payout_status)
+              }
+              const pendingItem = {
+                ...parsed,
+                id: parsed.id || t.id,
+                dbTxnId: t.id,
+                name: parsed.name || t.item_names?.replace(/\[EQUIPMENT_UPLOAD\]\s*/, '')?.split(':::')?.[0]?.trim() || 'Barang Baru',
+                uploader: parsed.uploader || t.buyer_org || 'Prasmulyan',
+                dateSubmitted: parsed.dateSubmitted || (t.created_at ? new Date(t.created_at).toLocaleDateString('id-ID') : 'Hari ini'),
+                status: 'Pending Admin Check'
+              }
+              pendingApprovalsMap.set(pendingItem.id, pendingItem)
+            } catch (err) {
+              console.warn('Gagal parse pending equipment dari transaksi:', err)
+            }
+          }
+        })
+      }
+      setPendingApprovals(Array.from(pendingApprovalsMap.values()))
+
+      // 6. Fetch Campus Impact dari Supabase
       try {
         const { data: impactRow, error: impactErr } = await supabase
           .from('campus_impact')
@@ -621,15 +649,34 @@ export function AppProvider({ children }) {
   }
 
   // --- ACTIONS UPLOAD & VERIFIKASI ---
-  const uploadEquipmentByUser = (newEquipment) => {
+  const uploadEquipmentByUser = async (newEquipment) => {
+    const pendingId = `APV-${Date.now().toString().slice(-4)}`
     const pendingItem = {
       ...newEquipment,
-      id: `APV-${Date.now().toString().slice(-4)}`,
+      id: pendingId,
       dateSubmitted: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
       status: 'Pending Admin Check',
       uploader: currentUserName || 'Prasmulyan'
     }
-    setPendingApprovals(prev => [pendingItem, ...prev])
+
+    // Simpan ke Supabase transactions agar terbaca di portal Admin semua perangkat
+    try {
+      const { data, error } = await supabase.from('transactions').insert([{
+        buyer_org: pendingItem.uploader,
+        item_names: `[EQUIPMENT_UPLOAD] ${pendingItem.name}:::${pendingId}`,
+        amount: Number(pendingItem.price) || 0,
+        qris_status: 'Pending Equipment Approval',
+        payout_status: JSON.stringify(pendingItem)
+      }]).select()
+      
+      if (!error && data && data.length > 0) {
+        pendingItem.dbTxnId = data[0].id
+      }
+    } catch (err) {
+      console.warn('Gagal sync upload equipment ke Supabase:', err)
+    }
+
+    setPendingApprovals(prev => [pendingItem, ...prev.filter(p => p.id !== pendingId)])
     return pendingItem.id
   }
 
@@ -640,7 +687,8 @@ export function AppProvider({ children }) {
     const priceVal = itemToApprove.pricingType === 'sale' ? (Number(itemToApprove.price) || 50000) : (Number(itemToApprove.price) || 20000)
     const salePriceVal = itemToApprove.pricingType === 'sale' ? (Number(itemToApprove.salePrice) || priceVal) : null
 
-    const newMarketplaceItem = {
+    // Objek bersih yang persis sesuai dengan skema kolom Supabase (tanpa kolom reuseCount ilegal)
+    const cleanMarketplaceItem = {
       name: itemToApprove.name,
       category: itemToApprove.category,
       price: priceVal,
@@ -652,7 +700,6 @@ export function AppProvider({ children }) {
       imageUrl: itemToApprove.imagePreview || null,
       circularScore: itemToApprove.circularScore || 88,
       reusedCount: 0,
-      reuseCount: 0,
       maxReuse: parseInt(itemToApprove.maxReuse) || 30,
       size: itemToApprove.size || 'Standar',
       material: itemToApprove.material || 'Aluminium',
@@ -668,24 +715,58 @@ export function AppProvider({ children }) {
     try {
       const { data, error } = await supabase
         .from('equipments')
-        .insert([newMarketplaceItem])
+        .insert([cleanMarketplaceItem])
         .select()
       
       if (!error && data && data.length > 0) {
-        newMarketplaceItem.id = data[0].id
+        cleanMarketplaceItem.id = data[0].id
       } else {
-        newMarketplaceItem.id = Date.now()
+        console.warn('Equipments insert error in Supabase:', error)
+        cleanMarketplaceItem.id = Date.now()
       }
     } catch (err) {
       console.warn('Gagal simpan ke Supabase equipments, gunakan lokal:', err)
-      newMarketplaceItem.id = Date.now()
+      cleanMarketplaceItem.id = Date.now()
     }
 
-    setEquipments(prev => [newMarketplaceItem, ...prev])
+    // Tandai status upload di database transactions sudah disetujui
+    try {
+      if (itemToApprove.dbTxnId) {
+        await supabase
+          .from('transactions')
+          .update({ qris_status: 'Equipment Approved by Admin' })
+          .eq('id', itemToApprove.dbTxnId)
+      } else {
+        await supabase
+          .from('transactions')
+          .update({ qris_status: 'Equipment Approved by Admin' })
+          .ilike('item_names', `%[EQUIPMENT_UPLOAD]%${approvalId}%`)
+      }
+    } catch (e) {
+      console.warn('Gagal update status upload di transactions:', e)
+    }
+
+    setEquipments(prev => [cleanMarketplaceItem, ...prev.filter(e => e.id !== cleanMarketplaceItem.id)])
     setPendingApprovals(prev => prev.filter(p => p.id !== approvalId))
   }
 
-  const rejectEquipmentByAdmin = (approvalId) => {
+  const rejectEquipmentByAdmin = async (approvalId) => {
+    const itemToReject = pendingApprovals.find(p => p.id === approvalId)
+    try {
+      if (itemToReject?.dbTxnId) {
+        await supabase
+          .from('transactions')
+          .update({ qris_status: 'Equipment Rejected by Admin' })
+          .eq('id', itemToReject.dbTxnId)
+      } else {
+        await supabase
+          .from('transactions')
+          .update({ qris_status: 'Equipment Rejected by Admin' })
+          .ilike('item_names', `%[EQUIPMENT_UPLOAD]%${approvalId}%`)
+      }
+    } catch (e) {
+      console.warn('Gagal update status reject di transactions:', e)
+    }
     setPendingApprovals(prev => prev.filter(p => p.id !== approvalId))
   }
 
@@ -697,7 +778,7 @@ export function AppProvider({ children }) {
 
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
-    // Potong ketersediaan stok
+    // Potong ketersediaan stok di state lokal dan sinkronkan ke database Supabase
     setEquipments(prev => prev.map(eq => {
       const reservedItem = cartItems.find(cart => cart.id === eq.id)
       if (reservedItem) {
@@ -705,6 +786,21 @@ export function AppProvider({ children }) {
       }
       return eq
     }))
+
+    for (const item of cartItems) {
+      const currentEq = equipments.find(e => e.id === item.id)
+      if (currentEq) {
+        const newAvail = Math.max(0, (currentEq.available || 1) - (item.qty || 1))
+        try {
+          await supabase
+            .from('equipments')
+            .update({ available: newAvail })
+            .eq('id', item.id)
+        } catch (eqErr) {
+          console.warn('Gagal potong stok di Supabase:', eqErr)
+        }
+      }
+    }
 
     const firstCartItem = cartItems[0]
     const detectedOwnerOrg = firstCartItem?.owner || 'Organisasi Pemilik Barang'
@@ -1047,7 +1143,7 @@ export function AppProvider({ children }) {
     // 2. Dari transaksi aktual yang tercatat di database
     transactions.forEach((txn, idx) => {
       if (activeReservation?.txnId && txn.id === activeReservation.txnId) return
-      if (txn.itemName?.startsWith('[RETURN_REQ]')) return
+      if (txn.itemName?.startsWith('[RETURN_REQ]') || txn.itemName?.startsWith('[EQUIPMENT_UPLOAD]')) return
       const parsedItems = txn.borrowedItems && txn.borrowedItems.length > 0
         ? txn.borrowedItems
         : (txn.itemName || 'Perlengkapan Event').split(',').map((part, pIdx) => {
