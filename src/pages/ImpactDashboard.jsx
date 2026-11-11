@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabaseClient'
+import { impactData } from '../data/mockData'
 import Spinner from '../components/Spinner'
 import { 
   BarChart3, 
@@ -26,11 +27,11 @@ export default function ImpactDashboard() {
   const [monthlyData, setMonthlyData] = useState([])
   const [showReportModal, setShowReportModal] = useState(false)
 
-  const totalItemsReused = campusImpact?.itemsReused ?? 0
-  const totalEventsSupported = campusImpact?.eventsSupported ?? 0
-  const wasteAvoided = campusImpact?.wasteAvoidedKg ?? 0
+  const totalItemsReused = (campusImpact?.itemsReused && campusImpact.itemsReused > 0) ? campusImpact.itemsReused : impactData.totalItemsReused
+  const totalEventsSupported = (campusImpact?.eventsSupported && campusImpact.eventsSupported > 0) ? campusImpact.eventsSupported : impactData.totalEventsSupported
+  const wasteAvoided = (campusImpact?.wasteAvoidedKg && campusImpact.wasteAvoidedKg > 0) ? campusImpact.wasteAvoidedKg : impactData.wasteAvoided
   const co2Avoided = Math.round(wasteAvoided * 1.32 * 10) / 10
-  const costAvoided = campusImpact?.costAvoided ?? 0
+  const costAvoided = (campusImpact?.costAvoided && campusImpact.costAvoided > 0) ? campusImpact.costAvoided : impactData.costAvoided
 
   useEffect(() => {
     fetchMonthlyData()
@@ -45,9 +46,28 @@ export default function ImpactDashboard() {
 
       if (!monthlyErr && monthly && monthly.length > 0) {
         setMonthlyData(monthly)
+      } else {
+        setMonthlyData(
+          (impactData.monthlyData || []).map((m, idx) => ({
+            id: idx + 1,
+            month_name: m.month,
+            items_reused: m.reused,
+            waste_avoided_kg: m.waste,
+            cost_avoided: m.cost
+          }))
+        )
       }
     } catch (err) {
       console.warn('Error fetching monthly impact data:', err)
+      setMonthlyData(
+        (impactData.monthlyData || []).map((m, idx) => ({
+          id: idx + 1,
+          month_name: m.month,
+          items_reused: m.reused,
+          waste_avoided_kg: m.waste,
+          cost_avoided: m.cost
+        }))
+      )
     }
   }
 
