@@ -339,13 +339,14 @@ export function AppProvider({ children }) {
       }
 
       // 2. Fetch Equipments dari Supabase
+      let normalizedEquipments = []
       const { data: eqData, error: eqErr } = await supabase
         .from('equipments')
         .select('*')
         .order('created_at', { ascending: false })
 
       if (!eqErr && eqData) {
-        const normalizedEquipments = eqData.map(item => ({
+        normalizedEquipments = eqData.map(item => ({
           id: item.id,
           name: item.name,
           category: item.category || 'General',
@@ -370,7 +371,6 @@ export function AppProvider({ children }) {
           lastStoragePhoto: item.lastStoragePhoto || null,
           uploader: item.uploader || 'Admin'
         }))
-        setEquipments(normalizedEquipments)
       }
 
       // 3. Fetch Transactions dari Supabase
@@ -380,7 +380,57 @@ export function AppProvider({ children }) {
         .order('created_at', { ascending: false })
 
       if (!txnErr && txnData) {
-        // Pisahkan transaksi umum, return, dan permohonan barang baru
+        // A. Ekstrak & gabungkan perlengkapan yang disetujui Admin yang tersimpan permanen di cloud transactions
+        txnData.forEach(t => {
+          if (t.qris_status === 'Equipment Approved by Admin') {
+            try {
+              let parsed = {}
+              if (t.payout_status && t.payout_status.startsWith('{')) {
+                parsed = JSON.parse(t.payout_status)
+              }
+              const approvedEq = {
+                id: parsed.id || `eq-${t.id.slice(0, 8)}`,
+                dbTxnId: t.id,
+                name: parsed.name,
+                category: parsed.category || 'General',
+                price: Number(parsed.price) || Number(t.amount) || 0,
+                salePrice: parsed.salePrice ? Number(parsed.salePrice) : null,
+                listingType: parsed.listingType || parsed.pricingType || (parsed.salePrice ? 'sale' : 'rental'),
+                available: Number(parsed.available) || Number(parsed.qty) || 1,
+                total: Number(parsed.total) || Number(parsed.qty) || 1,
+                image: parsed.image || (parsed.imagePreview ? '📷' : '📦'),
+                imageUrl: parsed.imageUrl || parsed.imagePreview || null,
+                circularScore: Number(parsed.circularScore) || 88,
+                reuseCount: 0,
+                reusedCount: 0,
+                maxReuse: Number(parsed.maxReuse) || 30,
+                size: parsed.size || 'Standar',
+                material: parsed.material || 'Aluminium',
+                condition: parsed.condition || 'Good',
+                owner: parsed.owner || parsed.ownerOrg || t.buyer_org || 'Ormawa Kampus',
+                ownerBank: parsed.ownerBank || parsed.bankInfo || 'BCA 8012345678',
+                description: parsed.description || '',
+                lastLocation: parsed.lastLocation || parsed.initialLocation || 'Warehouse Kampus Gedung C',
+                lastStoragePhoto: parsed.lastStoragePhoto || parsed.initialStoragePhoto || null,
+                uploader: parsed.uploader || t.buyer_org || 'Mahasiswa'
+              }
+
+              const alreadyExists = normalizedEquipments.some(e => 
+                String(e.id) === String(approvedEq.id) || 
+                (e.name?.toLowerCase().trim() === approvedEq.name?.toLowerCase().trim() && e.uploader === approvedEq.uploader)
+              )
+              if (!alreadyExists && approvedEq.name) {
+                normalizedEquipments.unshift(approvedEq)
+              }
+            } catch (err) {
+              console.warn('Gagal parse approved equipment dari transactions:', err)
+            }
+          }
+        })
+
+        setEquipments([...normalizedEquipments])
+
+        // B. Pisahkan transaksi umum, return, dan permohonan barang baru
         const orderTxns = txnData.filter(t => !t.item_names?.startsWith('[RETURN_REQ]') && !t.item_names?.startsWith('[EQUIPMENT_UPLOAD]'))
 
         if (orderTxns.length === 0) {
@@ -729,25 +779,42 @@ export function AppProvider({ children }) {
       cleanMarketplaceItem.id = Date.now()
     }
 
-    // Tandai status upload di database transactions sudah disetujui
+    const approvedPayload = {
+      ...cleanMarketplaceItem,
+      id: cleanMarketplaceItem.id,
+      dbTxnId: itemToApprove.dbTxnId || null
+    }
+
+    // Tandai status upload di database transactions sudah disetujui beserta payload perlengkapan
     try {
       if (itemToApprove.dbTxnId) {
         await supabase
           .from('transactions')
-          .update({ qris_status: 'Equipment Approved by Admin' })
+          .update({
+            qris_status: 'Equipment Approved by Admin',
+            payout_status: JSON.stringify(approvedPayload)
+          })
           .eq('id', itemToApprove.dbTxnId)
       } else {
-        await supabase
+        const { data: insertedTx } = await supabase
           .from('transactions')
-          .update({ qris_status: 'Equipment Approved by Admin' })
-          .ilike('item_names', `%[EQUIPMENT_UPLOAD]%${approvalId}%`)
+          .insert([{
+            buyer_org: cleanMarketplaceItem.uploader,
+            item_names: `[EQUIPMENT_UPLOAD] ${cleanMarketplaceItem.name}:::${cleanMarketplaceItem.id}`,
+            amount: cleanMarketplaceItem.price,
+            qris_status: 'Equipment Approved by Admin',
+            payout_status: JSON.stringify(approvedPayload)
+          }]).select()
+        if (insertedTx && insertedTx.length > 0) {
+          cleanMarketplaceItem.dbTxnId = insertedTx[0].id
+        }
       }
     } catch (e) {
       console.warn('Gagal update status upload di transactions:', e)
     }
 
-    setEquipments(prev => [cleanMarketplaceItem, ...prev.filter(e => e.id !== cleanMarketplaceItem.id)])
-    setPendingApprovals(prev => prev.filter(p => p.id !== approvalId))
+    setEquipments(prev => [cleanMarketplaceItem, ...prev.filter(e => String(e.id) !== String(cleanMarketplaceItem.id))])
+    setPendingApprovals(prev => prev.filter(p => p.id !== approvalId && p.dbTxnId !== approvalId))
   }
 
   const rejectEquipmentByAdmin = async (approvalId) => {
@@ -788,14 +855,23 @@ export function AppProvider({ children }) {
     }))
 
     for (const item of cartItems) {
-      const currentEq = equipments.find(e => e.id === item.id)
+      const currentEq = equipments.find(e => String(e.id) === String(item.id))
       if (currentEq) {
         const newAvail = Math.max(0, (currentEq.available || 1) - (item.qty || 1))
         try {
-          await supabase
-            .from('equipments')
-            .update({ available: newAvail })
-            .eq('id', item.id)
+          if (!isNaN(item.id)) {
+            await supabase
+              .from('equipments')
+              .update({ available: newAvail })
+              .eq('id', item.id)
+          }
+          if (currentEq.dbTxnId) {
+            const updatedPayload = { ...currentEq, available: newAvail }
+            await supabase
+              .from('transactions')
+              .update({ payout_status: JSON.stringify(updatedPayload) })
+              .eq('id', currentEq.dbTxnId)
+          }
         } catch (eqErr) {
           console.warn('Gagal potong stok di Supabase:', eqErr)
         }
@@ -971,18 +1047,28 @@ export function AppProvider({ children }) {
 
   const deleteEquipment = async (id) => {
     try {
-      await supabase.from('equipments').delete().eq('id', id)
+      if (!isNaN(id)) {
+        await supabase.from('equipments').delete().eq('id', id)
+      }
+      await supabase.from('transactions').delete().ilike('item_names', `%${id}%`)
+      await supabase.from('transactions').update({ qris_status: 'Equipment Deleted' }).ilike('item_names', `%${id}%`)
     } catch (err) {
       console.warn('Gagal hapus equipment di Supabase:', err)
     }
 
-    setEquipments(prev => prev.filter(item => item.id !== id))
-    setCartItems(prev => prev.filter(item => item.id !== id))
+    setEquipments(prev => prev.filter(item => String(item.id) !== String(id)))
+    setCartItems(prev => prev.filter(item => String(item.id) !== String(id)))
     return true
   }
 
-  const deletePendingEquipment = (id) => {
-    setPendingApprovals(prev => prev.filter(item => item.id !== id))
+  const deletePendingEquipment = async (id) => {
+    try {
+      await supabase.from('transactions').delete().ilike('item_names', `%${id}%`)
+      await supabase.from('transactions').update({ qris_status: 'Equipment Deleted' }).ilike('item_names', `%${id}%`)
+    } catch (err) {
+      console.warn('Gagal hapus pending equipment di Supabase:', err)
+    }
+    setPendingApprovals(prev => prev.filter(item => String(item.id) !== String(id)))
   }
 
   // --- ACTIONS PENGEMBALIAN BARANG ---
@@ -1068,15 +1154,29 @@ export function AppProvider({ children }) {
       }
 
       // 3. Update stok dan lokasi perlengkapan di Supabase
-      if (equipmentId && targetEq) {
-        await supabase
-          .from('equipments')
-          .update({ 
-            available: targetEq.available + qtyToAdd,
+      if (equipmentId) {
+        if (!isNaN(equipmentId) && targetEq) {
+          await supabase
+            .from('equipments')
+            .update({ 
+              available: targetEq.available + qtyToAdd,
+              lastLocation: finalLocation,
+              lastStoragePhoto: returnData?.storagePhoto || null
+            })
+            .eq('id', equipmentId)
+        }
+        if (targetEq?.dbTxnId) {
+          const updatedPayload = {
+            ...targetEq,
+            available: (targetEq.available || 0) + qtyToAdd,
             lastLocation: finalLocation,
-            lastStoragePhoto: returnData?.storagePhoto || null
-          })
-          .eq('id', equipmentId)
+            lastStoragePhoto: returnData?.storagePhoto || targetEq.lastStoragePhoto
+          }
+          await supabase
+            .from('transactions')
+            .update({ payout_status: JSON.stringify(updatedPayload) })
+            .eq('id', targetEq.dbTxnId)
+        }
       }
     } catch (err) {
       console.warn('Gagal update return status di Supabase:', err)
