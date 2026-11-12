@@ -490,6 +490,41 @@ export function AppProvider({ children }) {
         }
       }
 
+      // Fallback cross-device: jika userResRows kosong atau currentUserId belum terisi tapi ada nama pengguna
+      if (!hasCloudReservation) {
+        try {
+          const { data: fallbackResRows } = await supabase
+            .from('reservations')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(5)
+
+          if (fallbackResRows && fallbackResRows.length > 0) {
+            const matchedRes = fallbackResRows.find(r => {
+              if (r.item_name && currentUserName && currentUserName !== 'Prasmulyan') {
+                return r.item_name.toLowerCase().includes(currentUserName.toLowerCase())
+              }
+              return false
+            }) || fallbackResRows[0]
+
+            if (matchedRes && matchedRes.item_name && matchedRes.item_name.startsWith('{')) {
+              try {
+                const parsed = JSON.parse(matchedRes.item_name)
+                hasCloudReservation = true
+                setActiveReservation(parsed)
+                try { localStorage.setItem('eventloop_active_reservation', JSON.stringify(parsed)) } catch (e) {}
+                if (matchedRes.status) {
+                  setUserPaymentStatus(matchedRes.status)
+                  try { localStorage.setItem('eventloop_user_payment_status', matchedRes.status) } catch (e) {}
+                }
+              } catch (pe) {}
+            }
+          }
+        } catch (fbErr) {
+          console.warn('Catatan fallback reservations sync:', fbErr)
+        }
+      }
+
       // 2. Fetch Equipments dari Supabase
       let normalizedEquipments = []
       const { data: eqData, error: eqErr } = await supabase
@@ -697,24 +732,33 @@ export function AppProvider({ children }) {
       // 4. Fetch Returns dari Supabase (Dual Source: dari Transactions & Returns Table)
       const pendingReturnsMap = new Map()
 
-      // A. Ambil dari transaksi dengan status 'Pending Return Verification'
+      // A. Ambil dari transaksi dengan tag [RETURN_REQ] dan status Pending
       if (!txnErr && txnData) {
         txnData.forEach(t => {
-          if (t.qris_status === 'Pending Return Verification') {
+          const isReturnReq = (t.item_names || '').startsWith('[RETURN_REQ]')
+          const isPendingReturn = t.qris_status === 'Pending Return Verification' || 
+            (isReturnReq && (t.qris_status || '').toLowerCase().includes('pending'))
+
+          if (isPendingReturn) {
             try {
               let parsed = {}
               if (t.payout_status && t.payout_status.startsWith('{')) {
                 parsed = JSON.parse(t.payout_status)
               }
-              const eqIdMatch = t.item_names?.match(/\[RETURN_REQ\]\s*([^:]+)/)?.[1]?.trim()
+              const parts = (t.item_names || '').replace(/\[RETURN_REQ\]\s*/, '').split(':::')
+              const parsedEqId = parsed.equipmentId || (parts[0] ? (!isNaN(parts[0]) ? Number(parts[0]) : parts[0]) : 1)
+              const parsedName = parsed.itemName || parts[1] || t.buyer_org || 'Perlengkapan'
+              const parsedQty = parsed.returnedQty || (parts[2] ? Number(parts[2]) : t.amount) || 1
+              const parsedRetId = parsed.returnId || parsed.id || parts[3] || t.id
+
               const retItem = {
-                id: parsed.returnId || parsed.id || t.id,
-                returnId: parsed.returnId || parsed.id || t.id,
+                id: parsedRetId,
+                returnId: parsedRetId,
                 dbTxnId: t.id,
-                equipmentId: parsed.equipmentId || (eqIdMatch ? (!isNaN(eqIdMatch) ? Number(eqIdMatch) : eqIdMatch) : 1),
-                itemName: parsed.itemName || t.buyer_org || 'Perlengkapan',
-                itemCode: parsed.itemCode || `ITEM-${parsed.equipmentId || eqIdMatch || ''}`,
-                returnedQty: parsed.returnedQty || t.amount || 1,
+                equipmentId: parsedEqId,
+                itemName: parsedName,
+                itemCode: parsed.itemCode || `ITEM-${parsedEqId}`,
+                returnedQty: parsedQty,
                 borrower: parsed.borrower || t.buyer_org || 'Prasmulyan',
                 returnLocation: parsed.returnLocation || 'Warehouse Kampus Gedung C',
                 conditionPhoto: parsed.conditionPhoto || null,
@@ -765,6 +809,25 @@ export function AppProvider({ children }) {
 
       const mergedReturns = Array.from(pendingReturnsMap.values())
       setPendingReturns(mergedReturns)
+
+      // Sinkronisasi status pengembalian pengguna saat ini
+      const currentUserPending = mergedReturns.some(r => {
+        return (
+          (currentUserName && r.borrower && (
+            r.borrower.toLowerCase() === currentUserName.toLowerCase() ||
+            currentUserName.toLowerCase().includes(r.borrower.toLowerCase()) ||
+            r.borrower.toLowerCase().includes(currentUserName.toLowerCase())
+          ))
+        )
+      })
+
+      if (!currentUserPending) {
+        setReturnStatus(prev => (prev === 'pending_admin_approval' ? 'idle' : prev))
+        try { localStorage.setItem('eventloop_return_status', 'idle') } catch (e) {}
+      } else {
+        setReturnStatus('pending_admin_approval')
+        try { localStorage.setItem('eventloop_return_status', 'pending_admin_approval') } catch (e) {}
+      }
 
       // 5. Fetch Pending Equipment Approvals dari Supabase
       const pendingApprovalsMap = new Map()
@@ -1329,10 +1392,12 @@ export function AppProvider({ children }) {
 
   const transferPayoutToOwner = async (txnId, proofPhoto = null) => {
     try {
-      await supabase
-        .from('transactions')
-        .update({ payout_status: 'Transferred' })
-        .ilike('buyer_org', '%')
+      if (txnId) {
+        await supabase
+          .from('transactions')
+          .update({ payout_status: 'Transferred' })
+          .eq('id', txnId)
+      }
     } catch (err) {
       console.warn('Gagal update payout di Supabase:', err)
     }
@@ -1447,47 +1512,59 @@ export function AppProvider({ children }) {
       returnId,
       ...returnData,
       borrower: borrowerName,
+      status: 'Pending Admin Verification',
       timestamp: returnData.timestamp || (new Date().toLocaleString('id-ID') + ' WIB')
     }
 
     // 1. Dual-Sync ke Supabase:
-    // Sync ke tabel transactions (yang terbukti 100% didukung RLS dan terbaca di semua perangkat admin)
+    // Sync ke tabel transactions (terbukti 100% didukung RLS dan terbaca di semua perangkat admin)
     try {
-      const { error: txErr } = await supabase.from('transactions').insert([{
-        buyer_org: borrowerName,
-        item_names: `[RETURN_REQ] ${returnData.equipmentId}:::${returnData.itemName}:::${returnData.returnedQty || 1}:::${returnId}`,
-        amount: returnData.returnedQty || 1,
-        qris_status: 'Pending Return Verification',
-        payout_status: JSON.stringify({
-          ...newReturn,
-          returnId,
-          dbSyncType: 'transaction_return'
-        })
-      }])
+      const { data: insertedTxn, error: txErr } = await supabase
+        .from('transactions')
+        .insert([{
+          buyer_org: borrowerName,
+          item_names: `[RETURN_REQ] ${returnData.equipmentId}:::${returnData.itemName}:::${returnData.returnedQty || 1}:::${returnId}`,
+          amount: returnData.returnedQty || 1,
+          qris_status: 'Pending Return Verification',
+          payout_status: JSON.stringify({
+            ...newReturn,
+            returnId,
+            dbSyncType: 'transaction_return'
+          })
+        }])
+        .select('id')
+
       if (txErr) {
         console.warn('Gagal sync return ke transactions:', txErr)
+      } else if (insertedTxn && insertedTxn[0]?.id) {
+        newReturn.dbTxnId = insertedTxn[0].id
       }
     } catch (txEx) {
       console.warn('Exception sync return ke transactions:', txEx)
     }
 
-    // 2. Sync juga ke tabel returns jika tabel tersebut aktif/sudah diperbaiki
-    try {
-      await supabase.from('returns').insert([{
-        equipment_id: String(returnData.equipmentId || ''),
-        condition_photo: returnData.conditionPhoto || null,
-        storage_photo: returnData.storagePhoto || null,
-        status: 'Pending Admin Verification',
-        returned_qty: returnData.returnedQty || 1,
-        borrower: borrowerName,
-        return_location: returnData.returnLocation || null
-      }])
-    } catch (err) {
-      console.warn('Gagal kirim bukti return ke tabel returns:', err)
+    // 2. Sync ke tabel returns jika equipmentId valid UUID (Postgres UUID type constraint)
+    const isUuid = /^[0-9a-fA-F-]{36}$/.test(String(returnData.equipmentId || ''))
+    if (isUuid) {
+      try {
+        await supabase.from('returns').insert([{
+          equipment_id: String(returnData.equipmentId),
+          condition_photo: returnData.conditionPhoto || null,
+          storage_photo: returnData.storagePhoto || null,
+          status: 'Pending Admin Verification',
+          returned_qty: returnData.returnedQty || 1,
+          borrower: borrowerName
+        }])
+      } catch (err) {
+        console.warn('Catatan tabel returns sync:', err)
+      }
     }
 
     setPendingReturns(prev => [newReturn, ...prev.filter(r => r.id !== returnId)])
     setReturnStatus('pending_admin_approval')
+    try { localStorage.setItem('eventloop_return_status', 'pending_admin_approval') } catch (e) {}
+
+    return { success: true, returnId, dbTxnId: newReturn.dbTxnId }
   }
 
   const approveReturnByAdmin = async (returnId, equipmentId, returnedQty) => {

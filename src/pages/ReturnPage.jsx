@@ -92,6 +92,11 @@ export default function ReturnPage() {
   const [conditionTime, setConditionTime] = useState('')
   const [storagePhoto, setStoragePhoto] = useState(null)
   const [storageTime, setStorageTime] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+
+  const currentItemPending = pendingReturns?.find(r => String(r.equipmentId) === String(currentItem?.id))
+  const isCurrentItemPending = Boolean(currentItemPending)
 
   const [checklist, setChecklist] = useState({
     goodCondition: true,
@@ -114,6 +119,7 @@ export default function ReturnPage() {
     setConditionTime('')
     setStoragePhoto(null)
     setStorageTime('')
+    setSubmitError('')
     setChecklist({
       goodCondition: true,
       complete: true,
@@ -141,20 +147,29 @@ export default function ReturnPage() {
     }
   }
 
-  const handleReturn = (e) => {
+  const handleReturn = async (e) => {
     e.preventDefault()
-    if (!currentItem) return
+    if (!currentItem || isSubmitting) return
+    setIsSubmitting(true)
+    setSubmitError('')
 
-    submitUserReturnProof({
-      equipmentId: currentItem.id,
-      itemName: currentItem.name,
-      itemCode: `ITEM-${currentItem.id}`,
-      returnedQty: currentItem.qty || 1,
-      returnLocation: currentOriginLocation,
-      conditionPhoto,
-      storagePhoto,
-      timestamp: conditionTime
-    })
+    try {
+      await submitUserReturnProof({
+        equipmentId: currentItem.id,
+        itemName: currentItem.name,
+        itemCode: `ITEM-${currentItem.id}`,
+        returnedQty: currentItem.qty || 1,
+        returnLocation: currentOriginLocation,
+        conditionPhoto,
+        storagePhoto,
+        timestamp: conditionTime || (new Date().toLocaleString('id-ID') + ' WIB')
+      })
+    } catch (err) {
+      console.error('Gagal kirim bukti return:', err)
+      setSubmitError('Terjadi kendala saat mengirim bukti pengembalian. Silakan coba lagi.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const canSubmit = conditionPhoto && storagePhoto && Object.values(checklist).every(Boolean) && currentItem
@@ -342,13 +357,19 @@ export default function ReturnPage() {
           <div className="md:col-span-2 space-y-6">
             <div className="card p-6 space-y-6">
 
-              {returnStatus === 'idle' ? (
+              {!isCurrentItemPending ? (
                 <form onSubmit={handleReturn} className="space-y-5">
                   <div className="space-y-3.5">
                     <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                       <Camera className="w-4 h-4 text-emerald-600" />
                       Dokumentasi Foto Pengembalian ({currentItem?.name})
                     </h4>
+
+                    {submitError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs">
+                        {submitError}
+                      </div>
+                    )}
 
                     <div className="grid sm:grid-cols-2 gap-4">
                       {/* BUKTI FOTO 1 */}
@@ -457,11 +478,11 @@ export default function ReturnPage() {
                   <div>
                     <button
                       type="submit"
-                      disabled={!canSubmit}
-                      className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 cursor-pointer"
+                      disabled={!canSubmit || isSubmitting}
+                      className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                     >
-                      <RotateCcw className="w-4 h-4" />
-                      <span>Kirim Bukti Pengembalian</span>
+                      <RotateCcw className={`w-4 h-4 ${isSubmitting ? 'animate-spin' : ''}`} />
+                      <span>{isSubmitting ? 'Mengirimkan Bukti ke Admin...' : 'Kirim Bukti Pengembalian'}</span>
                     </button>
                     {!canSubmit && (
                       <p className="text-center text-[11px] text-slate-400 mt-2">
@@ -470,66 +491,55 @@ export default function ReturnPage() {
                     )}
                   </div>
                 </form>
-              ) : returnStatus === 'pending_admin_approval' ? (
+              ) : (
                 <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-6 text-center space-y-4">
                   <div className="w-12 h-12 bg-white text-amber-600 rounded-2xl flex items-center justify-center mx-auto border border-amber-200">
-                    <RotateCcw className="w-6 h-6" />
+                    <RotateCcw className="w-6 h-6 animate-spin" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-900">
+                    <span className="badge-warm mb-1.5 inline-block text-[10px]">Tersimpan di Cloud Database</span>
+                    <h3 className="text-base font-bold text-slate-900 mt-1">
                       Menunggu Verifikasi Admin
                     </h3>
                     <p className="text-xs text-slate-600 max-w-md mx-auto mt-1.5 leading-relaxed">
-                      Bukti pengembalian <strong>{currentItem?.name}</strong> ke lokasi <strong>{currentOriginLocation}</strong> sedang diperiksa oleh Admin.
+                      Bukti pengembalian <strong>{currentItem?.name}</strong> ke lokasi <strong>{currentOriginLocation}</strong> telah masuk ke antrean Admin.
                     </p>
+                    {currentItemPending?.timestamp && (
+                      <span className="text-[11px] text-slate-600 bg-white px-2.5 py-1 rounded-lg border border-amber-200 inline-block mt-2 font-medium">
+                        Diajukan pada: {currentItemPending.timestamp}
+                      </span>
+                    )}
                   </div>
-                  {rentedItems.length > 1 && (
-                    <div className="pt-2">
+
+                  {(currentItemPending?.conditionPhoto || currentItemPending?.storagePhoto) && (
+                    <div className="grid grid-cols-2 gap-3 max-w-md mx-auto pt-2">
+                      {currentItemPending.conditionPhoto && (
+                        <div className="border border-amber-200 rounded-xl overflow-hidden bg-white p-1">
+                          <span className="text-[10px] font-semibold text-slate-500 block mb-1">Foto Fisik</span>
+                          <img src={currentItemPending.conditionPhoto} alt="Kondisi Fisik" className="w-full h-24 object-cover rounded-lg" />
+                        </div>
+                      )}
+                      {currentItemPending.storagePhoto && (
+                        <div className="border border-amber-200 rounded-xl overflow-hidden bg-white p-1">
+                          <span className="text-[10px] font-semibold text-slate-500 block mb-1">Foto Lokasi Simpan</span>
+                          <img src={currentItemPending.storagePhoto} alt="Lokasi Simpan" className="w-full h-24 object-cover rounded-lg" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex flex-wrap justify-center gap-2.5">
+                    {rentedItems.length > 1 && (
                       <button 
-                        onClick={() => setReturnStatus('idle')}
+                        onClick={() => {
+                          const nextItem = rentedItems.find(i => !pendingReturns?.some(r => String(r.equipmentId) === String(i.id)))
+                          if (nextItem) setSelectedItemId(nextItem.id)
+                        }}
                         className="btn-secondary text-xs !py-2 !px-4 cursor-pointer"
                       >
                         Kembalikan Barang Lainnya
                       </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center space-y-4">
-                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center mx-auto">
-                    <CheckCircle2 className="w-6 h-6" />
-                  </div>
-
-                  <div>
-                    <span className="badge-sage mb-2">Pengembalian Terverifikasi</span>
-                    <h3 className="text-lg font-bold text-emerald-950">
-                      Barang Selesai Dikembalikan ♻️
-                    </h3>
-                    <p className="text-xs text-emerald-800 max-w-md mx-auto mt-1 leading-relaxed">
-                      Pengembalian barang telah disetujui Admin dan stok telah dipulihkan ke Marketplace.
-                    </p>
-                  </div>
-
-                  <div className="pt-3 flex flex-col sm:flex-row gap-2.5 justify-center">
-                    {rentedItems.length > 0 ? (
-                      <button 
-                        onClick={() => {
-                          setReturnStatus('idle')
-                          setSelectedItemId(rentedItems[0]?.id)
-                        }} 
-                        className="btn-primary text-xs !py-2.5 !px-5 cursor-pointer"
-                      >
-                        Kembalikan Sisa Barang ({rentedItems.length})
-                      </button>
-                    ) : (
-                      <Link to="/marketplace" className="btn-primary text-xs !py-2.5 !px-5">
-                        Lihat Katalog Marketplace
-                      </Link>
                     )}
-
-                    <Link to="/impact" className="btn-secondary text-xs !py-2.5 !px-5">
-                      Lihat Dampak Sirkular
-                    </Link>
                   </div>
                 </div>
               )}

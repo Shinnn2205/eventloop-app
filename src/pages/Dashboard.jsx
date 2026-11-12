@@ -35,7 +35,8 @@ export default function Dashboard() {
     loadingDb, 
     campusImpact,
     ongoingCampusEvents = [],
-    transactions = []
+    transactions = [],
+    pendingReturns = []
   } = useApp()
   
   const [trackingSearch, setTrackingSearch] = useState('')
@@ -55,6 +56,10 @@ export default function Dashboard() {
   const displayItems = (cartItems && cartItems.length > 0) ? cartItems : (activeReservation?.items || [])
   const hasItems = displayItems.length > 0
   const remainingRentedItems = (activeReservation?.items || []).filter(item => item.listingType !== 'sale')
+  const unreturnedItems = remainingRentedItems.filter(item => 
+    !pendingReturns.some(r => String(r.equipmentId) === String(item.id))
+  )
+  const isAllPendingReturn = remainingRentedItems.length > 0 && unreturnedItems.length === 0
   const isEventCompleted = Boolean(hasActiveEvent && effectivePaymentStatus === 'approved' && remainingRentedItems.length === 0)
 
   // Sapaan waktu
@@ -127,7 +132,15 @@ export default function Dashboard() {
 
   // Hitung status sisa hari pengembalian untuk activeReservation
   const calculateDaysLeft = () => {
-    if (!activeReservation?.eventName || effectivePaymentStatus !== 'approved' || remainingRentedItems.length === 0 || isEventCompleted) return null
+    if (
+      !activeReservation?.eventName || 
+      effectivePaymentStatus !== 'approved' || 
+      remainingRentedItems.length === 0 || 
+      unreturnedItems.length === 0 ||
+      isEventCompleted || 
+      isAllPendingReturn
+    ) return null
+
     const endStr = activeReservation.endDateLabel || activeReservation.endDate
     if (!endStr) return null
 
@@ -168,6 +181,27 @@ export default function Dashboard() {
               Selesaikan Siklus & Buat Event Baru
             </button>
           </div>
+        </div>
+      )}
+
+      {/* NOTIFIKASI PENGEMBALIAN SEDANG DIVERIFIKASI ADMIN */}
+      {isAllPendingReturn && !isEventCompleted && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in shadow-2xs">
+          <div className="flex items-start gap-2.5">
+            <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5 animate-pulse" />
+            <div>
+              <strong className="block text-sm font-bold text-amber-950">
+                ⏳ Pengembalian Perlengkapan Sedang Diverifikasi Admin
+              </strong>
+              Anda telah mengirimkan bukti dokumentasi pengembalian untuk event <strong>"{activeReservation.eventName}"</strong>. Denda tidak berjalan dan stok akan otomatis dipulihkan setelah disetujui Admin.
+            </div>
+          </div>
+          <Link
+            to="/return"
+            className="btn-secondary !py-2 !px-4 text-xs font-bold whitespace-nowrap self-start sm:self-auto"
+          >
+            Cek Status Pengembalian
+          </Link>
         </div>
       )}
 

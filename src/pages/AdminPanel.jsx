@@ -86,8 +86,8 @@ export default function AdminPanel() {
     setTimeout(() => setTransferSuccessMsg(''), 4000)
   }
 
-  const handleApproveReturnClick = (returnId, equipmentId, returnedQty, itemName) => {
-    approveReturnByAdmin(returnId, equipmentId, returnedQty)
+  const handleApproveReturnClick = async (returnId, equipmentId, returnedQty, itemName) => {
+    await approveReturnByAdmin(returnId, equipmentId, returnedQty)
     setTransferSuccessMsg(`Pengembalian "${itemName}" disetujui. Stok +${returnedQty} telah dikembalikan ke lokasi asalnya.`)
     setTimeout(() => setTransferSuccessMsg(''), 5000)
   }
