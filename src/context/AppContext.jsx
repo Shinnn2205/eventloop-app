@@ -690,6 +690,19 @@ export function AppProvider({ children }) {
                 }
               }
 
+              // Cek item mana saja yang sudah disetujui pengembaliannya oleh admin agar tidak muncul kembali sebagai tanggungan
+              const approvedReturnEqIds = new Set()
+              if (!txnErr && txnData) {
+                txnData.forEach(t => {
+                  const isRetReq = (t.item_names || '').startsWith('[RETURN_REQ]')
+                  const isApproved = (t.qris_status || '').toLowerCase().includes('approved')
+                  if (isRetReq && isApproved) {
+                    const parts = (t.item_names || '').replace(/\[RETURN_REQ\]\s*/, '').split(':::')
+                    if (parts[0]) approvedReturnEqIds.add(String(parts[0]))
+                  }
+                })
+              }
+
               // Rekonstruksi items dari catalog berdasarkan item_names di transaksi
               const parsedItems = []
               const rawNames = latestOrderTxn.item_names?.split(',') || []
@@ -699,7 +712,7 @@ export function AppProvider({ children }) {
                   e.name.toLowerCase().includes(clean.toLowerCase()) || 
                   clean.toLowerCase().includes(e.name.toLowerCase())
                 )
-                if (matchEq) {
+                if (matchEq && !approvedReturnEqIds.has(String(matchEq.id))) {
                   const qtyMatch = rn.match(/\((\d+)x\)/)?.[1]
                   parsedItems.push({
                     ...matchEq,
@@ -1419,9 +1432,13 @@ export function AppProvider({ children }) {
   // --- BATALKAN / RESET EVENT AKTIF ---
   const clearActiveEvent = async () => {
     try {
-      const lastTxn = transactions[0]?.id
-      if (lastTxn) {
-        localStorage.setItem('eventloop_cleared_txn_id', String(lastTxn))
+      const orderTxns = (transactions || []).filter(t => 
+        !t.item_names?.startsWith('[RETURN_REQ]') && !t.item_names?.startsWith('[EQUIPMENT_UPLOAD]') &&
+        !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')
+      )
+      const targetOrderTxnId = orderTxns[0]?.id || transactions[0]?.id
+      if (targetOrderTxnId) {
+        localStorage.setItem('eventloop_cleared_txn_id', String(targetOrderTxnId))
       }
     } catch (e) {}
     setActiveReservation(null)
@@ -1563,6 +1580,11 @@ export function AppProvider({ children }) {
     setPendingReturns(prev => [newReturn, ...prev.filter(r => r.id !== returnId)])
     setReturnStatus('pending_admin_approval')
     try { localStorage.setItem('eventloop_return_status', 'pending_admin_approval') } catch (e) {}
+
+    // Segera refresh Supabase data agar antrean langsung muncul di sisi Admin
+    try {
+      fetchSupabaseData()
+    } catch (e) {}
 
     return { success: true, returnId, dbTxnId: newReturn.dbTxnId }
   }

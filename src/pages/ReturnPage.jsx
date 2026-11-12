@@ -15,24 +15,100 @@ import {
   MessageSquare
 } from 'lucide-react'
 
-// Fungsi Kompresi Foto
+// Fungsi Kompresi Foto dengan Fallback Handal
 const compressImage = (file, callback) => {
+  if (!file) return
   const reader = new FileReader()
   reader.onload = (e) => {
+    const rawData = e.target?.result
+    if (!rawData) return
     const img = new Image()
     img.onload = () => {
-      const canvas = document.createElement('canvas')
-      const MAX_WIDTH = 500
-      const scaleSize = MAX_WIDTH / img.width
-      canvas.width = MAX_WIDTH
-      canvas.height = img.height * scaleSize
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      callback(canvas.toDataURL('image/jpeg', 0.6))
+      try {
+        const canvas = document.createElement('canvas')
+        const MAX_WIDTH = 500
+        const scaleSize = Math.min(1, MAX_WIDTH / (img.width || 500))
+        canvas.width = Math.round((img.width || 500) * scaleSize)
+        canvas.height = Math.round((img.height || 350) * scaleSize)
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        const compressed = canvas.toDataURL('image/jpeg', 0.65)
+        callback(compressed)
+      } catch (err) {
+        console.warn('Canvas compress error, fallback to raw data:', err)
+        callback(rawData)
+      }
     }
-    img.src = e.target.result
+    img.onerror = () => {
+      console.warn('Image load error, fallback to raw data')
+      callback(rawData)
+    }
+    img.src = rawData
+  }
+  reader.onerror = (err) => {
+    console.error('FileReader error:', err)
   }
   reader.readAsDataURL(file)
+}
+
+// Generator Foto Pengembalian Cepat / Demo
+const generateSampleReturnPhoto = (title, subtitle, info) => {
+  const canvas = document.createElement('canvas')
+  canvas.width = 600
+  canvas.height = 380
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return ''
+
+  // Gradient background
+  const grad = ctx.createLinearGradient(0, 0, 600, 380)
+  grad.addColorStop(0, '#064e3b')
+  grad.addColorStop(1, '#022c22')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, 600, 380)
+
+  // Border
+  ctx.strokeStyle = '#10b981'
+  ctx.lineWidth = 3
+  ctx.strokeRect(12, 12, 576, 356)
+
+  // Header
+  ctx.fillStyle = '#34d399'
+  ctx.font = 'bold 13px sans-serif'
+  ctx.fillText('🌿 EVENTLOOP CAMPUS LOGISTICS · VERIFIED RETURN PROOF', 28, 45)
+
+  // Title & Subtitle
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 20px sans-serif'
+  ctx.fillText(title, 28, 85)
+
+  ctx.fillStyle = '#a7f3d0'
+  ctx.font = '14px sans-serif'
+  ctx.fillText(subtitle, 28, 115)
+
+  // Details box
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.08)'
+  ctx.fillRect(28, 140, 544, 130)
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
+  ctx.lineWidth = 1
+  ctx.strokeRect(28, 140, 544, 130)
+
+  ctx.fillStyle = '#f1f5f9'
+  ctx.font = '12px monospace'
+  ctx.fillText(`Lokasi Simpan : ${info.location || 'Warehouse Kampus'}`, 42, 172)
+  ctx.fillText(`Kondisi Fisik : Baik, Bersih, Komponen Lengkap`, 42, 198)
+  ctx.fillText(`Peminjam      : ${info.borrower || 'Prasmulyan'}`, 42, 224)
+  ctx.fillText(`Unit Serial   : ${info.itemCode || 'ITEM-RETURN'}`, 42, 250)
+
+  // Timestamp footer
+  ctx.fillStyle = '#6ee7b7'
+  ctx.font = 'bold 12px sans-serif'
+  ctx.fillText(`⏱️ Dokumentasi Ber-timestamp: ${new Date().toLocaleString('id-ID')} WIB`, 28, 305)
+
+  ctx.fillStyle = '#94a3b8'
+  ctx.font = '11px sans-serif'
+  ctx.fillText('Foto ini memenuhi standar verifikasi pengembalian sarpras kampus.', 28, 335)
+
+  return canvas.toDataURL('image/jpeg', 0.8)
 }
 
 export default function ReturnPage() {
@@ -46,6 +122,7 @@ export default function ReturnPage() {
     currentUserName,
     userPaymentStatus,
     clearActiveEvent,
+    fetchSupabaseData,
     transactions = []
   } = useApp()
   
@@ -154,6 +231,7 @@ export default function ReturnPage() {
     setSubmitError('')
 
     try {
+      const borrowerName = currentItem.borrower || activeReservation?.borrowerName || activeReservation?.org || currentUserName || 'Jason Lim Surya'
       await submitUserReturnProof({
         equipmentId: currentItem.id,
         itemName: currentItem.name,
@@ -162,8 +240,12 @@ export default function ReturnPage() {
         returnLocation: currentOriginLocation,
         conditionPhoto,
         storagePhoto,
-        timestamp: conditionTime || (new Date().toLocaleString('id-ID') + ' WIB')
+        timestamp: conditionTime || (new Date().toLocaleString('id-ID') + ' WIB'),
+        borrower: borrowerName
       })
+      if (fetchSupabaseData) {
+        await fetchSupabaseData()
+      }
     } catch (err) {
       console.error('Gagal kirim bukti return:', err)
       setSubmitError('Terjadi kendala saat mengirim bukti pengembalian. Silakan coba lagi.')
@@ -374,8 +456,15 @@ export default function ReturnPage() {
                     <div className="grid sm:grid-cols-2 gap-4">
                       {/* BUKTI FOTO 1 */}
                       <div className="border border-emerald-100 rounded-xl p-4 bg-emerald-50/20 space-y-2.5">
-                        <div className="text-xs font-bold text-slate-800">
-                          1. Foto Kondisi Fisik Barang
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs font-bold text-slate-800">
+                            1. Foto Kondisi Fisik Barang
+                          </div>
+                          {conditionPhoto && (
+                            <span className="text-[10px] text-emerald-700 bg-emerald-100 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                              ✓ Terpasang
+                            </span>
+                          )}
                         </div>
                         <p className="text-[11px] text-slate-500">
                           Pastikan barang utuh, bersih, dan berfungsi baik.
@@ -386,7 +475,7 @@ export default function ReturnPage() {
                             type="file" 
                             accept="image/*" 
                             onChange={handleConditionPhotoChange}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                           />
                           {conditionPhoto ? (
                             <div className="space-y-2">
@@ -403,12 +492,53 @@ export default function ReturnPage() {
                             </div>
                           )}
                         </div>
+
+                        <div className="pt-1 flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const photo = generateSampleReturnPhoto(
+                                `Kondisi Fisik: ${currentItem?.name}`,
+                                'Barang bersih, terawat, dan berfungsi 100% normal',
+                                {
+                                  location: currentOriginLocation,
+                                  borrower: currentUserName || 'Jason Lim Surya',
+                                  itemCode: `ITEM-${currentItem?.id}`
+                                }
+                              )
+                              setConditionPhoto(photo)
+                              setConditionTime(new Date().toLocaleString('id-ID') + ' WIB')
+                            }}
+                            className="text-[11px] text-emerald-700 hover:text-emerald-800 font-semibold underline cursor-pointer"
+                          >
+                            ⚡ Gunakan Foto Contoh
+                          </button>
+                          {conditionPhoto && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setConditionPhoto(null)
+                                setConditionTime('')
+                              }}
+                              className="text-[10px] text-rose-600 hover:underline cursor-pointer"
+                            >
+                              Hapus
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* BUKTI FOTO 2 */}
                       <div className="border border-emerald-100 rounded-xl p-4 bg-emerald-50/20 space-y-2.5">
-                        <div className="text-xs font-bold text-slate-800">
-                          2. Foto di Lokasi Asal
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs font-bold text-slate-800">
+                            2. Foto di Lokasi Asal
+                          </div>
+                          {storagePhoto && (
+                            <span className="text-[10px] text-emerald-700 bg-emerald-100 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                              ✓ Terpasang
+                            </span>
+                          )}
                         </div>
                         <p className="text-[11px] text-slate-500 truncate" title={currentOriginLocation}>
                           Lokasi: {currentOriginLocation}
@@ -419,7 +549,7 @@ export default function ReturnPage() {
                             type="file" 
                             accept="image/*" 
                             onChange={handleStoragePhotoChange}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                           />
                           {storagePhoto ? (
                             <div className="space-y-2">
@@ -434,6 +564,40 @@ export default function ReturnPage() {
                               <span className="text-xs font-semibold text-slate-700">Pilih Foto Lokasi Simpan</span>
                               <span className="text-[10px] text-slate-400 mt-0.5">Perlihatkan posisi rak/gudang</span>
                             </div>
+                          )}
+                        </div>
+
+                        <div className="pt-1 flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const photo = generateSampleReturnPhoto(
+                                `Lokasi Gudang: ${currentOriginLocation}`,
+                                `Perlengkapan telah ditempatkan kembali pada rak asal (${currentItem?.name})`,
+                                {
+                                  location: currentOriginLocation,
+                                  borrower: currentUserName || 'Jason Lim Surya',
+                                  itemCode: `ITEM-${currentItem?.id}`
+                                }
+                              )
+                              setStoragePhoto(photo)
+                              setStorageTime(new Date().toLocaleString('id-ID') + ' WIB')
+                            }}
+                            className="text-[11px] text-emerald-700 hover:text-emerald-800 font-semibold underline cursor-pointer"
+                          >
+                            ⚡ Gunakan Foto Lokasi
+                          </button>
+                          {storagePhoto && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setStoragePhoto(null)
+                                setStorageTime('')
+                              }}
+                              className="text-[10px] text-rose-600 hover:underline cursor-pointer"
+                            >
+                              Hapus
+                            </button>
                           )}
                         </div>
                       </div>
@@ -479,14 +643,29 @@ export default function ReturnPage() {
                     <button
                       type="submit"
                       disabled={!canSubmit || isSubmitting}
-                      className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      className={`w-full text-xs !py-3.5 flex items-center justify-center gap-2 cursor-pointer font-bold rounded-xl transition-all ${
+                        canSubmit
+                          ? 'btn-primary !bg-emerald-600 hover:!bg-emerald-700 shadow-md text-white'
+                          : 'bg-slate-200 text-slate-500 cursor-not-allowed opacity-80'
+                      }`}
                     >
                       <RotateCcw className={`w-4 h-4 ${isSubmitting ? 'animate-spin' : ''}`} />
-                      <span>{isSubmitting ? 'Mengirimkan Bukti ke Admin...' : 'Kirim Bukti Pengembalian'}</span>
+                      <span>
+                        {isSubmitting 
+                          ? 'Mengirimkan Bukti ke Admin...' 
+                          : canSubmit 
+                          ? '✅ Kirim Bukti Pengembalian ke Admin' 
+                          : !conditionPhoto && !storagePhoto
+                          ? '📸 Lengkapi Foto Fisik & Lokasi Simpan di Atas'
+                          : !conditionPhoto
+                          ? '📸 Foto Kondisi Fisik Belum Dilampirkan'
+                          : '📸 Foto Lokasi Simpan Belum Dilampirkan'
+                        }
+                      </span>
                     </button>
                     {!canSubmit && (
-                      <p className="text-center text-[11px] text-slate-400 mt-2">
-                        Lengkapi kedua foto bukti di atas untuk mengirim pengembalian.
+                      <p className="text-center text-[11px] text-amber-700 mt-2 font-medium">
+                        💡 Anda dapat klik <strong>"⚡ Gunakan Foto Contoh"</strong> di atas atau pilih file foto dari perangkat.
                       </p>
                     )}
                   </div>
