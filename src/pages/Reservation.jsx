@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import { compressImageFile } from '../utils/imageCompression'
 import { 
   ClipboardCheck, 
   Trash2, 
@@ -19,26 +20,6 @@ import {
   MessageSquare
 } from 'lucide-react'
 
-// Fungsi Kompresi Foto Bukti Transfer QRIS
-const compressImage = (file, callback) => {
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    const img = new Image()
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      const MAX_WIDTH = 600
-      const scaleSize = MAX_WIDTH / img.width
-      canvas.width = MAX_WIDTH
-      canvas.height = img.height * scaleSize
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      callback(canvas.toDataURL('image/jpeg', 0.65))
-    }
-    img.src = e.target.result
-  }
-  reader.readAsDataURL(file)
-}
-
 export default function Reservation() {
   const { 
     cartItems, 
@@ -47,9 +28,10 @@ export default function Reservation() {
     activeReservation, 
     updateActiveEventDetails,
     clearActiveEvent,
-    userPaymentStatus, 
-    submitUserQrisPayment,
-    transactions
+    userPaymentStatus,
+    effectivePaymentStatus: ctxPaymentStatus,
+    activeOrderTxn,
+    submitUserQrisPayment
   } = useApp()
 
   const [paymentModal, setPaymentModal] = useState(false)
@@ -69,21 +51,13 @@ export default function Reservation() {
   const grandTotal = totalCost + adminFee
 
   const handlePayQris = () => {
-    if (!paymentProofPhoto) return
+    if (grandTotal > 0 && !paymentProofPhoto) return
     submitUserQrisPayment(grandTotal, paymentProofPhoto)
     setPaymentModal(false)
   }
 
-  const orderTransactions = (transactions || []).filter(t => 
-    !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')
-  )
-  const latestUserTxn = orderTransactions[0]
-  const isTxnApproved = Boolean(
-    latestUserTxn?.qrisStatus?.toLowerCase().includes('approved') || 
-    latestUserTxn?.qrisStatus?.toLowerCase().includes('lunas') ||
-    latestUserTxn?.qrisStatus?.toLowerCase().includes('sukses')
-  )
-  const effectivePaymentStatus = (userPaymentStatus === 'approved' || isTxnApproved) ? 'approved' : userPaymentStatus
+  const effectivePaymentStatus = ctxPaymentStatus || userPaymentStatus
+  const proofPhotoSource = activeOrderTxn?.paymentProofPhoto || activeReservation?.paymentProofPhoto || paymentProofPhoto
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -116,10 +90,10 @@ export default function Reservation() {
               </p>
             </div>
           </div>
-          {(latestUserTxn?.paymentProofPhoto || paymentProofPhoto) && (
+          {proofPhotoSource && (
             <button
               type="button"
-              onClick={() => setProofPreviewModal(latestUserTxn?.paymentProofPhoto || paymentProofPhoto)}
+              onClick={() => setProofPreviewModal(proofPhotoSource)}
               className="btn-secondary text-xs !py-2 !px-3.5 flex items-center gap-1.5 flex-shrink-0 cursor-pointer"
             >
               <Eye className="w-3.5 h-3.5" />
@@ -146,10 +120,10 @@ export default function Reservation() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {(latestUserTxn?.paymentProofPhoto || paymentProofPhoto) && (
+            {proofPhotoSource && (
               <button
                 type="button"
-                onClick={() => setProofPreviewModal(latestUserTxn?.paymentProofPhoto || paymentProofPhoto)}
+                onClick={() => setProofPreviewModal(proofPhotoSource)}
                 className="btn-secondary text-xs !py-2 !px-3.5 flex items-center gap-1.5 cursor-pointer"
               >
                 <Eye className="w-3.5 h-3.5" />
@@ -468,45 +442,57 @@ export default function Reservation() {
             </div>
 
             {/* Upload Screenshot Bukti Transfer */}
-            <div className="p-4 bg-emerald-50/30 border border-emerald-100 rounded-xl space-y-2.5">
-              <label className="block text-xs font-semibold text-slate-800 flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Upload className="w-3.5 h-3.5 text-emerald-600" />
-                  Upload Screenshot Bukti Transfer
-                </span>
-                <span className="text-[10px] text-amber-700 font-semibold">Wajib</span>
-              </label>
-
-              <input
-                type="file"
-                accept="image/*"
-                required
-                onChange={(e) => {
-                  const f = e.target.files?.[0]
-                  if (f) {
-                    compressImage(f, (b64) => setPaymentProofPhoto(b64))
-                  }
-                }}
-                className="w-full text-xs text-slate-500 file:mr-2.5 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
-              />
-
-              {paymentProofPhoto && (
-                <div className="relative mt-2 rounded-xl overflow-hidden border border-emerald-200 max-h-36 bg-white flex items-center justify-center">
-                  <img src={paymentProofPhoto} alt="Bukti Transfer" className="w-full h-auto object-contain max-h-36" />
-                  <span className="absolute bottom-1.5 right-1.5 bg-emerald-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded">
-                    Siap Dikirim
+            {grandTotal > 0 ? (
+              <div className="p-4 bg-emerald-50/30 border border-emerald-100 rounded-xl space-y-2.5">
+                <label className="block text-xs font-semibold text-slate-800 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                    Upload Screenshot Bukti Transfer
                   </span>
-                </div>
-              )}
-            </div>
+                  <span className="text-[10px] text-amber-700 font-semibold">Wajib</span>
+                </label>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  required
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) {
+                      compressImageFile(f, (b64) => setPaymentProofPhoto(b64), 600, 0.65)
+                    }
+                  }}
+                  className="w-full text-xs text-slate-500 file:mr-2.5 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
+                />
+
+                {paymentProofPhoto && (
+                  <div className="relative mt-2 rounded-xl overflow-hidden border border-emerald-200 max-h-36 bg-white flex items-center justify-center">
+                    <img src={paymentProofPhoto} alt="Bukti Transfer" className="w-full h-auto object-contain max-h-36" />
+                    <span className="absolute bottom-1.5 right-1.5 bg-emerald-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded">
+                      Siap Dikirim
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900">
+                Total pembayaran adalah <strong>Rp0 (Pinjam Gratis)</strong>. Anda tidak perlu melakukan transfer dan dapat langsung mengajukan konfirmasi ke Admin.
+              </div>
+            )}
 
             <button
-              disabled={!paymentProofPhoto}
+              disabled={grandTotal > 0 && !paymentProofPhoto}
               onClick={handlePayQris}
               className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>{paymentProofPhoto ? 'Kirim Bukti Pembayaran' : 'Lampirkan Screenshot Terlebih Dahulu'}</span>
+              <span>
+                {grandTotal === 0
+                  ? 'Ajukan Konfirmasi Pinjam Gratis'
+                  : paymentProofPhoto
+                  ? 'Kirim Bukti Pembayaran'
+                  : 'Lampirkan Screenshot Terlebih Dahulu'}
+              </span>
             </button>
           </div>
         </div>

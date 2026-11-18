@@ -600,11 +600,9 @@ export default function LoginPage() {
           return
         }
 
-        // 3. Bersihkan status pending forgot OTP
-        sessionStorage.removeItem('eventloop_pending_forgot_otp')
-
-        // Sign out agar pengguna dapat login ulang secara bersih dan aman dengan password baru
+        // Sign out dulu agar AuthHandler tidak sempat melempar ke dashboard saat pending flag dihapus
         await supabase.auth.signOut()
+        sessionStorage.removeItem('eventloop_pending_forgot_otp')
 
         // Beralih ke tab login
         setActiveTab('login')

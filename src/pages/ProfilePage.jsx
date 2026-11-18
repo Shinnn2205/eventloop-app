@@ -86,10 +86,13 @@ export default function ProfilePage() {
   const userEmail = sessionUser?.email || (nim ? `${nim}@student.prasetiyamulya.ac.id` : '-')
 
   // Hitung dampak sirkular ormawa murni dari transaksi/reservasi nyata tanpa data rekaan
-  const userTxns = transactions.filter(t => 
-    (fullName && t.borrowerName && t.borrowerName.toLowerCase().includes(fullName.toLowerCase())) ||
-    (orgName && t.buyerOrg && t.buyerOrg.toLowerCase().includes(orgName.toLowerCase()))
-  )
+  const userTxns = transactions.filter(t => {
+    if (t.itemName?.startsWith('[RETURN_REQ]') || t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')) return false
+    return (
+      (fullName && t.borrowerName && t.borrowerName.toLowerCase().includes(fullName.toLowerCase())) ||
+      (orgName && t.buyerOrg && t.buyerOrg.toLowerCase().includes(orgName.toLowerCase()))
+    )
+  })
 
   const eventsCount = userTxns.length + (activeReservation?.eventName ? 1 : 0)
   const estimatedSaved = eventsCount > 0 ? eventsCount * 450000 : 0

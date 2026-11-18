@@ -47,6 +47,16 @@ export default function MyEquipment() {
   const myApprovedEquipments = equipments.filter(item => isMine(item.uploader))
   const myPendingEquipments = pendingApprovals.filter(item => isMine(item.uploader))
 
+  const myPayoutTransactions = (transactions || []).filter(txn => {
+    if (txn.itemName?.startsWith('[RETURN_REQ]') || txn.itemName?.startsWith('[EQUIPMENT_UPLOAD]')) return false
+    if (currentUserRole === 'admin') return true
+    const matchesOwner = isMine(txn.ownerOrg)
+    const matchesItem = myApprovedEquipments.some(eq =>
+      eq.name && txn.itemName && txn.itemName.toLowerCase().includes(eq.name.toLowerCase())
+    )
+    return matchesOwner || matchesItem
+  })
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       {/* Header */}
@@ -295,19 +305,19 @@ export default function MyEquipment() {
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
             <Receipt className="w-4 h-4 text-emerald-600" />
-            Payout & Bukti Transfer dari Admin ({transactions.length})
+            Payout & Bukti Transfer dari Admin ({myPayoutTransactions.length})
           </h3>
           <span className="text-xs text-slate-400">Pencairan Dana Escrow</span>
         </div>
 
-        {transactions.length === 0 ? (
+        {myPayoutTransactions.length === 0 ? (
           <div className="card p-8 text-center text-xs text-slate-500 space-y-2">
             <Receipt className="w-7 h-7 text-emerald-300 mx-auto" />
-            <p>Belum ada riwayat transaksi penyewaan yang memerlukan pencairan dana.</p>
+            <p>Belum ada riwayat transaksi penyewaan barang Anda yang memerlukan pencairan dana.</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {transactions.map(txn => {
+            {myPayoutTransactions.map(txn => {
               const isTransferred = txn.payoutStatus === 'Transferred'
               return (
                 <div key={txn.id} className="card p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">

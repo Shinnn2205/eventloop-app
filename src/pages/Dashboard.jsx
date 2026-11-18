@@ -28,36 +28,28 @@ export default function Dashboard() {
   const { 
     activeReservation, 
     cartItems = [], 
-    userPaymentStatus, 
+    userPaymentStatus,
+    effectivePaymentStatus: ctxPaymentStatus,
     clearActiveEvent,
     currentUserName, 
     equipments, 
     loadingDb, 
     campusImpact,
     ongoingCampusEvents = [],
-    transactions = [],
-    pendingReturns = []
+    pendingReturns = [],
+    isMyPendingReturn
   } = useApp()
   
   const [trackingSearch, setTrackingSearch] = useState('')
 
-  const orderTransactions = (transactions || []).filter(t => 
-    !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')
-  )
-  const latestOrderTxn = orderTransactions[0]
-  const isTxnApproved = Boolean(
-    latestOrderTxn?.qrisStatus?.toLowerCase().includes('approved') || 
-    latestOrderTxn?.qrisStatus?.toLowerCase().includes('lunas') ||
-    latestOrderTxn?.qrisStatus?.toLowerCase().includes('sukses')
-  )
-  const effectivePaymentStatus = (userPaymentStatus === 'approved' || isTxnApproved) ? 'approved' : userPaymentStatus
+  const effectivePaymentStatus = ctxPaymentStatus || userPaymentStatus
 
   const hasActiveEvent = Boolean(activeReservation?.eventName)
   const displayItems = (cartItems && cartItems.length > 0) ? cartItems : (activeReservation?.items || [])
   const hasItems = displayItems.length > 0
   const remainingRentedItems = (activeReservation?.items || []).filter(item => item.listingType !== 'sale')
   const unreturnedItems = remainingRentedItems.filter(item => 
-    !pendingReturns.some(r => String(r.equipmentId) === String(item.id))
+    !pendingReturns.some(r => String(r.equipmentId) === String(item.id) && (!isMyPendingReturn || isMyPendingReturn(r)))
   )
   const isAllPendingReturn = remainingRentedItems.length > 0 && unreturnedItems.length === 0
   const isEventCompleted = Boolean(hasActiveEvent && effectivePaymentStatus === 'approved' && remainingRentedItems.length === 0)

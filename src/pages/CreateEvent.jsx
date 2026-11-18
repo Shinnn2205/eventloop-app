@@ -25,16 +25,26 @@ export default function CreateEvent() {
     updateActiveEventDetails,
     clearActiveEvent,
     userPaymentStatus,
+    effectivePaymentStatus: ctxPaymentStatus,
     currentUserRole,
     currentUserName
   } = useApp()
 
+  const effectivePaymentStatus = ctxPaymentStatus || userPaymentStatus
+  const remainingRentedItems = (activeReservation?.items || []).filter(item => item.listingType !== 'sale')
+  const isEventCycleCompleted = Boolean(
+    currentUserRole === 'user' &&
+    activeReservation?.eventName &&
+    effectivePaymentStatus === 'approved' &&
+    remainingRentedItems.length === 0
+  )
+
   // Sesi terkunci hanya jika pembayaran sudah dikirim atau disetujui
   const isPaidEvent = currentUserRole === 'user' && Boolean(
-    activeReservation?.eventName && (userPaymentStatus === 'approved' || userPaymentStatus === 'pending_admin_approval')
+    activeReservation?.eventName && (effectivePaymentStatus === 'approved' || effectivePaymentStatus === 'pending_admin_approval')
   )
   const isDraftEvent = currentUserRole === 'user' && Boolean(
-    activeReservation?.eventName && userPaymentStatus === 'idle'
+    activeReservation?.eventName && effectivePaymentStatus === 'idle'
   )
 
   const [eventName, setEventName] = useState(() => activeReservation?.eventName || '')
@@ -116,17 +126,18 @@ export default function CreateEvent() {
       competition: ['banner', 'signage', 'rope', 'post', 'table', 'meja', 'sound', 'audio', 'led']
     }[typeLower] || ['banner', 'signage', 'sound', 'booth', 'led']
 
-    // Filter dan urutkan item nyata dari database berdasarkan kesesuaian kategori & ketersediaan
-    const scored = equipments.map(eq => {
-      const text = `${eq.name} ${eq.category} ${eq.description || ''}`.toLowerCase()
-      let score = 0
-      targetKeywords.forEach(kw => {
-        if (text.includes(kw)) score += 3
+    // Filter item nyata yang tersedia stoknya dan urutkan berdasarkan kesesuaian kategori
+    const scored = equipments
+      .filter(eq => (eq.available || 0) > 0)
+      .map(eq => {
+        const text = `${eq.name || ''} ${eq.category || ''} ${eq.description || ''}`.toLowerCase()
+        let score = 0
+        targetKeywords.forEach(kw => {
+          if (text.includes(kw)) score += 3
+        })
+        if (eq.listingType !== 'sale') score += 1
+        return { eq, score }
       })
-      if (eq.available > 0) score += 2
-      if (eq.listingType !== 'sale') score += 1
-      return { eq, score }
-    })
 
     scored.sort((a, b) => b.score - a.score)
 
@@ -146,7 +157,7 @@ export default function CreateEvent() {
 
       return {
         equipment: eq,
-        qty: Math.min(eq.available > 0 ? eq.available : 1, 2),
+        qty: Math.min(eq.available, 2),
         reason
       }
     })
@@ -203,15 +214,20 @@ export default function CreateEvent() {
         <div className="card p-7 sm:p-8 space-y-6">
           <div className="flex items-start gap-4">
             <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0 border border-emerald-200/70">
-              <Lock className="w-5 h-5" />
+              {isEventCycleCompleted ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <Lock className="w-5 h-5" />}
             </div>
             <div>
-              <span className="badge-sage mb-2">1 Akun · 1 Event Aktif</span>
+              <span className="badge-sage mb-2">
+                {isEventCycleCompleted ? 'Siklus Peminjaman Selesai 🌿' : '1 Akun · 1 Event Aktif'}
+              </span>
               <h2 className="text-xl font-bold text-slate-900">
-                Kegiatan Anda Sedang Berjalan
+                {isEventCycleCompleted ? 'Seluruh Perlengkapan Event Telah Dikembalikan' : 'Kegiatan Anda Sedang Berjalan'}
               </h2>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Pembayaran untuk kegiatan <strong>"{activeReservation.eventName}"</strong> telah dikirimkan / disetujui. Selesaikan pengembalian perlengkapan kegiatan ini terlebih dahulu sebelum membuat event baru.
+                {isEventCycleCompleted
+                  ? `Terima kasih! Seluruh barang untuk kegiatan "${activeReservation.eventName}" sudah kembali dan diverifikasi admin. Klik tombol di bawah untuk menutup siklus ini dan membuat event baru.`
+                  : <>Pembayaran untuk kegiatan <strong>"{activeReservation.eventName}"</strong> telah dikirimkan / disetujui. Selesaikan pengembalian perlengkapan kegiatan ini terlebih dahulu sebelum membuat event baru.</>
+                }
               </p>
             </div>
           </div>
@@ -234,11 +250,13 @@ export default function CreateEvent() {
             <div className="flex justify-between py-1">
               <span className="text-slate-500">Status Saat Ini</span>
               <span className={
-                userPaymentStatus === 'approved'
+                effectivePaymentStatus === 'approved'
                   ? 'badge-sage'
                   : 'badge-warm'
               }>
-                {userPaymentStatus === 'approved'
+                {isEventCycleCompleted
+                  ? 'Selesai & Dikembalikan'
+                  : effectivePaymentStatus === 'approved'
                   ? 'Lunas / Sedang Dipinjam'
                   : 'Menunggu Verifikasi Admin'}
               </span>
@@ -247,17 +265,34 @@ export default function CreateEvent() {
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <div className="flex flex-wrap gap-2.5">
-              <Link to="/reservation" className="btn-primary text-xs flex items-center gap-2">
-                <ClipboardList className="w-4 h-4" />
-                <span>Lihat Tiket Reservasi</span>
-              </Link>
-              <Link to="/return" className="btn-secondary text-xs flex items-center gap-2">
-                <RotateCcw className="w-4 h-4" />
-                <span>Halaman Pengembalian</span>
-              </Link>
+              {isEventCycleCompleted ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearActiveEvent()
+                    setEventName('')
+                    setShowRecommendation(false)
+                  }}
+                  className="btn-primary text-xs flex items-center gap-2 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Selesaikan Siklus & Buat Event Baru</span>
+                </button>
+              ) : (
+                <>
+                  <Link to="/reservation" className="btn-primary text-xs flex items-center gap-2">
+                    <ClipboardList className="w-4 h-4" />
+                    <span>Lihat Tiket Reservasi</span>
+                  </Link>
+                  <Link to="/return" className="btn-secondary text-xs flex items-center gap-2">
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Halaman Pengembalian</span>
+                  </Link>
+                </>
+              )}
             </div>
 
-            {userPaymentStatus === 'pending_admin_approval' && (
+            {effectivePaymentStatus === 'pending_admin_approval' && (
               <button
                 type="button"
                 onClick={handleCancelEvent}

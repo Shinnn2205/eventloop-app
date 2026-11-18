@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useApp, parseFlexibleDate } from '../context/AppContext'
+import { useApp, parseFlexibleDate, formatIdDate } from '../context/AppContext'
 import { 
   ArrowLeft, 
   MapPin, 
@@ -27,7 +27,8 @@ export default function EquipmentDetail() {
     cartItems, 
     addToCart, 
     removeFromCart, 
-    userPaymentStatus, 
+    userPaymentStatus,
+    effectivePaymentStatus: ctxPaymentStatus,
     currentUserRole, 
     getEquipmentBorrowings,
     activeReservation,
@@ -38,7 +39,8 @@ export default function EquipmentDetail() {
   const [futureEndDate, setFutureEndDate] = useState('2026-11-22')
 
   const item = equipments.find(eq => eq.id.toString() === id)
-  const isLockedByActivePayment = currentUserRole === 'user' && userPaymentStatus !== 'idle'
+  const effectiveStatus = ctxPaymentStatus || userPaymentStatus
+  const isLockedByActivePayment = currentUserRole === 'user' && effectiveStatus !== 'idle'
   
   if (!item) {
     return (
@@ -53,12 +55,16 @@ export default function EquipmentDetail() {
   const isReserved = cartItems.some(cartItem => cartItem.id === item.id)
   const activeBorrowings = getEquipmentBorrowings ? getEquipmentBorrowings(item.id, item.name) : []
 
-  // Periksa apakah rentang tanggal masa depan bertabrakan dengan jadwal aktif
+  // Periksa apakah rentang tanggal masa depan valid & tidak bentrok melebihi total stok
+  const isDateRangeValid = !futureStartDate || !futureEndDate || new Date(futureEndDate).getTime() >= new Date(futureStartDate).getTime()
+
   const isFutureDateAvailable = () => {
     if (!futureStartDate || !futureEndDate) return true
     const reqStart = new Date(futureStartDate).getTime()
     const reqEnd = new Date(futureEndDate).getTime()
+    if (reqEnd < reqStart) return false
 
+    let overlappingQty = 0
     for (const b of activeBorrowings) {
       const bStart = parseFlexibleDate(b.startDate)
       const bEnd = parseFlexibleDate(b.endDate)
@@ -66,14 +72,32 @@ export default function EquipmentDetail() {
         const startMs = bStart.getTime()
         const endMs = bEnd.getTime()
         if (reqStart <= endMs && reqEnd >= startMs) {
-          if (b.qty >= (item.total || 1)) return false
+          overlappingQty += Number(b.qty) || 1
         }
       }
     }
-    return true
+    return overlappingQty < (item.total || 1)
   }
 
   const futureAvailable = isFutureDateAvailable()
+
+  const buildSchedulePayload = () => {
+    const startLbl = formatIdDate(futureStartDate) || futureStartDate
+    const endLbl = formatIdDate(futureEndDate) || futureEndDate
+    const s = new Date(futureStartDate)
+    const e = new Date(futureEndDate)
+    const diff = (!isNaN(s.getTime()) && !isNaN(e.getTime()) && e >= s)
+      ? Math.max(1, Math.round((e - s) / (1000 * 60 * 60 * 24)) || 1)
+      : (activeReservation?.durationDays || 1)
+    return {
+      startDate: futureStartDate,
+      endDate: futureEndDate,
+      startDateLabel: startLbl,
+      endDateLabel: endLbl,
+      eventDate: `${startLbl} – ${endLbl}`,
+      durationDays: diff
+    }
+  }
 
   const toggleReserve = () => {
     if (isLockedByActivePayment) return
@@ -82,25 +106,18 @@ export default function EquipmentDetail() {
     } else {
       addToCart(item, 1)
       if (updateActiveEventDetails && (!activeReservation?.startDateLabel)) {
-        updateActiveEventDetails({
-          startDateLabel: futureStartDate,
-          endDateLabel: futureEndDate
-        })
+        updateActiveEventDetails(buildSchedulePayload())
       }
     }
   }
 
   const handleBookFutureDate = () => {
-    if (isLockedByActivePayment) return
+    if (isLockedByActivePayment || !futureAvailable) return
     if (!isReserved) {
       addToCart(item, 1)
     }
     if (updateActiveEventDetails) {
-      updateActiveEventDetails({
-        startDateLabel: futureStartDate,
-        endDateLabel: futureEndDate,
-        eventDate: `${futureStartDate} – ${futureEndDate}`
-      })
+      updateActiveEventDetails(buildSchedulePayload())
     }
     navigate('/reservation')
   }
@@ -319,7 +336,9 @@ export default function EquipmentDetail() {
                     <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
                   )}
                   <span className="text-[11px] font-medium">
-                    {futureAvailable 
+                    {!isDateRangeValid
+                      ? 'Tanggal selesai tidak boleh sebelum tanggal mulai.'
+                      : futureAvailable 
                       ? 'Tersedia untuk rentang tanggal yang dipilih!' 
                       : 'Jadwal bertabrakan dengan kegiatan lain.'
                     }

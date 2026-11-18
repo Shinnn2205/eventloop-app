@@ -26,7 +26,8 @@ export default function Marketplace() {
     addToCart, 
     removeFromCart, 
     loadingDb, 
-    userPaymentStatus, 
+    userPaymentStatus,
+    effectivePaymentStatus: ctxPaymentStatus,
     currentUserRole,
     activeReservation
   } = useApp()
@@ -35,7 +36,8 @@ export default function Marketplace() {
   const [selectedListingType, setSelectedListingType] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const isLockedByActivePayment = currentUserRole === 'user' && userPaymentStatus !== 'idle'
+  const effectiveStatus = ctxPaymentStatus || userPaymentStatus
+  const isLockedByActivePayment = currentUserRole === 'user' && effectiveStatus !== 'idle'
   const durationDays = Math.max(1, Number(activeReservation?.durationDays) || 1)
 
   const filteredItems = equipments.filter((item) => {
@@ -44,10 +46,11 @@ export default function Marketplace() {
       selectedListingType === 'All' || 
       (selectedListingType === 'rental' && item.listingType !== 'sale') ||
       (selectedListingType === 'sale' && item.listingType === 'sale')
+    const q = searchQuery.toLowerCase()
     const matchSearch = 
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.material.toLowerCase().includes(searchQuery.toLowerCase())
+      (item.name || '').toLowerCase().includes(q) ||
+      (item.owner || '').toLowerCase().includes(q) ||
+      (item.material || '').toLowerCase().includes(q)
     return matchCategory && matchType && matchSearch
   })
 

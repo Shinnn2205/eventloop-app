@@ -43,6 +43,7 @@ export default function Layout() {
     cartItems = [],
     activeReservation,
     userPaymentStatus,
+    effectivePaymentStatus: ctxPaymentStatus,
     transactions = [],
     pendingApprovals = [],
     pendingReturns = [],
@@ -50,16 +51,7 @@ export default function Layout() {
   } = useApp()
 
   const rentedItemsCount = activeReservation?.items?.filter(i => i.listingType !== 'sale')?.length || 0
-  const orderTransactions = (transactions || []).filter(t => 
-    !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')
-  )
-  const latestOrderTxn = orderTransactions[0]
-  const isTxnApproved = Boolean(
-    latestOrderTxn?.qrisStatus?.toLowerCase().includes('approved') || 
-    latestOrderTxn?.qrisStatus?.toLowerCase().includes('lunas') ||
-    latestOrderTxn?.qrisStatus?.toLowerCase().includes('sukses')
-  )
-  const effectivePaymentStatus = (userPaymentStatus === 'approved' || isTxnApproved) ? 'approved' : userPaymentStatus
+  const effectivePaymentStatus = ctxPaymentStatus || userPaymentStatus
 
   const pendingAdminTasks = 
     transactions.filter(t => !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]') && (t.qrisStatus?.includes('Pending') || t.payoutStatus === 'Pending Transfer')).length +

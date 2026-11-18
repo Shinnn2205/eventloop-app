@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
+import { compressImageFile } from '../utils/imageCompression'
 import { 
   ShieldCheck, 
   DollarSign, 
@@ -16,25 +17,6 @@ import {
   Clock,
   X
 } from 'lucide-react'
-
-const compressImage = (file, callback) => {
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    const img = new Image()
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      const MAX_WIDTH = 600
-      const scaleSize = MAX_WIDTH / img.width
-      canvas.width = MAX_WIDTH
-      canvas.height = img.height * scaleSize
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      callback(canvas.toDataURL('image/jpeg', 0.65))
-    }
-    img.src = e.target.result
-  }
-  reader.readAsDataURL(file)
-}
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('payouts')
@@ -59,17 +41,17 @@ export default function AdminPanel() {
     setAdminProofPhoto(null)
   }
 
-  const handleConfirmPayoutWithProof = () => {
+  const handleConfirmPayoutWithProof = async () => {
     if (!payoutModalTxn || !adminProofPhoto) return
-    transferPayoutToOwner(payoutModalTxn.id, adminProofPhoto)
+    await transferPayoutToOwner(payoutModalTxn.id, adminProofPhoto)
     setTransferSuccessMsg(`Dana Rp${payoutModalTxn.payoutAmount?.toLocaleString('id-ID')} beserta bukti transfer berhasil dikirim ke ${payoutModalTxn.ownerOrg}.`)
     setPayoutModalTxn(null)
     setAdminProofPhoto(null)
     setTimeout(() => setTransferSuccessMsg(''), 5000)
   }
 
-  const handleApprovePaymentClick = (txnId) => {
-    approvePaymentByAdmin(txnId)
+  const handleApprovePaymentClick = async (txnId) => {
+    await approvePaymentByAdmin(txnId)
     setTransferSuccessMsg(`Pembayaran QRIS ${txnId} telah disetujui. Status reservasi mahasiswa kini aktif.`)
     setTimeout(() => setTransferSuccessMsg(''), 5000)
   }
@@ -497,32 +479,44 @@ export default function AdminPanel() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2.5">
-                    <div 
-                      onClick={() => setViewingProof({
-                        title: `Kondisi Fisik: ${ret.itemName}`,
-                        photo: ret.conditionPhoto,
-                        details: `Peminjam: ${ret.borrower} · Waktu: ${ret.timestamp}`
-                      })}
-                      className="border border-emerald-100 rounded-xl overflow-hidden relative group cursor-pointer bg-white"
-                    >
-                      <div className="absolute top-1.5 left-1.5 bg-white/90 text-slate-800 text-[10px] px-2 py-0.5 rounded-md font-semibold">
-                        1. Kondisi Fisik
+                    {ret.conditionPhoto ? (
+                      <div 
+                        onClick={() => setViewingProof({
+                          title: `Kondisi Fisik: ${ret.itemName}`,
+                          photo: ret.conditionPhoto,
+                          details: `Peminjam: ${ret.borrower} · Waktu: ${ret.timestamp}`
+                        })}
+                        className="border border-emerald-100 rounded-xl overflow-hidden relative group cursor-pointer bg-white"
+                      >
+                        <div className="absolute top-1.5 left-1.5 bg-white/90 text-slate-800 text-[10px] px-2 py-0.5 rounded-md font-semibold">
+                          1. Kondisi Fisik
+                        </div>
+                        <img src={ret.conditionPhoto} alt="Fisik" className="h-32 w-full object-cover" />
                       </div>
-                      <img src={ret.conditionPhoto} alt="Fisik" className="h-32 w-full object-cover" />
-                    </div>
-                    <div 
-                      onClick={() => setViewingProof({
-                        title: `Lokasi Simpan: ${ret.itemName}`,
-                        photo: ret.storagePhoto,
-                        details: `Lokasi Asal: ${ret.returnLocation || 'Gudang Asal'}`
-                      })}
-                      className="border border-emerald-100 rounded-xl overflow-hidden relative group cursor-pointer bg-white"
-                    >
-                      <div className="absolute top-1.5 left-1.5 bg-white/90 text-slate-800 text-[10px] px-2 py-0.5 rounded-md font-semibold">
-                        2. Lokasi Asal
+                    ) : (
+                      <div className="h-32 border border-dashed border-slate-200 rounded-xl bg-white flex items-center justify-center text-[11px] text-slate-400">
+                        Tanpa Foto Fisik
                       </div>
-                      <img src={ret.storagePhoto} alt="Rak" className="h-32 w-full object-cover" />
-                    </div>
+                    )}
+                    {ret.storagePhoto ? (
+                      <div 
+                        onClick={() => setViewingProof({
+                          title: `Lokasi Simpan: ${ret.itemName}`,
+                          photo: ret.storagePhoto,
+                          details: `Lokasi Asal: ${ret.returnLocation || 'Gudang Asal'}`
+                        })}
+                        className="border border-emerald-100 rounded-xl overflow-hidden relative group cursor-pointer bg-white"
+                      >
+                        <div className="absolute top-1.5 left-1.5 bg-white/90 text-slate-800 text-[10px] px-2 py-0.5 rounded-md font-semibold">
+                          2. Lokasi Asal
+                        </div>
+                        <img src={ret.storagePhoto} alt="Rak" className="h-32 w-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="h-32 border border-dashed border-slate-200 rounded-xl bg-white flex items-center justify-center text-[11px] text-slate-400">
+                        Tanpa Foto Lokasi
+                      </div>
+                    )}
                   </div>
 
                   <button
@@ -626,7 +620,7 @@ export default function AdminPanel() {
                 onChange={(e) => {
                   const f = e.target.files?.[0]
                   if (f) {
-                    compressImage(f, (b64) => setAdminProofPhoto(b64))
+                    compressImageFile(f, (b64) => setAdminProofPhoto(b64), 600, 0.65)
                   }
                 }}
                 className="w-full text-xs text-slate-500 file:mr-2.5 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"

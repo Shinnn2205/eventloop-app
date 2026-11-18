@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useApp, parseFlexibleDate } from '../context/AppContext'
+import { compressImageFile } from '../utils/imageCompression'
 import { 
   RotateCcw, 
   CheckCircle2, 
@@ -14,42 +15,6 @@ import {
   ShieldCheck,
   MessageSquare
 } from 'lucide-react'
-
-// Fungsi Kompresi Foto dengan Fallback Handal
-const compressImage = (file, callback) => {
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    const rawData = e.target?.result
-    if (!rawData) return
-    const img = new Image()
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas')
-        const MAX_WIDTH = 500
-        const scaleSize = Math.min(1, MAX_WIDTH / (img.width || 500))
-        canvas.width = Math.round((img.width || 500) * scaleSize)
-        canvas.height = Math.round((img.height || 350) * scaleSize)
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-        const compressed = canvas.toDataURL('image/jpeg', 0.65)
-        callback(compressed)
-      } catch (err) {
-        console.warn('Canvas compress error, fallback to raw data:', err)
-        callback(rawData)
-      }
-    }
-    img.onerror = () => {
-      console.warn('Image load error, fallback to raw data')
-      callback(rawData)
-    }
-    img.src = rawData
-  }
-  reader.onerror = (err) => {
-    console.error('FileReader error:', err)
-  }
-  reader.readAsDataURL(file)
-}
 
 // Generator Foto Pengembalian Cepat / Demo
 const generateSampleReturnPhoto = (title, subtitle, info) => {
@@ -114,28 +79,19 @@ const generateSampleReturnPhoto = (title, subtitle, info) => {
 export default function ReturnPage() {
   const navigate = useNavigate()
   const { 
-    returnStatus, 
     setReturnStatus, 
     submitUserReturnProof, 
     activeReservation, 
     pendingReturns, 
+    isMyPendingReturn,
     currentUserName,
     userPaymentStatus,
+    effectivePaymentStatus: ctxPaymentStatus,
     clearActiveEvent,
-    fetchSupabaseData,
-    transactions = []
+    fetchSupabaseData
   } = useApp()
   
-  const orderTransactions = (transactions || []).filter(t => 
-    !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')
-  )
-  const latestOrderTxn = orderTransactions[0]
-  const isTxnApproved = Boolean(
-    latestOrderTxn?.qrisStatus?.toLowerCase().includes('approved') || 
-    latestOrderTxn?.qrisStatus?.toLowerCase().includes('lunas') ||
-    latestOrderTxn?.qrisStatus?.toLowerCase().includes('sukses')
-  )
-  const effectivePaymentStatus = (userPaymentStatus === 'approved' || isTxnApproved) ? 'approved' : userPaymentStatus
+  const effectivePaymentStatus = ctxPaymentStatus || userPaymentStatus
 
   const rentedItems = activeReservation?.items?.filter(item => item.listingType !== 'sale') || []
   const hasActiveEvent = Boolean(activeReservation?.eventName)
@@ -172,7 +128,9 @@ export default function ReturnPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
-  const currentItemPending = pendingReturns?.find(r => String(r.equipmentId) === String(currentItem?.id))
+  const currentItemPending = pendingReturns?.find(r => 
+    String(r.equipmentId) === String(currentItem?.id) && (!isMyPendingReturn || isMyPendingReturn(r))
+  )
   const isCurrentItemPending = Boolean(currentItemPending)
 
   const [checklist, setChecklist] = useState({
@@ -183,7 +141,9 @@ export default function ReturnPage() {
 
   const selectItem = (newId) => {
     setSelectedItemId(newId)
-    const isPending = pendingReturns?.some(r => String(r.equipmentId) === String(newId))
+    const isPending = pendingReturns?.some(r => 
+      String(r.equipmentId) === String(newId) && (!isMyPendingReturn || isMyPendingReturn(r))
+    )
     if (isPending) {
       if (setReturnStatus) setReturnStatus('pending_admin_approval')
     } else {
@@ -207,20 +167,20 @@ export default function ReturnPage() {
   const handleConditionPhotoChange = (e) => {
     const file = e.target.files?.[0]
     if (file) {
-      compressImage(file, (compressedBase64) => {
+      compressImageFile(file, (compressedBase64) => {
         setConditionPhoto(compressedBase64)
         setConditionTime(new Date().toLocaleString('id-ID') + ' WIB')
-      })
+      }, 500, 0.65)
     }
   }
 
   const handleStoragePhotoChange = (e) => {
     const file = e.target.files?.[0]
     if (file) {
-      compressImage(file, (compressedBase64) => {
+      compressImageFile(file, (compressedBase64) => {
         setStoragePhoto(compressedBase64)
         setStorageTime(new Date().toLocaleString('id-ID') + ' WIB')
-      })
+      }, 500, 0.65)
     }
   }
 
@@ -231,7 +191,7 @@ export default function ReturnPage() {
     setSubmitError('')
 
     try {
-      const borrowerName = currentItem.borrower || activeReservation?.borrowerName || activeReservation?.org || currentUserName || 'Jason Lim Surya'
+      const borrowerName = currentItem.borrower || activeReservation?.borrowerName || activeReservation?.org || currentUserName || 'Prasmulyan'
       await submitUserReturnProof({
         equipmentId: currentItem.id,
         itemName: currentItem.name,
@@ -275,19 +235,32 @@ export default function ReturnPage() {
         <div className="card p-4 bg-emerald-50/40 border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-3">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold ${
-              overdueDays > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'
+              isCurrentItemPending
+                ? 'bg-amber-100 text-amber-700'
+                : overdueDays > 0
+                ? 'bg-rose-100 text-rose-700'
+                : 'bg-emerald-100 text-emerald-800'
             }`}>
-              {overdueDays > 0 ? <AlertTriangle className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+              {isCurrentItemPending ? <Clock className="w-4 h-4" /> : overdueDays > 0 ? <AlertTriangle className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
             </div>
             <div>
               <div className="font-bold text-slate-900">
-                {overdueDays > 0 
+                {isCurrentItemPending
+                  ? 'Status: Bukti Pengembalian Sedang Diverifikasi Admin'
+                  : overdueDays > 0 
                   ? `Status: Melewati Batas ${overdueDays} Hari` 
                   : 'Status Pengembalian: Tepat Waktu (Bebas Denda)'
                 }
               </div>
               <div className="text-[11px] text-slate-500">
-                Batas Akhir: <strong>{activeReservation?.endDateLabel || activeReservation?.endDate || '06 Nov 2026'}</strong> · Denda Terlambat: <strong className={overdueDays > 0 ? 'text-rose-700 font-bold' : 'text-emerald-700'}>Rp{(overdueDays > 0 ? overdueDays * 25000 : 0).toLocaleString('id-ID')}</strong> (Rp25.000/hari)
+                Batas Akhir: <strong>{activeReservation?.endDateLabel || activeReservation?.endDate || '06 Nov 2026'}</strong>
+                {isCurrentItemPending ? (
+                  <span> · <strong className="text-amber-700">Denda dijeda selama proses verifikasi Admin</strong></span>
+                ) : (
+                  <>
+                    {' · '}Denda Terlambat: <strong className={overdueDays > 0 ? 'text-rose-700 font-bold' : 'text-emerald-700'}>Rp{(overdueDays > 0 ? overdueDays * 25000 : 0).toLocaleString('id-ID')}</strong> (Rp25.000/hari)
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -306,7 +279,7 @@ export default function ReturnPage() {
         </div>
       )}
 
-      {/* KONDISI 1: PEMBAYARAN MASIH MENUNGGU VERIFIKASI ADMIN */}
+      {/* KONDISI 1: PEMBAYARAN MASIH MENUNGGU VERIFIKASI ADMIN ATAU BELUM BAYAR */}
       {effectivePaymentStatus === 'pending_admin_approval' ? (
         <div className="card p-10 text-center space-y-4">
           <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto border border-amber-200">
@@ -320,6 +293,28 @@ export default function ReturnPage() {
             <Link to="/reservation" className="btn-primary text-xs !py-2.5 !px-5 inline-flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
               <span>Lihat Status Reservasi</span>
+            </Link>
+          </div>
+        </div>
+      ) : effectivePaymentStatus !== 'approved' ? (
+        <div className="card p-10 text-center space-y-4">
+          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto border border-emerald-200">
+            <ClipboardList className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900">
+            {hasActiveEvent ? 'Reservasi Event Belum Dibayar' : 'Tidak Ada Tanggungan Pengembalian'}
+          </h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+            {hasActiveEvent
+              ? `Event "${activeReservation?.eventName}" masih berstatus draft atau menunggu pembayaran QRIS. Selesaikan pembayaran terlebih dahulu sebelum melakukan pengembalian barang.`
+              : 'Anda belum memiliki pinjaman perlengkapan aktif saat ini. Silakan daftarkan kegiatan dan pilih perlengkapan di Marketplace.'}
+          </p>
+          <div className="pt-2 flex flex-wrap justify-center gap-2.5">
+            <Link to={hasActiveEvent ? '/reservation' : '/create-event'} className="btn-primary text-xs !py-2.5 !px-5">
+              {hasActiveEvent ? 'Lanjut ke Pembayaran Reservasi' : 'Buat Event Baru'}
+            </Link>
+            <Link to="/marketplace" className="btn-secondary text-xs !py-2.5 !px-5">
+              Buka Marketplace
             </Link>
           </div>
         </div>
@@ -374,7 +369,9 @@ export default function ReturnPage() {
 
               <div className="space-y-2">
                 {rentedItems.map(item => {
-                  const isPending = pendingReturns?.some(r => String(r.equipmentId) === String(item.id))
+                  const isPending = pendingReturns?.some(r => 
+                    String(r.equipmentId) === String(item.id) && (!isMyPendingReturn || isMyPendingReturn(r))
+                  )
                   const isSelected = currentItem?.id === item.id
                   return (
                     <button
@@ -708,17 +705,18 @@ export default function ReturnPage() {
                   )}
 
                   <div className="pt-2 flex flex-wrap justify-center gap-2.5">
-                    {rentedItems.length > 1 && (
-                      <button 
-                        onClick={() => {
-                          const nextItem = rentedItems.find(i => !pendingReturns?.some(r => String(r.equipmentId) === String(i.id)))
-                          if (nextItem) setSelectedItemId(nextItem.id)
-                        }}
-                        className="btn-secondary text-xs !py-2 !px-4 cursor-pointer"
-                      >
-                        Kembalikan Barang Lainnya
-                      </button>
-                    )}
+                    {(() => {
+                      const nextItem = rentedItems.find(i => !pendingReturns?.some(r => String(r.equipmentId) === String(i.id) && (!isMyPendingReturn || isMyPendingReturn(r))))
+                      return nextItem ? (
+                        <button 
+                          type="button"
+                          onClick={() => setSelectedItemId(nextItem.id)}
+                          className="btn-secondary text-xs !py-2 !px-4 cursor-pointer"
+                        >
+                          Kembalikan Barang Lainnya
+                        </button>
+                      ) : null
+                    })()}
                   </div>
                 </div>
               )}

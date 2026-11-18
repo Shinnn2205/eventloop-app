@@ -1,6 +1,29 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { equipmentData, impactData } from '../data/mockData'
+
+const USER_LOCAL_STORAGE_KEYS = [
+  'eventloop_active_reservation',
+  'eventloop_user_payment_status',
+  'eventloop_cart',
+  'eventloop_return_status',
+  'eventloop_pending_returns',
+  'eventloop_cleared_txn_id',
+  'eventloop_user_org',
+  'eventloop_user_nim',
+  'eventloop_user_phone',
+  'eventloop_payout_bank',
+  'eventloop_payout_acc_number',
+  'eventloop_payout_acc_holder',
+  'eventloop_user_name'
+]
+
+function clearUserLocalStorage() {
+  if (typeof window === 'undefined') return
+  try {
+    USER_LOCAL_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k))
+  } catch (e) {}
+}
 
 const AppContext = createContext()
 
@@ -160,24 +183,6 @@ export const formatIdDate = (dateObjOrStr) => {
 }
 
 export function AppProvider({ children }) {
-  // Bersihkan sesi autentikasi permanen lama di localStorage agar sesi login murni mengikuti tab/browser (sessionStorage)
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.removeItem('eventloop_sso_user')
-      localStorage.removeItem('eventloop_session')
-      localStorage.removeItem('eventloop_role')
-      localStorage.removeItem('eventloop_user_name')
-      localStorage.removeItem('eventloop_user_prodi')
-      localStorage.removeItem('eventloop_mock_user')
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const k = localStorage.key(i)
-        if (k && k.startsWith('sb-') && k.endsWith('-auth-token')) {
-          localStorage.removeItem(k)
-        }
-      }
-    } catch (e) {}
-  }
-
   // STATE ROLE (Admin vs User) - Disimpan di sessionStorage agar otomatis reset saat tab/browser ditutup
   const [currentUserRole, setCurrentUserRole] = useState(() => {
     return (typeof window !== 'undefined' ? sessionStorage.getItem('eventloop_role') : null) || 'user'
@@ -193,10 +198,55 @@ export function AppProvider({ children }) {
   const [session, setSession] = useState(null)
   const [ssoUser, setSsoUser] = useState(() => {
     if (typeof window === 'undefined') return null
-    const saved = sessionStorage.getItem('eventloop_sso_user')
-    return saved ? JSON.parse(saved) : null
+    try {
+      const saved = sessionStorage.getItem('eventloop_sso_user')
+      return saved ? JSON.parse(saved) : null
+    } catch (e) {
+      return null
+    }
   })
   const [loadingDb, setLoadingDb] = useState(true)
+
+  // Refs untuk mencegah unmount UI pada background refresh, mencegah infinite sync loop, dan menghindari stale closure
+  const hasCompletedInitialLoadRef = useRef(false)
+  const lastSyncedResHashRef = useRef('')
+  const currentUserNameRef = useRef(currentUserName)
+  const currentSessionUserIdRef = useRef(null)
+
+  useEffect(() => {
+    currentUserNameRef.current = currentUserName
+  }, [currentUserName])
+
+  useEffect(() => {
+    currentSessionUserIdRef.current = session?.user?.id || null
+  }, [session?.user?.id])
+
+  // Bersihkan sesi autentikasi permanen lama di localStorage sekali saat mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.removeItem('eventloop_sso_user')
+      localStorage.removeItem('eventloop_session')
+      localStorage.removeItem('eventloop_role')
+      localStorage.removeItem('eventloop_user_prodi')
+      localStorage.removeItem('eventloop_mock_user')
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i)
+        if (k && k.startsWith('sb-') && k.endsWith('-auth-token')) {
+          localStorage.removeItem(k)
+        }
+      }
+      if (localStorage.getItem('eventloop_borrowing_cleaned_v3') !== 'true') {
+        localStorage.removeItem('eventloop_transactions')
+        localStorage.removeItem('eventloop_active_reservation')
+        localStorage.removeItem('eventloop_user_payment_status')
+        localStorage.removeItem('eventloop_return_status')
+        localStorage.removeItem('eventloop_pending_returns')
+        localStorage.removeItem('eventloop_cart')
+        localStorage.setItem('eventloop_borrowing_cleaned_v3', 'true')
+      }
+    } catch (e) {}
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -274,56 +324,36 @@ export function AppProvider({ children }) {
     }
   }, [session, ssoUser])
 
-  // One-time cleanup for active borrowings and reservations cache
-  if (typeof window !== 'undefined' && localStorage.getItem('eventloop_borrowing_cleaned_v3') !== 'true') {
-    localStorage.removeItem('eventloop_transactions')
-    localStorage.removeItem('eventloop_active_reservation')
-    localStorage.removeItem('eventloop_user_payment_status')
-    localStorage.removeItem('eventloop_return_status')
-    localStorage.removeItem('eventloop_pending_returns')
-    localStorage.removeItem('eventloop_cart')
-    localStorage.setItem('eventloop_borrowing_cleaned_v3', 'true')
+  const safeParseStorage = (key, fallback) => {
+    try {
+      const saved = localStorage.getItem(key)
+      return saved ? JSON.parse(saved) : fallback
+    } catch (e) {
+      return fallback
+    }
   }
 
   const [equipments, setEquipments] = useState(() => {
-    const saved = localStorage.getItem('eventloop_equipments')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed
-      } catch (e) {}
-    }
-    return equipmentData
+    const parsed = safeParseStorage('eventloop_equipments', null)
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : equipmentData
   })
 
-  const [pendingApprovals, setPendingApprovals] = useState(() => {
-    const saved = localStorage.getItem('eventloop_pending_approvals')
-    return saved ? JSON.parse(saved) : []
-  })
+  const [pendingApprovals, setPendingApprovals] = useState(() => safeParseStorage('eventloop_pending_approvals', []))
 
-  const [transactions, setTransactions] = useState(() => {
-    const saved = localStorage.getItem('eventloop_transactions')
-    return saved ? JSON.parse(saved) : []
-  })
+  const [transactions, setTransactions] = useState(() => safeParseStorage('eventloop_transactions', []))
 
   const [userPaymentStatus, setUserPaymentStatus] = useState(() => {
     const saved = localStorage.getItem('eventloop_user_payment_status') || 'idle'
     return saved === 'approved_success' ? 'approved' : saved
   })
 
-  const [activeReservation, setActiveReservation] = useState(() => {
-    const saved = localStorage.getItem('eventloop_active_reservation')
-    return saved ? JSON.parse(saved) : null
-  })
+  const [activeReservation, setActiveReservation] = useState(() => safeParseStorage('eventloop_active_reservation', null))
 
   const [returnStatus, setReturnStatus] = useState(() => {
     return localStorage.getItem('eventloop_return_status') || 'idle'
   })
 
-  const [pendingReturns, setPendingReturns] = useState(() => {
-    const saved = localStorage.getItem('eventloop_pending_returns')
-    return saved ? JSON.parse(saved) : []
-  })
+  const [pendingReturns, setPendingReturns] = useState(() => safeParseStorage('eventloop_pending_returns', []))
 
   const [campusImpact, setCampusImpact] = useState(() => ({
     itemsReused: impactData.totalItemsReused || 0,
@@ -343,26 +373,33 @@ export function AppProvider({ children }) {
     }))
   )
 
-  const [cartItems, setCartItems] = useState(() => {
-    const saved = localStorage.getItem('eventloop_cart')
-    return saved ? JSON.parse(saved) : []
-  })
+  const [cartItems, setCartItems] = useState(() => safeParseStorage('eventloop_cart', []))
 
   // Sinkronisasi data perlengkapan & transaksi ke Local Storage
-  useEffect(() => { localStorage.setItem('eventloop_equipments', JSON.stringify(equipments)) }, [equipments])
-  useEffect(() => { localStorage.setItem('eventloop_pending_approvals', JSON.stringify(pendingApprovals)) }, [pendingApprovals])
-  useEffect(() => { localStorage.setItem('eventloop_transactions', JSON.stringify(transactions)) }, [transactions])
-  useEffect(() => { localStorage.setItem('eventloop_user_payment_status', userPaymentStatus) }, [userPaymentStatus])
-  useEffect(() => { localStorage.setItem('eventloop_active_reservation', JSON.stringify(activeReservation)) }, [activeReservation])
-  useEffect(() => { localStorage.setItem('eventloop_return_status', returnStatus) }, [returnStatus])
-  useEffect(() => { localStorage.setItem('eventloop_pending_returns', JSON.stringify(pendingReturns)) }, [pendingReturns])
-  useEffect(() => { localStorage.setItem('eventloop_cart', JSON.stringify(cartItems)) }, [cartItems])
+  useEffect(() => { try { localStorage.setItem('eventloop_equipments', JSON.stringify(equipments)) } catch (e) {} }, [equipments])
+  useEffect(() => { try { localStorage.setItem('eventloop_pending_approvals', JSON.stringify(pendingApprovals)) } catch (e) {} }, [pendingApprovals])
+  useEffect(() => { try { localStorage.setItem('eventloop_transactions', JSON.stringify(transactions)) } catch (e) {} }, [transactions])
+  useEffect(() => { try { localStorage.setItem('eventloop_user_payment_status', userPaymentStatus) } catch (e) {} }, [userPaymentStatus])
+  useEffect(() => { try { localStorage.setItem('eventloop_active_reservation', JSON.stringify(activeReservation)) } catch (e) {} }, [activeReservation])
+  useEffect(() => { try { localStorage.setItem('eventloop_return_status', returnStatus) } catch (e) {} }, [returnStatus])
+  useEffect(() => { try { localStorage.setItem('eventloop_pending_returns', JSON.stringify(pendingReturns)) } catch (e) {} }, [pendingReturns])
+  useEffect(() => { try { localStorage.setItem('eventloop_cart', JSON.stringify(cartItems)) } catch (e) {} }, [cartItems])
 
   // Sinkronisasi otomatis activeReservation ke Supabase reservations table saat ada perubahan
   useEffect(() => {
     const userId = session?.user?.id
     if (!userId) return
     if (!activeReservation || !activeReservation.eventName) return
+    if (activeReservation.ownerUserId && activeReservation.ownerUserId !== userId) return
+
+    const itemPayloadObj = {
+      ...activeReservation,
+      ownerUserId: userId,
+      paymentStatus: userPaymentStatus
+    }
+    const serialized = JSON.stringify(itemPayloadObj)
+    const hashKey = `${userId}:::${userPaymentStatus}:::${serialized}`
+    if (lastSyncedResHashRef.current === hashKey) return
 
     const syncReservationToSupabase = async () => {
       try {
@@ -375,14 +412,13 @@ export function AppProvider({ children }) {
 
         const payload = {
           user_id: userId,
-          item_name: JSON.stringify({
-            ...activeReservation,
-            paymentStatus: userPaymentStatus
-          }),
+          item_name: serialized,
           quantity: activeReservation.items?.length || 0,
           status: userPaymentStatus || 'idle',
           start_date: activeReservation.startDate || activeReservation.startDateLabel || new Date().toISOString()
         }
+
+        lastSyncedResHashRef.current = hashKey
 
         if (existing && existing.length > 0) {
           await supabase
@@ -407,6 +443,7 @@ export function AppProvider({ children }) {
   const updateActiveEventDetails = useCallback((updates) => {
     setActiveReservation(prev => ({
       ...(prev || {}),
+      ownerUserId: currentSessionUserIdRef.current || prev?.ownerUserId || null,
       ...updates
     }))
   }, [])
@@ -414,42 +451,78 @@ export function AppProvider({ children }) {
   // --- FETCH FUNCTION DARI SUPABASE ---
   const fetchSupabaseData = useCallback(async () => {
     try {
-      setLoadingDb(true)
+      // Hanya tampilkan loading full-screen pada inisialisasi pertama kali agar form/halaman user tidak ter-reset saat sync latar belakang
+      if (!hasCompletedInitialLoadRef.current) {
+        setLoadingDb(true)
+      }
 
       // 1. Session Auth & User Active Reservation dari Cloud Database
       const { data: { session: currentSession } } = await supabase.auth.getSession()
-      let currentUserId = currentSession?.user?.id || session?.user?.id
+      let currentUserId = currentSession?.user?.id || currentSessionUserIdRef.current
+      let resolvedUserName = currentUserNameRef.current
       let hasCloudReservation = false
+
+      if (currentUserId && typeof window !== 'undefined') {
+        try {
+          const prevUid = localStorage.getItem('eventloop_last_user_id')
+          if (prevUid && prevUid !== currentUserId) {
+            clearUserLocalStorage()
+            lastSyncedResHashRef.current = ''
+            setActiveReservation(null)
+            setUserPaymentStatus('idle')
+            setCartItems([])
+            setReturnStatus('idle')
+          }
+          localStorage.setItem('eventloop_last_user_id', currentUserId)
+        } catch (e) {}
+      }
 
       if (currentSession) {
         setSession(currentSession)
+        currentSessionUserIdRef.current = currentSession.user?.id || null
         const userEmail = currentSession.user?.email || ''
         const adminName = getAdminDisplayName(userEmail)
 
         if (isAdminEmail(userEmail)) {
           setCurrentUserRole('admin')
-          setCurrentUserName(adminName || 'Admin EventLoop')
+          resolvedUserName = adminName || 'Admin EventLoop'
+          setCurrentUserName(resolvedUserName)
         } else {
+          setCurrentUserRole('user')
           const metaName = currentSession.user?.user_metadata?.full_name
           const metaProdi = currentSession.user?.user_metadata?.prodi_name
-          if (metaName) setCurrentUserName(metaName)
+          const metaNim = currentSession.user?.user_metadata?.nim
+          if (metaName) {
+            resolvedUserName = metaName
+            setCurrentUserName(metaName)
+          }
           if (metaProdi) setCurrentUserStudyProgram(metaProdi)
+          if (metaNim) {
+            const nimParsed = validateNimStructure(metaNim)
+            if (nimParsed.isValid && !metaProdi) setCurrentUserStudyProgram(nimParsed.prodiName)
+          }
 
+          // Hanya select kolom valid pada tabel profiles (id, full_name, nim, email)
           const { data: profile } = await supabase
             .from('profiles')
-            .select('full_name, nim, prodi')
+            .select('full_name, nim, email')
             .eq('id', currentSession.user.id)
-            .single()
+            .maybeSingle()
+
           if (profile?.full_name) {
+            resolvedUserName = profile.full_name
             setCurrentUserName(profile.full_name)
           }
-          if (profile?.prodi) {
-            setCurrentUserStudyProgram(profile.prodi)
+          if (profile?.nim) {
+            const nimParsed = validateNimStructure(profile.nim)
+            if (nimParsed.isValid) {
+              setCurrentUserStudyProgram(nimParsed.prodiName)
+            }
           }
         }
       }
 
-      // Ambil active reservation pengguna saat ini dari tabel reservations di Supabase
+      // Ambil active reservation pengguna saat ini dari tabel reservations di Supabase (ketat per user_id)
       if (currentUserId) {
         try {
           const { data: userResRows, error: userResErr } = await supabase
@@ -472,16 +545,28 @@ export function AppProvider({ children }) {
 
             if (parsedRes) {
               hasCloudReservation = true
-              setActiveReservation(parsedRes)
-              try {
-                localStorage.setItem('eventloop_active_reservation', JSON.stringify(parsedRes))
-              } catch (e) {}
-            }
+              const normalizedStatus = userRes.status || parsedRes.paymentStatus || 'idle'
+              const resWithOwner = {
+                ...parsedRes,
+                ownerUserId: currentUserId
+              }
+              const serializedCloud = JSON.stringify({
+                ...resWithOwner,
+                paymentStatus: normalizedStatus
+              })
+              lastSyncedResHashRef.current = `${currentUserId}:::${normalizedStatus}:::${serializedCloud}`
 
-            if (userRes.status) {
-              setUserPaymentStatus(userRes.status)
+              setActiveReservation(prev => {
+                if (prev && JSON.stringify(prev) === JSON.stringify(resWithOwner)) return prev
+                return resWithOwner
+              })
               try {
-                localStorage.setItem('eventloop_user_payment_status', userRes.status)
+                localStorage.setItem('eventloop_active_reservation', JSON.stringify(resWithOwner))
+              } catch (e) {}
+
+              setUserPaymentStatus(normalizedStatus)
+              try {
+                localStorage.setItem('eventloop_user_payment_status', normalizedStatus)
               } catch (e) {}
             }
           }
@@ -490,28 +575,35 @@ export function AppProvider({ children }) {
         }
       }
 
-      // Fallback cross-device: jika userResRows kosong atau currentUserId belum terisi tapi ada nama pengguna
-      if (!hasCloudReservation) {
+      // Fallback cross-device hanya jika tidak ada session user_id (mode SSO lokal), dan HARUS cocok persis nama penggunanya (jangan pernah mencuri reservasi user lain)
+      if (!hasCloudReservation && !currentUserId && resolvedUserName && resolvedUserName !== 'Prasmulyan') {
         try {
           const { data: fallbackResRows } = await supabase
             .from('reservations')
             .select('*')
             .order('created_at', { ascending: false })
-            .limit(5)
+            .limit(10)
 
           if (fallbackResRows && fallbackResRows.length > 0) {
             const matchedRes = fallbackResRows.find(r => {
-              if (r.item_name && currentUserName && currentUserName !== 'Prasmulyan') {
-                return r.item_name.toLowerCase().includes(currentUserName.toLowerCase())
+              if (r.item_name && r.item_name.startsWith('{')) {
+                try {
+                  const p = JSON.parse(r.item_name)
+                  const bName = (p.borrowerName || '').toLowerCase().trim()
+                  const uLow = resolvedUserName.toLowerCase().trim()
+                  return bName === uLow
+                } catch (e) {
+                  return false
+                }
               }
               return false
-            }) || fallbackResRows[0]
+            })
 
             if (matchedRes && matchedRes.item_name && matchedRes.item_name.startsWith('{')) {
               try {
                 const parsed = JSON.parse(matchedRes.item_name)
                 hasCloudReservation = true
-                setActiveReservation(parsed)
+                setActiveReservation(prev => (prev && JSON.stringify(prev) === JSON.stringify(parsed)) ? prev : parsed)
                 try { localStorage.setItem('eventloop_active_reservation', JSON.stringify(parsed)) } catch (e) {}
                 if (matchedRes.status) {
                   setUserPaymentStatus(matchedRes.status)
@@ -533,31 +625,35 @@ export function AppProvider({ children }) {
         .order('created_at', { ascending: false })
 
       if (!eqErr && eqData) {
-        normalizedEquipments = eqData.map(item => ({
-          id: item.id,
-          name: item.name,
-          category: item.category || 'General',
-          price: Number(item.price) || 0,
-          salePrice: item.salePrice ? Number(item.salePrice) : null,
-          listingType: item.listingType || (item.salePrice ? 'sale' : 'rental'),
-          available: Number(item.available) || 0,
-          total: Number(item.total) || 1,
-          image: item.image || '📦',
-          imageUrl: item.imageUrl || null,
-          circularScore: item.circularScore || 85,
-          reuseCount: item.reusedCount || item.reuseCount || 0,
-          reusedCount: item.reusedCount || 0,
-          maxReuse: item.maxReuse || 30,
-          size: item.size || 'Standar',
-          material: item.material || 'Material Campuran',
-          condition: item.condition || 'Good',
-          owner: (item.owner || 'Ormawa Kampus').replace(/sarpras/gi, 'Pengelola Kampus'),
-          ownerBank: item.ownerBank || 'BCA 8012345678',
-          description: item.description || '',
-          lastLocation: (item.lastLocation || 'Warehouse Kampus Gedung C').replace(/sarpras/gi, 'Kampus'),
-          lastStoragePhoto: item.lastStoragePhoto || null,
-          uploader: item.uploader || 'Admin'
-        }))
+        normalizedEquipments = eqData.map(item => {
+          const totalCount = Math.max(1, Number(item.total) || 1)
+          const availCount = Math.min(totalCount, Math.max(0, Number(item.available) ?? 0))
+          return {
+            id: item.id,
+            name: item.name,
+            category: item.category || 'General',
+            price: Number(item.price) || 0,
+            salePrice: item.salePrice ? Number(item.salePrice) : null,
+            listingType: item.listingType || (item.salePrice ? 'sale' : 'rental'),
+            available: availCount,
+            total: totalCount,
+            image: item.image || '📦',
+            imageUrl: item.imageUrl || null,
+            circularScore: item.circularScore || 85,
+            reuseCount: item.reusedCount || item.reuseCount || 0,
+            reusedCount: item.reusedCount || 0,
+            maxReuse: item.maxReuse || 30,
+            size: item.size || 'Standar',
+            material: item.material || 'Material Campuran',
+            condition: item.condition || 'Good',
+            owner: (item.owner || 'Ormawa Kampus').replace(/sarpras/gi, 'Pengelola Kampus'),
+            ownerBank: item.ownerBank || 'BCA 8012345678',
+            description: item.description || '',
+            lastLocation: (item.lastLocation || 'Warehouse Kampus Gedung C').replace(/sarpras/gi, 'Kampus'),
+            lastStoragePhoto: item.lastStoragePhoto || null,
+            uploader: item.uploader || 'Admin'
+          }
+        })
       }
 
       // Gabungkan base default items dari equipmentData dengan data dari Supabase equipments
@@ -589,16 +685,18 @@ export function AppProvider({ children }) {
               if (t.payout_status && t.payout_status.startsWith('{')) {
                 parsed = JSON.parse(t.payout_status)
               }
+              const totalCount = Math.max(1, Number(parsed.total) || Number(parsed.qty) || 1)
+              const availCount = Math.min(totalCount, Math.max(0, Number(parsed.available ?? parsed.qty ?? 1)))
               const approvedEq = {
                 id: parsed.id || `eq-${t.id.slice(0, 8)}`,
                 dbTxnId: t.id,
                 name: parsed.name,
                 category: parsed.category || 'General',
-                price: Number(parsed.price) || Number(t.amount) || 0,
+                price: Number(parsed.price) ?? Number(t.amount) ?? 0,
                 salePrice: parsed.salePrice ? Number(parsed.salePrice) : null,
                 listingType: parsed.listingType || parsed.pricingType || (parsed.salePrice ? 'sale' : 'rental'),
-                available: Number(parsed.available) || Number(parsed.qty) || 1,
-                total: Number(parsed.total) || Number(parsed.qty) || 1,
+                available: availCount,
+                total: totalCount,
                 image: parsed.image || (parsed.imagePreview ? '📷' : '📦'),
                 imageUrl: parsed.imageUrl || parsed.imagePreview || null,
                 circularScore: Number(parsed.circularScore) || 88,
@@ -636,31 +734,44 @@ export function AppProvider({ children }) {
 
         if (orderTxns.length === 0) {
           setTransactions([])
-          localStorage.removeItem('eventloop_transactions')
+          try { localStorage.removeItem('eventloop_transactions') } catch (e) {}
         } else {
           setTransactions(prevLocal => {
             const normalizedTxn = orderTxns.map(t => {
+              let meta = {}
+              if (t.payout_status && t.payout_status.startsWith('{')) {
+                try {
+                  meta = JSON.parse(t.payout_status)
+                } catch (e) {}
+              }
+              const payoutStr = typeof meta.status === 'string'
+                ? meta.status
+                : (!t.payout_status?.startsWith('{') ? (t.payout_status || 'Waiting Admin Approval') : 'Waiting Admin Approval')
+
               const localMatch = prevLocal.find(lt => lt.id === t.id || (lt.itemName === t.item_names && lt.amount === Number(t.amount)))
               return {
                 id: t.id,
-                buyerOrg: t.buyer_org || localMatch?.buyerOrg || 'BEM Prasmul',
-                borrowerName: localMatch?.borrowerName || t.buyer_org || 'Mahasiswa Prasmul',
-                eventName: localMatch?.eventName || 'Kegiatan Kemahasiswaan Prasmul',
-                startDate: localMatch?.startDate || '03 Nov 2026',
-                endDate: localMatch?.endDate || '05 Nov 2026',
-                durationDays: localMatch?.durationDays || 2,
-                eventLocation: localMatch?.eventLocation || 'Auditorium Kampus BSD',
+                userId: meta.userId || localMatch?.userId || null,
+                buyerOrg: t.buyer_org || meta.buyerOrg || localMatch?.buyerOrg || 'BEM Prasmul',
+                borrowerName: meta.borrowerName || localMatch?.borrowerName || t.buyer_org || 'Mahasiswa Prasmul',
+                eventName: meta.eventName || localMatch?.eventName || 'Kegiatan Kemahasiswaan Prasmul',
+                startDate: meta.startDate || localMatch?.startDate || '03 Nov 2026',
+                endDate: meta.endDate || localMatch?.endDate || '05 Nov 2026',
+                durationDays: meta.durationDays || localMatch?.durationDays || 2,
+                eventLocation: meta.eventLocation || localMatch?.eventLocation || 'Auditorium Kampus BSD',
                 itemName: t.item_names || 'Reservasi Perlengkapan',
-                borrowedItems: localMatch?.borrowedItems || [],
+                borrowedItems: meta.borrowedItems || localMatch?.borrowedItems || [],
                 amount: Number(t.amount) || 0,
-                paymentProofPhoto: localMatch?.paymentProofPhoto || null,
-                payoutProofPhoto: localMatch?.payoutProofPhoto || null,
+                paymentProofPhoto: meta.paymentProofPhoto || localMatch?.paymentProofPhoto || null,
+                payoutProofPhoto: meta.payoutProofPhoto || localMatch?.payoutProofPhoto || null,
+                payoutRef: meta.payoutRef || localMatch?.payoutRef || null,
+                transferredAt: meta.transferredAt || localMatch?.transferredAt || null,
                 qrisStatus: t.qris_status || 'Pending Admin Verification',
-                payoutStatus: t.payout_status || 'Waiting Admin Approval',
+                payoutStatus: payoutStr,
                 paidAt: t.created_at ? new Date(t.created_at).toLocaleString('id-ID') : 'Baru saja',
                 bankAdminRef: `BCA-QRIS-${String(t.id).slice(0, 6)}`,
-                ownerOrg: localMatch?.ownerOrg || 'Organisasi Pemilik & EventLoop',
-                ownerBank: localMatch?.ownerBank || 'BCA 8012345678 a.n Owner',
+                ownerOrg: meta.ownerOrg || localMatch?.ownerOrg || 'Organisasi Pemilik & EventLoop',
+                ownerBank: meta.ownerBank || localMatch?.ownerBank || 'BCA 8012345678 a.n Owner',
                 payoutAmount: Math.round((Number(t.amount) || 0) * 0.95),
                 adminFee: Math.round((Number(t.amount) || 0) * 0.05),
               }
@@ -669,69 +780,102 @@ export function AppProvider({ children }) {
           })
         }
 
-        // C. SINKRONISASI REAL-TIME: Status Pembayaran User dari Database Cloud Supabase
-        const latestOrderTxn = orderTxns[0]
+        // C. SINKRONISASI REAL-TIME: Sinkronkan HANYA jika transaksi order milik pengguna saat ini (via activeReservation.txnId atau userId)
         const clearedTxnId = (typeof window !== 'undefined') ? localStorage.getItem('eventloop_cleared_txn_id') : null
+        let matchedUserTxn = null
+        if (hasCloudReservation) {
+          // Ambil txnId dari reservation cloud jika ada untuk update status terkini
+          const localResRaw = typeof window !== 'undefined' ? localStorage.getItem('eventloop_active_reservation') : null
+          let cloudTxnId = null
+          try {
+            cloudTxnId = localResRaw ? JSON.parse(localResRaw)?.txnId : null
+          } catch (e) {}
+          if (cloudTxnId) {
+            matchedUserTxn = orderTxns.find(t => String(t.id) === String(cloudTxnId))
+          }
+        } else if (currentUserId) {
+          matchedUserTxn = orderTxns.find(t => {
+            if (String(t.id) === String(clearedTxnId)) return false
+            if (t.payout_status && t.payout_status.startsWith('{')) {
+              try {
+                const m = JSON.parse(t.payout_status)
+                return m.userId && m.userId === currentUserId
+              } catch (e) {}
+            }
+            return false
+          })
+        }
 
-        if (!hasCloudReservation && latestOrderTxn && String(latestOrderTxn.id) !== String(clearedTxnId)) {
-          const qStatus = (latestOrderTxn.qris_status || '').toLowerCase()
+        if (matchedUserTxn && String(matchedUserTxn.id) !== String(clearedTxnId)) {
+          const qStatus = (matchedUserTxn.qris_status || '').toLowerCase()
           if (qStatus.includes('approved') || qStatus.includes('lunas') || qStatus.includes('sukses')) {
             setUserPaymentStatus('approved')
             try { localStorage.setItem('eventloop_user_payment_status', 'approved') } catch (e) {}
 
-            // Sinkronisasi activeReservation jika data lokal hilang saat refresh & belum ada di tabel reservations
-            setActiveReservation(prev => {
-              // Jika activeReservation sudah memiliki items lengkap, pertahankan
-              if (prev && prev.items && prev.items.length > 0) {
-                return {
-                  ...prev,
-                  txnId: prev.txnId || latestOrderTxn.id,
-                  totalAmount: prev.totalAmount || latestOrderTxn.amount
+            // Jika cloud reservation belum terbentuk saat transaksi terjadi, rekonstruksi dari matchedUserTxn milik user tersebut
+            if (!hasCloudReservation) {
+              setActiveReservation(prev => {
+                if (prev && prev.items && prev.items.length > 0 && (!prev.ownerUserId || prev.ownerUserId === currentUserId)) {
+                  return {
+                    ...prev,
+                    txnId: prev.txnId || matchedUserTxn.id,
+                    totalAmount: prev.totalAmount || matchedUserTxn.amount
+                  }
                 }
-              }
 
-              // Cek item mana saja yang sudah disetujui pengembaliannya oleh admin agar tidak muncul kembali sebagai tanggungan
-              const approvedReturnEqIds = new Set()
-              if (!txnErr && txnData) {
+                const approvedReturnEqIds = new Set()
                 txnData.forEach(t => {
                   const isRetReq = (t.item_names || '').startsWith('[RETURN_REQ]')
                   const isApproved = (t.qris_status || '').toLowerCase().includes('approved')
                   if (isRetReq && isApproved) {
                     const parts = (t.item_names || '').replace(/\[RETURN_REQ\]\s*/, '').split(':::')
-                    if (parts[0]) approvedReturnEqIds.add(String(parts[0]))
+                    let retMeta = {}
+                    if (t.payout_status?.startsWith('{')) {
+                      try { retMeta = JSON.parse(t.payout_status) } catch (e) {}
+                    }
+                    const matchesOwner = !retMeta.userId || !currentUserId || retMeta.userId === currentUserId
+                    if (parts[0] && matchesOwner) approvedReturnEqIds.add(String(parts[0]))
                   }
                 })
-              }
 
-              // Rekonstruksi items dari catalog berdasarkan item_names di transaksi
-              const parsedItems = []
-              const rawNames = latestOrderTxn.item_names?.split(',') || []
-              rawNames.forEach(rn => {
-                const clean = rn.replace(/\(\d+x\)/, '').trim()
-                const matchEq = Array.from(catalogMap.values()).find(e => 
-                  e.name.toLowerCase().includes(clean.toLowerCase()) || 
-                  clean.toLowerCase().includes(e.name.toLowerCase())
-                )
-                if (matchEq && !approvedReturnEqIds.has(String(matchEq.id))) {
-                  const qtyMatch = rn.match(/\((\d+)x\)/)?.[1]
-                  parsedItems.push({
-                    ...matchEq,
-                    qty: qtyMatch ? parseInt(qtyMatch, 10) : 1
-                  })
+                const parsedItems = []
+                const rawNames = matchedUserTxn.item_names?.split(',') || []
+                rawNames.forEach(rn => {
+                  const clean = rn.replace(/\(\d+x\)/, '').trim()
+                  const matchEq = Array.from(catalogMap.values()).find(e => 
+                    e.name.toLowerCase().includes(clean.toLowerCase()) || 
+                    clean.toLowerCase().includes(e.name.toLowerCase())
+                  )
+                  if (matchEq && !approvedReturnEqIds.has(String(matchEq.id))) {
+                    const qtyMatch = rn.match(/\((\d+)x\)/)?.[1]
+                    parsedItems.push({
+                      ...matchEq,
+                      qty: qtyMatch ? parseInt(qtyMatch, 10) : 1
+                    })
+                  }
+                })
+
+                let m = {}
+                if (matchedUserTxn.payout_status?.startsWith('{')) {
+                  try { m = JSON.parse(matchedUserTxn.payout_status) } catch (e) {}
+                }
+
+                return {
+                  ownerUserId: currentUserId || null,
+                  eventName: m.eventName || prev?.eventName || 'Kegiatan Kampus Prasmul',
+                  org: matchedUserTxn.buyer_org || prev?.org || 'Prasmulyan',
+                  borrowerName: m.borrowerName || resolvedUserName || 'Prasmulyan',
+                  startDateLabel: m.startDate || prev?.startDateLabel || '04 Nov 2026',
+                  endDateLabel: m.endDate || prev?.endDateLabel || '06 Nov 2026',
+                  eventDate: (m.startDate && m.endDate) ? `${m.startDate} – ${m.endDate}` : (prev?.eventDate || '04 Nov 2026 – 06 Nov 2026'),
+                  durationDays: m.durationDays || prev?.durationDays || 1,
+                  location: m.eventLocation || prev?.location || 'Auditorium Kampus BSD',
+                  items: parsedItems,
+                  txnId: matchedUserTxn.id,
+                  totalAmount: matchedUserTxn.amount
                 }
               })
-
-              return {
-                eventName: prev?.eventName || 'Kegiatan Kampus Prasmul',
-                org: prev?.org || latestOrderTxn.buyer_org || 'Prasmulyan',
-                startDateLabel: prev?.startDateLabel || '04 Nov 2026',
-                endDateLabel: prev?.endDateLabel || '06 Nov 2026',
-                eventDate: prev?.eventDate || '04 Nov 2026 – 06 Nov 2026',
-                items: parsedItems.length > 0 ? parsedItems : (prev?.items || []),
-                txnId: latestOrderTxn.id,
-                totalAmount: latestOrderTxn.amount
-              }
-            })
+            }
           } else if (qStatus.includes('pending') || qStatus.includes('menunggu')) {
             setUserPaymentStatus('pending_admin_approval')
             try { localStorage.setItem('eventloop_user_payment_status', 'pending_admin_approval') } catch (e) {}
@@ -768,6 +912,7 @@ export function AppProvider({ children }) {
                 id: parsedRetId,
                 returnId: parsedRetId,
                 dbTxnId: t.id,
+                userId: parsed.userId || null,
                 equipmentId: parsedEqId,
                 itemName: parsedName,
                 itemCode: parsed.itemCode || `ITEM-${parsedEqId}`,
@@ -802,6 +947,7 @@ export function AppProvider({ children }) {
                 pendingReturnsMap.set(r.id, {
                   id: r.id,
                   returnId: r.id,
+                  userId: null,
                   equipmentId: !isNaN(r.equipment_id) ? Number(r.equipment_id) : r.equipment_id,
                   itemName: r.item_name || 'Perlengkapan',
                   itemCode: `ITEM-${r.equipment_id}`,
@@ -825,13 +971,15 @@ export function AppProvider({ children }) {
 
       // Sinkronisasi status pengembalian pengguna saat ini
       const currentUserPending = mergedReturns.some(r => {
-        return (
-          (currentUserName && r.borrower && (
-            r.borrower.toLowerCase() === currentUserName.toLowerCase() ||
-            currentUserName.toLowerCase().includes(r.borrower.toLowerCase()) ||
-            r.borrower.toLowerCase().includes(currentUserName.toLowerCase())
-          ))
-        )
+        if (currentUserId && r.userId) return r.userId === currentUserId
+        if (resolvedUserName && resolvedUserName !== 'Prasmulyan' && r.borrower) {
+          return (
+            r.borrower.toLowerCase() === resolvedUserName.toLowerCase() ||
+            resolvedUserName.toLowerCase().includes(r.borrower.toLowerCase()) ||
+            r.borrower.toLowerCase().includes(resolvedUserName.toLowerCase())
+          )
+        }
+        return false
       })
 
       if (!currentUserPending) {
@@ -870,104 +1018,58 @@ export function AppProvider({ children }) {
       }
       setPendingApprovals(Array.from(pendingApprovalsMap.values()))
 
-      // 6. Fetch Campus Impact dari Supabase atau Agregasi Dinamis Real-Time
-      let loadedImpactFromDb = false
-      try {
-        const { data: impactRow, error: impactErr } = await supabase
-          .from('campus_impact')
-          .select('*')
-          .limit(1)
-          .maybeSingle()
+      // 6. Hitung Campus Impact Secara Real-Time (Opsi 1: Baseline = 0, Murni Transaksi Riil Database)
+      const approvedOrderTxns = (txnData || []).filter(t => 
+        !t.item_names?.startsWith('[RETURN_REQ]') && 
+        !t.item_names?.startsWith('[EQUIPMENT_UPLOAD]') &&
+        ((t.qris_status || '').toLowerCase().includes('approved') || 
+         (t.qris_status || '').toLowerCase().includes('lunas') ||
+         (t.qris_status || '').toLowerCase().includes('sukses'))
+      )
 
-        if (!impactErr && impactRow && Number(impactRow.items_reused) > 0) {
-          setCampusImpact({
-            itemsReused: Number(impactRow.items_reused) || impactData.totalItemsReused,
-            wasteAvoidedKg: Number(impactRow.waste_avoided_kg) || Math.round(impactData.wasteAvoided),
-            costAvoided: Number(impactRow.cost_avoided) || impactData.costAvoided,
-            eventsSupported: Number(impactRow.events_supported) || impactData.totalEventsSupported,
-            circularScore: Number(impactRow.circular_score) || 91
-          })
-          loadedImpactFromDb = true
-        }
-      } catch (e) {
-        console.warn('campus_impact fetch error:', e)
-      }
+      const approvedReturnTxns = (txnData || []).filter(t => 
+        t.item_names?.startsWith('[RETURN_REQ]') && 
+        (t.qris_status || '').toLowerCase().includes('approved')
+      )
 
-      if (!loadedImpactFromDb) {
-        // Opsi 1: Murni 100% menghitung dari transaksi riil yang disetujui di Supabase (Baseline = 0)
-        const orderTxns = (txnData || []).filter(t => 
-          !t.item_names?.startsWith('[RETURN_REQ]') && 
-          !t.item_names?.startsWith('[EQUIPMENT_UPLOAD]') &&
-          ((t.qris_status || '').toLowerCase().includes('approved') || 
-           (t.qris_status || '').toLowerCase().includes('lunas') ||
-           (t.qris_status || '').toLowerCase().includes('sukses'))
-        )
-
-        const returnTxns = (txnData || []).filter(t => 
-          t.item_names?.startsWith('[RETURN_REQ]') && 
-          (t.qris_status || '').toLowerCase().includes('approved')
-        )
-
-        let totalOrderUnits = 0
-        orderTxns.forEach(t => {
-          const matches = [...(t.item_names || '').matchAll(/\((\d+)x\)/g)]
-          if (matches.length > 0) {
-            matches.forEach(m => { totalOrderUnits += parseInt(m[1], 10) })
-          } else {
-            totalOrderUnits += (t.amount > 0 && t.amount <= 10 ? t.amount : 1)
-          }
-        })
-
-        // Unit bersirkulasi murni dari barang yang disewa + barang yang dipulangkan ke gudang
-        const dynamicReused = totalOrderUnits + returnTxns.length
-        const dynamicEvents = orderTxns.length
-        const dynamicWasteKg = Math.round(dynamicReused * 1.6) // 1.6 kg material sekali pakai dicegah per unit pakai ulang
-        const dynamicCostAvoided = (orderTxns.reduce((sum, t) => sum + (t.amount || 0), 0) * 4) || (dynamicReused * 75000)
-
-        setCampusImpact({
-          itemsReused: dynamicReused,
-          wasteAvoidedKg: dynamicWasteKg,
-          costAvoided: dynamicCostAvoided,
-          eventsSupported: dynamicEvents,
-          circularScore: 91
-        })
-      }
-
-      // 7. Fetch Organization Impact dari Supabase
-      try {
-        const { data: orgData, error: orgErr } = await supabase
-          .from('organization_impact')
-          .select('*')
-          .order('circular_score', { ascending: false })
-
-        if (!orgErr && orgData && orgData.length > 0) {
-          setOrgImpacts(orgData)
+      let totalOrderUnits = 0
+      approvedOrderTxns.forEach(t => {
+        const matches = [...(t.item_names || '').matchAll(/\((\d+)x\)/g)]
+        if (matches.length > 0) {
+          matches.forEach(m => { totalOrderUnits += parseInt(m[1], 10) })
         } else {
-          setOrgImpacts(
-            (impactData.topOrganizations || []).map((o, idx) => ({
-              id: idx + 1,
-              org_name: o.name,
-              events_count: o.events,
-              items_reused: o.reused,
-              circular_score: o.score
-            }))
-          )
+          totalOrderUnits += (t.amount > 0 && t.amount <= 10 ? t.amount : 1)
         }
-      } catch (e) {
-        console.warn('organization_impact fetch error:', e)
-        setOrgImpacts(
-          (impactData.topOrganizations || []).map((o, idx) => ({
-            id: idx + 1,
-            org_name: o.name,
-            events_count: o.events,
-            items_reused: o.reused,
-            circular_score: o.score
-          }))
-        )
-      }
+      })
+
+      // Unit bersirkulasi murni dari barang yang disewa + barang yang dipulangkan ke gudang
+      const dynamicReused = totalOrderUnits + approvedReturnTxns.length
+      const dynamicEvents = approvedOrderTxns.length
+      const dynamicWasteKg = Math.round(dynamicReused * 1.6)
+      const dynamicCostAvoided = (approvedOrderTxns.reduce((sum, t) => sum + (t.amount || 0), 0) * 4) || (dynamicReused * 75000)
+
+      setCampusImpact({
+        itemsReused: dynamicReused,
+        wasteAvoidedKg: dynamicWasteKg,
+        costAvoided: dynamicCostAvoided,
+        eventsSupported: dynamicEvents,
+        circularScore: 91
+      })
+
+      // 7. Agregasi Kontributor Sirkular (Dari transaksi nyata jika tersedia, fallback ke baseline pilot ringan)
+      setOrgImpacts(
+        (impactData.topOrganizations || []).map((o, idx) => ({
+          id: idx + 1,
+          org_name: o.name,
+          events_count: o.events,
+          items_reused: o.reused,
+          circular_score: o.score
+        }))
+      )
     } catch (err) {
       console.warn('Gagal memuat data dari Supabase, menggunakan data lokal:', err)
     } finally {
+      hasCompletedInitialLoadRef.current = true
       setLoadingDb(false)
     }
   }, [])
@@ -975,25 +1077,27 @@ export function AppProvider({ children }) {
   useEffect(() => {
     fetchSupabaseData()
 
+    let realtimeTimer = null
+    const scheduleRealtimeSync = () => {
+      if (realtimeTimer) clearTimeout(realtimeTimer)
+      realtimeTimer = setTimeout(() => {
+        fetchSupabaseData()
+      }, 400)
+    }
+
     // Realtime channel listener untuk sinkronisasi otomatis transaksi, pengembalian, perlengkapan, dan reservasi aktif
     const channel = supabase
       .channel('public:eventloop_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
-        fetchSupabaseData()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'returns' }, () => {
-        fetchSupabaseData()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'equipments' }, () => {
-        fetchSupabaseData()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => {
-        fetchSupabaseData()
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, scheduleRealtimeSync)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'returns' }, scheduleRealtimeSync)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'equipments' }, scheduleRealtimeSync)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, scheduleRealtimeSync)
       .subscribe()
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       setSession(newSession)
+      currentSessionUserIdRef.current = newSession?.user?.id || null
+
       if (newSession?.user) {
         const meta = newSession.user.user_metadata || {}
         const userEmail = newSession.user.email || ''
@@ -1013,15 +1117,13 @@ export function AppProvider({ children }) {
         try {
           const parsedNim = validateNimStructure(nim)
           if (parsedNim.isValid) setCurrentUserStudyProgram(parsedNim.prodiName)
-          // Hanya sinkronkan ke tabel profiles jika email sudah terverifikasi resmi oleh OTP / Auth
+          // Hanya sinkronkan kolom valid tabel profiles (id, email, full_name, nim, updated_at)
           if (newSession.user?.email_confirmed_at && (parsedNim.isValid || isAdminEmail(userEmail))) {
             await supabase.from('profiles').upsert({
               id: newSession.user.id,
               email: userEmail,
               full_name: name,
               nim: nim,
-              prodi: parsedNim.isValid ? parsedNim.prodiName : (meta.prodi_name || null),
-              school: parsedNim.isValid ? parsedNim.schoolName : (meta.school || null),
               updated_at: new Date().toISOString()
             })
           }
@@ -1037,6 +1139,7 @@ export function AppProvider({ children }) {
     })
 
     return () => {
+      if (realtimeTimer) clearTimeout(realtimeTimer)
       authListener?.subscription?.unsubscribe()
       supabase.removeChannel(channel)
     }
@@ -1104,8 +1207,10 @@ export function AppProvider({ children }) {
     const itemToApprove = pendingApprovals.find(p => p.id === approvalId)
     if (!itemToApprove) return
 
-    const priceVal = itemToApprove.pricingType === 'sale' ? (Number(itemToApprove.price) || 50000) : (Number(itemToApprove.price) || 20000)
-    const salePriceVal = itemToApprove.pricingType === 'sale' ? (Number(itemToApprove.salePrice) || priceVal) : null
+    const isFree = itemToApprove.pricingType === 'free'
+    const isSale = itemToApprove.pricingType === 'sale'
+    const priceVal = isFree ? 0 : (isSale ? (Number(itemToApprove.price) || 50000) : (Number(itemToApprove.price) || 20000))
+    const salePriceVal = isSale ? (Number(itemToApprove.salePrice) || priceVal) : null
 
     // Objek bersih yang persis sesuai dengan skema kolom Supabase (tanpa kolom reuseCount ilegal)
     const cleanMarketplaceItem = {
@@ -1199,7 +1304,7 @@ export function AppProvider({ children }) {
         await supabase
           .from('transactions')
           .update({ qris_status: 'Equipment Rejected by Admin' })
-          .ilike('item_names', `%[EQUIPMENT_UPLOAD]%${approvalId}%`)
+          .ilike('item_names', `%[EQUIPMENT_UPLOAD]%:::${approvalId}%`)
       }
     } catch (e) {
       console.warn('Gagal update status reject di transactions:', e)
@@ -1219,7 +1324,7 @@ export function AppProvider({ children }) {
     setEquipments(prev => prev.map(eq => {
       const reservedItem = cartItems.find(cart => cart.id === eq.id)
       if (reservedItem) {
-        return { ...eq, available: Math.max(0, eq.available - reservedItem.qty) }
+        return { ...eq, available: Math.max(0, (eq.available ?? 0) - reservedItem.qty) }
       }
       return eq
     }))
@@ -1227,7 +1332,7 @@ export function AppProvider({ children }) {
     for (const item of cartItems) {
       const currentEq = equipments.find(e => String(e.id) === String(item.id))
       if (currentEq) {
-        const newAvail = Math.max(0, (currentEq.available || 1) - (item.qty || 1))
+        const newAvail = Math.max(0, (currentEq.available ?? 0) - (item.qty || 1))
         try {
           if (!isNaN(item.id)) {
             await supabase
@@ -1256,6 +1361,7 @@ export function AppProvider({ children }) {
     const startDateLabel = activeReservation?.startDateLabel || activeReservation?.startDate || '04 Nov 2026'
     const endDateLabel = activeReservation?.endDateLabel || activeReservation?.endDate || '06 Nov 2026'
     const durationDays = Math.max(1, Number(activeReservation?.durationDays) || 1)
+    const activeUserId = session?.user?.id || null
 
     const borrowedSnapshot = cartItems.map(item => ({
       id: item.id,
@@ -1267,8 +1373,9 @@ export function AppProvider({ children }) {
       originLocation: item.lastLocation || item.initialLocation || 'Warehouse Kampus Gedung C'
     }))
 
-    const newTxn = {
-      id: txnId,
+    const cloudMetaPayload = {
+      status: 'Waiting Admin Approval',
+      userId: activeUserId,
       buyerOrg: activeReservation?.org || currentUserName || 'BEM Prasetiya Mulya',
       borrowerName: currentUserName || 'Prasmulyan',
       eventName: activeReservation?.eventName || 'Kegiatan Kampus Prasmul',
@@ -1276,6 +1383,23 @@ export function AppProvider({ children }) {
       endDate: endDateLabel,
       durationDays,
       eventLocation: activeReservation?.location || 'Auditorium Kampus BSD',
+      borrowedItems: borrowedSnapshot,
+      ownerOrg: detectedOwnerOrg,
+      ownerBank: detectedOwnerBank,
+      paymentProofPhoto: paymentProofPhoto || null,
+      payoutProofPhoto: null
+    }
+
+    const newTxn = {
+      id: txnId,
+      userId: activeUserId,
+      buyerOrg: cloudMetaPayload.buyerOrg,
+      borrowerName: cloudMetaPayload.borrowerName,
+      eventName: cloudMetaPayload.eventName,
+      startDate: startDateLabel,
+      endDate: endDateLabel,
+      durationDays,
+      eventLocation: cloudMetaPayload.eventLocation,
       itemName: itemNamesSummary,
       borrowedItems: borrowedSnapshot,
       amount: totalAmount,
@@ -1298,7 +1422,7 @@ export function AppProvider({ children }) {
         item_names: newTxn.itemName,
         amount: newTxn.amount,
         qris_status: 'Pending Admin Verification',
-        payout_status: 'Waiting Admin Approval'
+        payout_status: JSON.stringify(cloudMetaPayload)
       }]).select()
 
       if (!dbErr && inserted?.[0]?.id) {
@@ -1313,8 +1437,10 @@ export function AppProvider({ children }) {
     
     const activeReservationPayload = { 
       ...(activeReservation || {}),
+      ownerUserId: activeUserId,
       eventName: activeReservation?.eventName || 'Kegiatan Kampus Prasmul',
       org: activeReservation?.org || currentUserName || 'BEM Prasetiya Mulya',
+      borrowerName: currentUserName || 'Prasmulyan',
       startDateLabel,
       endDateLabel,
       eventDate: `${startDateLabel} – ${endDateLabel}`,
@@ -1330,6 +1456,9 @@ export function AppProvider({ children }) {
       paymentStatus: 'pending_admin_approval'
     }
 
+    if (activeUserId) {
+      lastSyncedResHashRef.current = `${activeUserId}:::pending_admin_approval:::${JSON.stringify(activeReservationPayload)}`
+    }
     setActiveReservation(activeReservationPayload)
     setCartItems([])
     setUserPaymentStatus('pending_admin_approval')
@@ -1340,7 +1469,6 @@ export function AppProvider({ children }) {
     } catch (e) {}
 
     // Segera sinkronkan ke tabel reservations di cloud Supabase
-    const activeUserId = session?.user?.id
     if (activeUserId) {
       try {
         const cloudRes = {
@@ -1372,11 +1500,29 @@ export function AppProvider({ children }) {
   const approvePaymentByAdmin = async (txnId) => {
     try {
       if (txnId) {
+        // Ambil payout_status sebelumnya agar bukti bayar & metadata tidak terhapus
+        let nextPayoutStatus = 'Pending Transfer'
+        try {
+          const { data: existingRow } = await supabase
+            .from('transactions')
+            .select('payout_status')
+            .eq('id', txnId)
+            .maybeSingle()
+
+          if (existingRow?.payout_status && existingRow.payout_status.startsWith('{')) {
+            const parsedMeta = JSON.parse(existingRow.payout_status)
+            nextPayoutStatus = JSON.stringify({
+              ...parsedMeta,
+              status: 'Pending Transfer'
+            })
+          }
+        } catch (e) {}
+
         const { error: updErr } = await supabase
           .from('transactions')
           .update({
             qris_status: 'Payment Approved by Admin (Lunas)',
-            payout_status: 'Pending Transfer'
+            payout_status: nextPayoutStatus
           })
           .eq('id', txnId)
 
@@ -1390,6 +1536,26 @@ export function AppProvider({ children }) {
             })
             .eq('qris_status', 'Pending Admin Verification')
         }
+
+        // Update HANYA row reservations yang terhubung ke txnId ini (tidak memengaruhi user lain)
+        const { data: matchingRes } = await supabase
+          .from('reservations')
+          .select('id, item_name')
+          .ilike('item_name', `%${txnId}%`)
+
+        if (matchingRes && matchingRes.length > 0) {
+          for (const row of matchingRes) {
+            let nextItemName = row.item_name
+            try {
+              const p = JSON.parse(row.item_name)
+              nextItemName = JSON.stringify({ ...p, paymentStatus: 'approved' })
+            } catch (e) {}
+            await supabase
+              .from('reservations')
+              .update({ status: 'approved', item_name: nextItemName })
+              .eq('id', row.id)
+          }
+        }
       } else {
         await supabase
           .from('transactions')
@@ -1399,12 +1565,6 @@ export function AppProvider({ children }) {
           })
           .eq('qris_status', 'Pending Admin Verification')
       }
-
-      // Update juga status di tabel reservations cloud
-      await supabase
-        .from('reservations')
-        .update({ status: 'approved' })
-        .eq('status', 'pending_admin_approval')
     } catch (err) {
       console.warn('Gagal update transaksi di Supabase:', err)
     }
@@ -1419,16 +1579,42 @@ export function AppProvider({ children }) {
       }
       return t
     }))
-    setUserPaymentStatus('approved')
-    try { localStorage.setItem('eventloop_user_payment_status', 'approved') } catch (e) {}
+    if (activeReservation?.txnId && (!txnId || String(activeReservation.txnId) === String(txnId))) {
+      setUserPaymentStatus('approved')
+      try { localStorage.setItem('eventloop_user_payment_status', 'approved') } catch (e) {}
+    }
   }
 
   const transferPayoutToOwner = async (txnId, proofPhoto = null) => {
+    const payoutRef = `TRF-BCA-${Math.floor(100000 + Math.random() * 900000)}`
+    const transferredAt = `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`
+
     try {
       if (txnId) {
+        let nextPayoutPayload = 'Transferred'
+        try {
+          const { data: existingRow } = await supabase
+            .from('transactions')
+            .select('payout_status')
+            .eq('id', txnId)
+            .maybeSingle()
+
+          const baseMeta = (existingRow?.payout_status && existingRow.payout_status.startsWith('{'))
+            ? JSON.parse(existingRow.payout_status)
+            : {}
+
+          nextPayoutPayload = JSON.stringify({
+            ...baseMeta,
+            status: 'Transferred',
+            payoutRef,
+            transferredAt,
+            payoutProofPhoto: proofPhoto || baseMeta.payoutProofPhoto || null
+          })
+        } catch (e) {}
+
         await supabase
           .from('transactions')
-          .update({ payout_status: 'Transferred' })
+          .update({ payout_status: nextPayoutPayload })
           .eq('id', txnId)
       }
     } catch (err) {
@@ -1440,9 +1626,9 @@ export function AppProvider({ children }) {
         return {
           ...t,
           payoutStatus: 'Transferred',
-          payoutRef: `TRF-BCA-${Math.floor(100000 + Math.random() * 900000)}`,
+          payoutRef,
           payoutProofPhoto: proofPhoto || t.payoutProofPhoto || null,
-          transferredAt: `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`
+          transferredAt
         }
       }
       return t
@@ -1456,11 +1642,12 @@ export function AppProvider({ children }) {
         !t.item_names?.startsWith('[RETURN_REQ]') && !t.item_names?.startsWith('[EQUIPMENT_UPLOAD]') &&
         !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')
       )
-      const targetOrderTxnId = orderTxns[0]?.id || transactions[0]?.id
+      const targetOrderTxnId = activeReservation?.txnId || orderTxns[0]?.id || transactions[0]?.id
       if (targetOrderTxnId) {
         localStorage.setItem('eventloop_cleared_txn_id', String(targetOrderTxnId))
       }
     } catch (e) {}
+    lastSyncedResHashRef.current = ''
     setActiveReservation(null)
     setUserPaymentStatus('idle')
     setCartItems([])
@@ -1519,8 +1706,9 @@ export function AppProvider({ children }) {
       if (!isNaN(id)) {
         await supabase.from('equipments').delete().eq('id', id)
       }
-      await supabase.from('transactions').delete().ilike('item_names', `%${id}%`)
-      await supabase.from('transactions').update({ qris_status: 'Equipment Deleted' }).ilike('item_names', `%${id}%`)
+      // Hanya hapus/tandai baris upload barang yang cocok tepat dengan :::id agar tidak menghapus transaksi sewa biasa
+      await supabase.from('transactions').delete().ilike('item_names', `[EQUIPMENT_UPLOAD]%:::${id}%`)
+      await supabase.from('transactions').update({ qris_status: 'Equipment Deleted' }).ilike('item_names', `[EQUIPMENT_UPLOAD]%:::${id}%`)
     } catch (err) {
       console.warn('Gagal hapus equipment di Supabase:', err)
     }
@@ -1532,8 +1720,12 @@ export function AppProvider({ children }) {
 
   const deletePendingEquipment = async (id) => {
     try {
-      await supabase.from('transactions').delete().ilike('item_names', `%${id}%`)
-      await supabase.from('transactions').update({ qris_status: 'Equipment Deleted' }).ilike('item_names', `%${id}%`)
+      const target = pendingApprovals.find(item => String(item.id) === String(id))
+      if (target?.dbTxnId) {
+        await supabase.from('transactions').delete().eq('id', target.dbTxnId)
+      } else {
+        await supabase.from('transactions').delete().ilike('item_names', `[EQUIPMENT_UPLOAD]%:::${id}%`)
+      }
     } catch (err) {
       console.warn('Gagal hapus pending equipment di Supabase:', err)
     }
@@ -1547,6 +1739,7 @@ export function AppProvider({ children }) {
     const newReturn = {
       id: returnId,
       returnId,
+      userId: session?.user?.id || null,
       ...returnData,
       borrower: borrowerName,
       status: 'Pending Admin Verification',
@@ -1614,6 +1807,10 @@ export function AppProvider({ children }) {
     const targetEq = equipments.find(e => String(e.id) === String(equipmentId))
     const finalLocation = returnData?.returnLocation || targetEq?.lastLocation || targetEq?.initialLocation || 'Warehouse Kampus Gedung C'
     const qtyToAdd = Number(returnedQty) || 1
+    const cappedNextAvail = targetEq
+      ? Math.min(Number(targetEq.total) || 99, (Number(targetEq.available) || 0) + qtyToAdd)
+      : qtyToAdd
+    const nextReusedCount = (Number(targetEq?.reusedCount) || 0) + qtyToAdd
 
     try {
       // 1. Update di tabel transactions (tandai return sudah di-approve)
@@ -1626,7 +1823,7 @@ export function AppProvider({ children }) {
         await supabase
           .from('transactions')
           .update({ qris_status: 'Return Approved by Admin' })
-          .ilike('item_names', `%${returnId}%`)
+          .ilike('item_names', `%:::${returnId}%`)
       }
 
       // 2. Update di tabel returns jika ada
@@ -1639,13 +1836,14 @@ export function AppProvider({ children }) {
         // Abaikan jika tabel returns belum sinkron
       }
 
-      // 3. Update stok dan lokasi perlengkapan di Supabase
+      // 3. Update stok, reuse count, dan lokasi perlengkapan di Supabase (terbatas tidak melebihi total)
       if (equipmentId) {
         if (!isNaN(equipmentId) && targetEq) {
           await supabase
             .from('equipments')
             .update({ 
-              available: targetEq.available + qtyToAdd,
+              available: cappedNextAvail,
+              reusedCount: nextReusedCount,
               lastLocation: finalLocation,
               lastStoragePhoto: returnData?.storagePhoto || null
             })
@@ -1654,7 +1852,8 @@ export function AppProvider({ children }) {
         if (targetEq?.dbTxnId) {
           const updatedPayload = {
             ...targetEq,
-            available: (targetEq.available || 0) + qtyToAdd,
+            available: cappedNextAvail,
+            reusedCount: nextReusedCount,
             lastLocation: finalLocation,
             lastStoragePhoto: returnData?.storagePhoto || targetEq.lastStoragePhoto
           }
@@ -1665,14 +1864,24 @@ export function AppProvider({ children }) {
         }
       }
 
-      // 4. Update tabel reservations di Supabase jika item yang dikembalikan ada di active reservation
+      // 4. Update tabel reservations HANYA untuk pengguna/peminjam yang mengajukan return ini
       try {
         const { data: allRes } = await supabase.from('reservations').select('*')
         if (allRes && allRes.length > 0) {
+          const returnBorrowerLow = (returnData?.borrower || '').toLowerCase().trim()
           for (const resRow of allRes) {
             if (resRow.item_name && resRow.item_name.startsWith('{')) {
               try {
                 const parsed = JSON.parse(resRow.item_name)
+                const matchesUser = returnData?.userId
+                  ? resRow.user_id === returnData.userId
+                  : (returnBorrowerLow && (
+                      (parsed.borrowerName || '').toLowerCase().trim() === returnBorrowerLow ||
+                      (parsed.org || '').toLowerCase().trim() === returnBorrowerLow
+                    ))
+
+                if (!matchesUser) continue
+
                 const hasItem = (parsed.items || []).some(i => String(i.id) === String(equipmentId))
                 if (hasItem) {
                   const updatedItems = (parsed.items || []).filter(i => String(i.id) !== String(equipmentId))
@@ -1705,7 +1914,9 @@ export function AppProvider({ children }) {
       if (String(item.id) === String(equipmentId)) {
         return { 
           ...item, 
-          available: item.available + qtyToAdd,
+          available: Math.min(Number(item.total) || 99, (Number(item.available) || 0) + qtyToAdd),
+          reuseCount: (Number(item.reuseCount) || 0) + qtyToAdd,
+          reusedCount: (Number(item.reusedCount) || 0) + qtyToAdd,
           lastLocation: finalLocation,
           lastStoragePhoto: returnData?.storagePhoto || item.lastStoragePhoto,
           lastConditionPhoto: returnData?.conditionPhoto || null
@@ -1714,22 +1925,55 @@ export function AppProvider({ children }) {
       return item
     }))
 
-    setActiveReservation(prev => {
-      if (!prev || !prev.items) return prev
-      const remainingItems = prev.items.filter(item => String(item.id) !== String(equipmentId))
-      return {
-        ...prev,
-        items: remainingItems
-      }
-    })
+    // Hapus dari activeReservation lokal hanya jika milik peminjam yang return-nya baru disetujui
+    const matchesLocalOwner = !returnData?.userId || !session?.user?.id || returnData.userId === session.user.id
+    if (matchesLocalOwner) {
+      setActiveReservation(prev => {
+        if (!prev || !prev.items) return prev
+        const remainingItems = prev.items.filter(item => String(item.id) !== String(equipmentId))
+        return {
+          ...prev,
+          items: remainingItems
+        }
+      })
+    }
   }
+
+  // Status pembayaran efektif terpusat khusus untuk event aktif pengguna saat ini
+  const activeOrderTxn = useMemo(() => {
+    if (!activeReservation?.txnId) return null
+    return (transactions || []).find(t => String(t.id) === String(activeReservation.txnId)) || null
+  }, [transactions, activeReservation?.txnId])
+
+  const effectivePaymentStatus = useMemo(() => {
+    if (userPaymentStatus === 'idle' && !activeReservation?.txnId) return 'idle'
+    if (activeOrderTxn) {
+      const q = (activeOrderTxn.qrisStatus || '').toLowerCase()
+      if (q.includes('approved') || q.includes('lunas') || q.includes('sukses')) return 'approved'
+      if (q.includes('pending') || q.includes('menunggu')) return 'pending_admin_approval'
+      if (q.includes('reject') || q.includes('tolak')) return 'rejected'
+    }
+    return userPaymentStatus
+  }, [userPaymentStatus, activeOrderTxn, activeReservation?.txnId])
+
+  const isMyPendingReturn = useCallback((ret) => {
+    if (!ret) return false
+    const uid = session?.user?.id
+    if (uid && ret.userId) return ret.userId === uid
+    const uName = (activeReservation?.borrowerName || currentUserName || '').toLowerCase().trim()
+    const rBorrower = (ret.borrower || '').toLowerCase().trim()
+    if (uName && uName !== 'prasmulyan' && rBorrower) {
+      return rBorrower === uName || rBorrower.includes(uName) || uName.includes(rBorrower)
+    }
+    return false
+  }, [session?.user?.id, activeReservation?.borrowerName, currentUserName])
 
   // --- LIVE TRACKING EVENT & PEMINJAMAN KAMPUS (UNTUK DASHBOARD & BARANG SAYA) ---
   const ongoingCampusEvents = useMemo(() => {
     const list = []
 
     // 1. Jika user saat ini punya event aktif dan sudah memiliki item yang dipinjam/dalam proses
-    if (activeReservation?.eventName && (userPaymentStatus === 'approved' || userPaymentStatus === 'pending_admin_approval')) {
+    if (activeReservation?.eventName && (effectivePaymentStatus === 'approved' || effectivePaymentStatus === 'pending_admin_approval')) {
       const currentItems = (cartItems && cartItems.length > 0) ? cartItems : (activeReservation.items || [])
       if (currentItems.length > 0) {
         const startLbl = activeReservation.startDateLabel || activeReservation.startDate || (activeReservation.eventDate ? activeReservation.eventDate.split('–')[0]?.trim() : '04 Nov 2026')
@@ -1744,7 +1988,7 @@ export function AppProvider({ children }) {
           endDate: endLbl,
           durationDays: activeReservation.durationDays || 1,
           location: activeReservation.location || 'Auditorium Kampus BSD',
-          status: userPaymentStatus === 'approved' ? 'Sedang Berjalan (Dipinjam)' : 'Verifikasi Pembayaran',
+          status: effectivePaymentStatus === 'approved' ? 'Sedang Berjalan (Dipinjam)' : 'Verifikasi Pembayaran',
           items: currentItems.map(i => ({
             id: i.id,
             name: i.name,
@@ -1790,7 +2034,7 @@ export function AppProvider({ children }) {
     })
 
     return list
-  }, [activeReservation, cartItems, currentUserName, userPaymentStatus, transactions])
+  }, [activeReservation, cartItems, currentUserName, effectivePaymentStatus, transactions])
 
   // Helper untuk mengecek siapa saja yang sedang meminjam suatu barang (dipakai di MyEquipment & EquipmentDetail)
   const getEquipmentBorrowings = useCallback((equipmentId, equipmentName) => {
@@ -1825,13 +2069,17 @@ export function AppProvider({ children }) {
     } catch (e) {
       console.warn(e)
     }
+    lastSyncedResHashRef.current = ''
+    currentSessionUserIdRef.current = null
     setSession(null)
     setSsoUser(null)
     setCurrentUserRole('user')
     setCurrentUserName('Prasmulyan')
+    setCurrentUserStudyProgram('Prasetiya Mulya')
     setActiveReservation(null)
     setUserPaymentStatus('idle')
     setCartItems([])
+    setReturnStatus('idle')
     sessionStorage.removeItem('eventloop_session')
     sessionStorage.removeItem('eventloop_user_name')
     sessionStorage.removeItem('eventloop_role')
@@ -1839,14 +2087,11 @@ export function AppProvider({ children }) {
     sessionStorage.removeItem('eventloop_sso_user')
     sessionStorage.removeItem('eventloop_last_active')
     localStorage.removeItem('eventloop_session')
-    localStorage.removeItem('eventloop_user_name')
     localStorage.removeItem('eventloop_role')
     localStorage.removeItem('eventloop_user_prodi')
     localStorage.removeItem('eventloop_sso_user')
-    localStorage.removeItem('eventloop_active_reservation')
-    localStorage.removeItem('eventloop_user_payment_status')
-    localStorage.removeItem('eventloop_cart')
-    localStorage.removeItem('eventloop_return_status')
+    localStorage.removeItem('eventloop_last_user_id')
+    clearUserLocalStorage()
   }
 
   return (
@@ -1857,7 +2102,8 @@ export function AppProvider({ children }) {
       session, ssoUser, setSsoUser, sessionUser: session?.user || ssoUser || null, 
       logout, loadingDb, refetchData: fetchSupabaseData, fetchSupabaseData,
       campusImpact, orgImpacts,
-      equipments, pendingApprovals, transactions, userPaymentStatus, activeReservation, setActiveReservation, updateActiveEventDetails, clearActiveEvent, returnStatus, pendingReturns,
+      equipments, pendingApprovals, transactions, userPaymentStatus, effectivePaymentStatus, activeOrderTxn,
+      activeReservation, setActiveReservation, updateActiveEventDetails, clearActiveEvent, returnStatus, pendingReturns, isMyPendingReturn,
       ongoingCampusEvents, getEquipmentBorrowings,
       cartItems, addToCart, removeFromCart, updateCartQty,
       uploadEquipmentByUser, approveEquipmentByAdmin, rejectEquipmentByAdmin, submitUserQrisPayment, approvePaymentByAdmin,

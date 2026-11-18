@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import { compressImageFile } from '../utils/imageCompression'
 import { 
   Package, 
   Star, 
@@ -14,25 +15,6 @@ import {
   X
 } from 'lucide-react'
 
-const compressImage = (file, callback) => {
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    const img = new Image()
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      const MAX_WIDTH = 400 
-      const scaleSize = MAX_WIDTH / img.width
-      canvas.width = MAX_WIDTH
-      canvas.height = img.height * scaleSize
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      callback(canvas.toDataURL('image/jpeg', 0.6))
-    }
-    img.src = e.target.result
-  }
-  reader.readAsDataURL(file)
-}
-
 export default function UploadEquipment() {
   const appContext = useApp() || {}
   const uploadEquipmentByUser = appContext.uploadEquipmentByUser || (() => `APV-${Math.floor(Math.random() * 9999)}`)
@@ -41,7 +23,7 @@ export default function UploadEquipment() {
   const [category, setCategory] = useState('Signage')
   const [qty, setQty] = useState('1')
   const [size, setSize] = useState('')
-  const [material, setMaterial] = useState('')
+  const [material, setMaterial] = useState('Aluminium')
   const [maxReuse, setMaxReuse] = useState('30')
   const [pricingType, setPricingType] = useState('rental')
   const [price, setPrice] = useState('')
@@ -69,7 +51,7 @@ export default function UploadEquipment() {
     const file = e.target.files?.[0]
     if (file) {
       setImageFileName(file.name)
-      compressImage(file, (compressedBase64) => setImagePreview(compressedBase64))
+      compressImageFile(file, (compressedBase64) => setImagePreview(compressedBase64), 400, 0.6)
     }
   }
 
@@ -77,7 +59,7 @@ export default function UploadEquipment() {
     const file = e.target.files?.[0]
     if (file) {
       setStorageFileName(file.name)
-      compressImage(file, (compressedBase64) => setStoragePhotoPreview(compressedBase64))
+      compressImageFile(file, (compressedBase64) => setStoragePhotoPreview(compressedBase64), 400, 0.6)
     }
   }
 
