@@ -262,27 +262,22 @@ export const categories = [
 ];
 
 export const impactData = {
-  totalItemsReused: 1284,
-  totalEventsSupported: 42,
-  wasteAvoided: 186.5,
-  costAvoided: 18400000,
-  co2Avoided: 245.8,
-  singleUseAvoided: 892,
-  organizationsParticipating: 28,
+  totalItemsReused: 0,
+  totalEventsSupported: 0,
+  wasteAvoided: 0,
+  costAvoided: 0,
+  co2Avoided: 0,
+  singleUseAvoided: 0,
+  organizationsParticipating: 0,
   monthlyData: [
-    { month: 'May', reused: 98, waste: 12.5, cost: 1200000 },
-    { month: 'Jun', reused: 145, waste: 18.2, cost: 2100000 },
-    { month: 'Jul', reused: 178, waste: 22.8, cost: 2800000 },
-    { month: 'Aug', reused: 234, waste: 31.5, cost: 3400000 },
-    { month: 'Sep', reused: 312, waste: 42.3, cost: 4200000 },
-    { month: 'Oct', reused: 317, waste: 59.2, cost: 4700000 },
+    { month: 'Sep', reused: 2, waste: 3.2, cost: 240000 },
+    { month: 'Okt', reused: 4, waste: 6.4, cost: 520000 },
+    { month: 'Nov', reused: 6, waste: 9.6, cost: 1046000 },
   ],
   topOrganizations: [
-    { name: 'BEM', events: 8, reused: 156, score: 94 },
-    { name: 'SISO', events: 6, reused: 132, score: 91 },
-    { name: 'HMTI', events: 5, reused: 98, score: 88 },
-    { name: 'UKM Musik', events: 4, reused: 87, score: 85 },
-    { name: 'HIMAKA', events: 3, reused: 65, score: 82 },
+    { name: 'BEM Prasmul', events: 2, reused: 5, score: 92 },
+    { name: 'HMTI Prasmul', events: 2, reused: 4, score: 89 },
+    { name: 'UKM Musik', events: 1, reused: 3, score: 85 },
   ],
 };
 

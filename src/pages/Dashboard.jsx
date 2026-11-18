@@ -83,15 +83,9 @@ export default function Dashboard() {
     ? Math.round(equipments.reduce((sum, e) => sum + (e.circularScore || 85), 0) / equipments.length)
     : 87
 
-  const totalItemsReused = (campusImpact?.itemsReused && campusImpact.itemsReused > 0) 
-    ? campusImpact.itemsReused 
-    : (dynamicItemsReused > 0 ? dynamicItemsReused : 1284)
-  const totalWasteAvoidedKg = (campusImpact?.wasteAvoidedKg && campusImpact.wasteAvoidedKg > 0)
-    ? campusImpact.wasteAvoidedKg
-    : Math.round(totalItemsReused * 0.15)
-  const totalCostAvoided = (campusImpact?.costAvoided && campusImpact.costAvoided > 0)
-    ? campusImpact.costAvoided
-    : totalItemsReused * 15000
+  const totalItemsReused = campusImpact?.itemsReused ?? dynamicItemsReused ?? 0
+  const totalWasteAvoidedKg = campusImpact?.wasteAvoidedKg ?? Math.round(totalItemsReused * 1.6)
+  const totalCostAvoided = campusImpact?.costAvoided ?? (totalItemsReused * 75000)
   const avgCircularScore = (campusImpact?.circularScore && campusImpact.circularScore > 0)
     ? campusImpact.circularScore
     : dynamicAvgScore

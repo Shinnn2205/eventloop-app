@@ -27,11 +27,11 @@ export default function ImpactDashboard() {
   const [monthlyData, setMonthlyData] = useState([])
   const [showReportModal, setShowReportModal] = useState(false)
 
-  const totalItemsReused = (campusImpact?.itemsReused && campusImpact.itemsReused > 0) ? campusImpact.itemsReused : impactData.totalItemsReused
-  const totalEventsSupported = (campusImpact?.eventsSupported && campusImpact.eventsSupported > 0) ? campusImpact.eventsSupported : impactData.totalEventsSupported
-  const wasteAvoided = (campusImpact?.wasteAvoidedKg && campusImpact.wasteAvoidedKg > 0) ? campusImpact.wasteAvoidedKg : impactData.wasteAvoided
+  const totalItemsReused = campusImpact?.itemsReused ?? impactData.totalItemsReused ?? 0
+  const totalEventsSupported = campusImpact?.eventsSupported ?? impactData.totalEventsSupported ?? 0
+  const wasteAvoided = campusImpact?.wasteAvoidedKg ?? impactData.wasteAvoided ?? 0
   const co2Avoided = Math.round(wasteAvoided * 1.32 * 10) / 10
-  const costAvoided = (campusImpact?.costAvoided && campusImpact.costAvoided > 0) ? campusImpact.costAvoided : impactData.costAvoided
+  const costAvoided = campusImpact?.costAvoided ?? impactData.costAvoided ?? 0
 
   useEffect(() => {
     fetchMonthlyData()

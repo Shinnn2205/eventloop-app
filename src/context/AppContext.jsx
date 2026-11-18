@@ -326,10 +326,10 @@ export function AppProvider({ children }) {
   })
 
   const [campusImpact, setCampusImpact] = useState(() => ({
-    itemsReused: impactData.totalItemsReused || 1284,
-    wasteAvoidedKg: Math.round(impactData.wasteAvoided) || 187,
-    costAvoided: impactData.costAvoided || 18400000,
-    eventsSupported: impactData.totalEventsSupported || 42,
+    itemsReused: impactData.totalItemsReused || 0,
+    wasteAvoidedKg: Math.round(impactData.wasteAvoided) || 0,
+    costAvoided: impactData.costAvoided || 0,
+    eventsSupported: impactData.totalEventsSupported || 0,
     circularScore: 91
   }))
 
@@ -894,15 +894,35 @@ export function AppProvider({ children }) {
       }
 
       if (!loadedImpactFromDb) {
-        const completedTxnCount = (txnData || []).filter(t => 
-          (t.qris_status || '').toLowerCase().includes('approved') || 
-          (t.qris_status || '').toLowerCase().includes('return')
-        ).length
+        // Opsi 1: Murni 100% menghitung dari transaksi riil yang disetujui di Supabase (Baseline = 0)
+        const orderTxns = (txnData || []).filter(t => 
+          !t.item_names?.startsWith('[RETURN_REQ]') && 
+          !t.item_names?.startsWith('[EQUIPMENT_UPLOAD]') &&
+          ((t.qris_status || '').toLowerCase().includes('approved') || 
+           (t.qris_status || '').toLowerCase().includes('lunas') ||
+           (t.qris_status || '').toLowerCase().includes('sukses'))
+        )
 
-        const dynamicReused = impactData.totalItemsReused + (completedTxnCount * 3)
-        const dynamicWasteKg = Math.round(impactData.wasteAvoided + (completedTxnCount * 4.5))
-        const dynamicCostAvoided = impactData.costAvoided + (completedTxnCount * 150000)
-        const dynamicEvents = impactData.totalEventsSupported + completedTxnCount
+        const returnTxns = (txnData || []).filter(t => 
+          t.item_names?.startsWith('[RETURN_REQ]') && 
+          (t.qris_status || '').toLowerCase().includes('approved')
+        )
+
+        let totalOrderUnits = 0
+        orderTxns.forEach(t => {
+          const matches = [...(t.item_names || '').matchAll(/\((\d+)x\)/g)]
+          if (matches.length > 0) {
+            matches.forEach(m => { totalOrderUnits += parseInt(m[1], 10) })
+          } else {
+            totalOrderUnits += (t.amount > 0 && t.amount <= 10 ? t.amount : 1)
+          }
+        })
+
+        // Unit bersirkulasi murni dari barang yang disewa + barang yang dipulangkan ke gudang
+        const dynamicReused = totalOrderUnits + returnTxns.length
+        const dynamicEvents = orderTxns.length
+        const dynamicWasteKg = Math.round(dynamicReused * 1.6) // 1.6 kg material sekali pakai dicegah per unit pakai ulang
+        const dynamicCostAvoided = (orderTxns.reduce((sum, t) => sum + (t.amount || 0), 0) * 4) || (dynamicReused * 75000)
 
         setCampusImpact({
           itemsReused: dynamicReused,
