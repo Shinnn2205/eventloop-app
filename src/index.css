@@ -83,3 +83,24 @@
 .animate-fade-in {
   animation: fadeInUp 0.25s ease-out forwards;
 }
+
+@media print {
+  aside,
+  header,
+  .print\:hidden {
+    display: none !important;
+  }
+  .print-modal-overlay {
+    position: static !important;
+    background: white !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .print-modal-card {
+    box-shadow: none !important;
+    border: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+}

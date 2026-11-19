@@ -28,13 +28,15 @@ export default function AdminPanel() {
     pendingApprovals, 
     approveEquipmentByAdmin, 
     rejectEquipmentByAdmin, 
-    approvePaymentByAdmin, 
+    approvePaymentByAdmin,
+    rejectPaymentByAdmin,
     transferPayoutToOwner,
     pendingReturns = [], 
     approveReturnByAdmin 
   } = useApp()
   
   const [transferSuccessMsg, setTransferSuccessMsg] = useState('')
+  const [processingKey, setProcessingKey] = useState('')
 
   const openPayoutModal = (txn) => {
     setPayoutModalTxn(txn)
@@ -42,36 +44,78 @@ export default function AdminPanel() {
   }
 
   const handleConfirmPayoutWithProof = async () => {
-    if (!payoutModalTxn || !adminProofPhoto) return
-    await transferPayoutToOwner(payoutModalTxn.id, adminProofPhoto)
-    setTransferSuccessMsg(`Dana Rp${payoutModalTxn.payoutAmount?.toLocaleString('id-ID')} beserta bukti transfer berhasil dikirim ke ${payoutModalTxn.ownerOrg}.`)
-    setPayoutModalTxn(null)
-    setAdminProofPhoto(null)
-    setTimeout(() => setTransferSuccessMsg(''), 5000)
+    if (!payoutModalTxn || !adminProofPhoto || processingKey) return
+    setProcessingKey(`payout-${payoutModalTxn.id}`)
+    try {
+      await transferPayoutToOwner(payoutModalTxn.id, adminProofPhoto)
+      setTransferSuccessMsg(`Dana Rp${payoutModalTxn.payoutAmount?.toLocaleString('id-ID')} beserta bukti transfer berhasil dikirim ke ${payoutModalTxn.ownerOrg}.`)
+      setPayoutModalTxn(null)
+      setAdminProofPhoto(null)
+      setTimeout(() => setTransferSuccessMsg(''), 5000)
+    } finally {
+      setProcessingKey('')
+    }
   }
 
   const handleApprovePaymentClick = async (txnId) => {
-    await approvePaymentByAdmin(txnId)
-    setTransferSuccessMsg(`Pembayaran QRIS ${txnId} telah disetujui. Status reservasi mahasiswa kini aktif.`)
-    setTimeout(() => setTransferSuccessMsg(''), 5000)
+    if (processingKey) return
+    setProcessingKey(`approve-pay-${txnId}`)
+    try {
+      await approvePaymentByAdmin(txnId)
+      setTransferSuccessMsg(`Pembayaran QRIS ${txnId} telah disetujui. Status reservasi mahasiswa kini aktif.`)
+      setTimeout(() => setTransferSuccessMsg(''), 5000)
+    } finally {
+      setProcessingKey('')
+    }
+  }
+
+  const handleRejectPaymentClick = async (txnId) => {
+    if (processingKey) return
+    if (!window.confirm('Tolak pembayaran ini? Stok perlengkapan akan dipulihkan dan mahasiswa dapat mengunggah ulang bukti pembayaran.')) return
+    setProcessingKey(`reject-pay-${txnId}`)
+    try {
+      await rejectPaymentByAdmin(txnId)
+      setTransferSuccessMsg(`Pembayaran ${txnId} telah ditolak dan stok perlengkapan dipulihkan.`)
+      setTimeout(() => setTransferSuccessMsg(''), 5000)
+    } finally {
+      setProcessingKey('')
+    }
   }
 
   const handleApproveEquipmentClick = async (id) => {
-    await approveEquipmentByAdmin(id)
-    setTransferSuccessMsg(`Barang #${id} disetujui, langsung tersimpan di database, dan tayang di Marketplace.`)
-    setTimeout(() => setTransferSuccessMsg(''), 5000)
+    if (processingKey) return
+    setProcessingKey(`approve-eq-${id}`)
+    try {
+      await approveEquipmentByAdmin(id)
+      setTransferSuccessMsg(`Barang #${id} disetujui, langsung tersimpan di database, dan tayang di Marketplace.`)
+      setTimeout(() => setTransferSuccessMsg(''), 5000)
+    } finally {
+      setProcessingKey('')
+    }
   }
 
   const handleRejectEquipmentClick = async (id) => {
-    await rejectEquipmentByAdmin(id)
-    setTransferSuccessMsg(`Barang #${id} telah ditolak dari antrean verifikasi.`)
-    setTimeout(() => setTransferSuccessMsg(''), 4000)
+    if (processingKey) return
+    setProcessingKey(`reject-eq-${id}`)
+    try {
+      await rejectEquipmentByAdmin(id)
+      setTransferSuccessMsg(`Barang #${id} telah ditolak dari antrean verifikasi.`)
+      setTimeout(() => setTransferSuccessMsg(''), 4000)
+    } finally {
+      setProcessingKey('')
+    }
   }
 
   const handleApproveReturnClick = async (returnId, equipmentId, returnedQty, itemName) => {
-    await approveReturnByAdmin(returnId, equipmentId, returnedQty)
-    setTransferSuccessMsg(`Pengembalian "${itemName}" disetujui. Stok +${returnedQty} telah dikembalikan ke lokasi asalnya.`)
-    setTimeout(() => setTransferSuccessMsg(''), 5000)
+    if (processingKey) return
+    setProcessingKey(`approve-ret-${returnId}`)
+    try {
+      await approveReturnByAdmin(returnId, equipmentId, returnedQty)
+      setTransferSuccessMsg(`Pengembalian "${itemName}" disetujui. Stok +${returnedQty} telah dikembalikan ke lokasi asalnya.`)
+      setTimeout(() => setTransferSuccessMsg(''), 5000)
+    } finally {
+      setProcessingKey('')
+    }
   }
 
   const validOrderTransactions = transactions.filter(t => !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]'))
@@ -216,15 +260,29 @@ export default function AdminPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-emerald-100/60">
-                  {validOrderTransactions.map((txn) => {
-                    const isPendingQris = txn.qrisStatus?.includes('Pending')
-                    const isPendingTransfer = txn.payoutStatus === 'Pending Transfer'
+                  {validOrderTransactions.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="p-10 text-center text-slate-400 text-xs">
+                        Belum ada transaksi pembayaran masuk saat ini.
+                      </td>
+                    </tr>
+                  ) : validOrderTransactions.map((txn) => {
+                    const qLow = (txn.qrisStatus || '').toLowerCase()
+                    const isPendingQris = qLow.includes('pending')
+                    const isRejectedOrCancelled = qLow.includes('reject') || qLow.includes('tolak') || qLow.includes('cancel') || qLow.includes('batal')
+                    const isPendingTransfer = !isRejectedOrCancelled && txn.payoutStatus === 'Pending Transfer'
                     return (
                       <tr key={txn.id} className="hover:bg-emerald-50/30 transition-colors">
                         <td className="p-4">
                           <div className="font-mono font-bold text-slate-900 text-xs">{txn.id}</div>
                           <div className="text-[11px] text-slate-400 mt-0.5">{txn.paidAt}</div>
-                          <span className={`inline-block mt-1 ${isPendingQris ? 'badge-warm' : 'badge-sage'}`}>
+                          <span className={`inline-block mt-1 ${
+                            isPendingQris
+                              ? 'badge-warm'
+                              : isRejectedOrCancelled
+                              ? 'inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200'
+                              : 'badge-sage'
+                          }`}>
                             {isPendingQris ? 'Menunggu ACC' : txn.qrisStatus}
                           </span>
                         </td>
@@ -258,7 +316,7 @@ export default function AdminPanel() {
                             </button>
                           ) : (
                             <span className="text-[11px] text-slate-400 block mt-1">
-                              Terverifikasi
+                              {Number(txn.amount) === 0 ? 'Pinjam Gratis' : isPendingQris ? 'Tanpa Lampiran' : 'Terverifikasi'}
                             </span>
                           )}
                         </td>
@@ -281,15 +339,30 @@ export default function AdminPanel() {
 
                         <td className="p-4 text-center">
                           {isPendingQris ? (
-                            <button
-                              onClick={() => handleApprovePaymentClick(txn.id)}
-                              className="btn-primary text-[11px] !py-2 !px-3 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
-                            >
-                              <BadgeCheck className="w-3.5 h-3.5" />
-                              <span>Setujui Pembayaran</span>
-                            </button>
+                            <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5">
+                              <button
+                                disabled={Boolean(processingKey)}
+                                onClick={() => handleApprovePaymentClick(txn.id)}
+                                className="btn-primary text-[11px] !py-2 !px-3 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+                              >
+                                <BadgeCheck className="w-3.5 h-3.5" />
+                                <span>{processingKey === `approve-pay-${txn.id}` ? 'Memproses...' : 'Setujui'}</span>
+                              </button>
+                              <button
+                                disabled={Boolean(processingKey)}
+                                onClick={() => handleRejectPaymentClick(txn.id)}
+                                className="px-2.5 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
+                              >
+                                Tolak
+                              </button>
+                            </div>
+                          ) : isRejectedOrCancelled ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                              <X className="w-3 h-3" /> {qLow.includes('cancel') || qLow.includes('batal') ? 'Dibatalkan' : 'Ditolak'}
+                            </span>
                           ) : isPendingTransfer ? (
                             <button
+                              disabled={Boolean(processingKey)}
                               onClick={() => openPayoutModal(txn)}
                               className="btn-primary text-[11px] !py-2 !px-3 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
                             >
@@ -386,7 +459,11 @@ export default function AdminPanel() {
                   <div className="flex items-start justify-between">
                     <div>
                       <span className="badge-stone">
-                        {item.listingType === 'sale' || item.pricingType === 'sale' ? 'Preloved' : 'Sewa Harian'}
+                        {item.listingType === 'sale' || item.pricingType === 'sale'
+                          ? 'Preloved'
+                          : item.listingType === 'free' || item.pricingType === 'free'
+                          ? 'Pinjam Gratis'
+                          : 'Sewa Harian'}
                       </span>
                       <h4 className="font-bold text-slate-900 text-base mt-1.5">{item.name}</h4>
                       <p className="text-xs text-slate-500">Pemilik: <strong>{item.uploader || item.owner || item.ownerOrg}</strong> · {item.qty} unit</p>
@@ -400,7 +477,9 @@ export default function AdminPanel() {
                     <div>
                       <span className="text-slate-400 text-[10px] block">Tarif</span>
                       <span className="font-bold text-slate-900">
-                        Rp{item.price?.toLocaleString('id-ID')} {item.pricingType !== 'sale' && '/ hari'}
+                        {(item.listingType === 'free' || item.pricingType === 'free')
+                          ? 'Gratis'
+                          : `Rp${(item.price || 0).toLocaleString('id-ID')} ${item.pricingType !== 'sale' && item.listingType !== 'sale' ? '/ hari' : ''}`}
                       </span>
                     </div>
                     <div>
@@ -418,15 +497,17 @@ export default function AdminPanel() {
 
                   <div className="flex gap-2">
                     <button
+                      disabled={Boolean(processingKey)}
                       onClick={() => handleApproveEquipmentClick(item.id)}
                       className="flex-1 btn-primary text-xs !py-2.5 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Check className="w-4 h-4" />
-                      <span>Setujui & Tayangkan</span>
+                      <span>{processingKey === `approve-eq-${item.id}` ? 'Menyimpan...' : 'Setujui & Tayangkan'}</span>
                     </button>
                     <button
+                      disabled={Boolean(processingKey)}
                       onClick={() => handleRejectEquipmentClick(item.id)}
-                      className="px-4 py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold transition-colors cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
                     >
                       Tolak
                     </button>
@@ -520,11 +601,12 @@ export default function AdminPanel() {
                   </div>
 
                   <button
+                    disabled={Boolean(processingKey)}
                     onClick={() => handleApproveReturnClick(ret.id, ret.equipmentId, ret.returnedQty, ret.itemName)}
                     className="w-full btn-primary text-xs !py-2.5 flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Setujui Pengembalian & Pulihkan Stok (+{ret.returnedQty})</span>
+                    <span>{processingKey === `approve-ret-${ret.id}` ? 'Memproses...' : `Setujui Pengembalian & Pulihkan Stok (+${ret.returnedQty})`}</span>
                   </button>
                 </div>
               ))}
@@ -641,12 +723,12 @@ export default function AdminPanel() {
 
             <div className="pt-1 space-y-2">
               <button
-                disabled={!adminProofPhoto}
+                disabled={!adminProofPhoto || Boolean(processingKey)}
                 onClick={handleConfirmPayoutWithProof}
                 className="w-full btn-primary text-xs !py-2.5 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>{adminProofPhoto ? 'Konfirmasi & Kirim Bukti ke Owner' : 'Upload Bukti Transfer Terlebih Dahulu'}</span>
+                <span>{processingKey ? 'Mengirim Payout...' : adminProofPhoto ? 'Konfirmasi & Kirim Bukti ke Owner' : 'Upload Bukti Transfer Terlebih Dahulu'}</span>
               </button>
               <button
                 onClick={() => setPayoutModalTxn(null)}

@@ -46,6 +46,7 @@ export default function UploadEquipment() {
 
   const [submitted, setSubmitted] = useState(false)
   const [submittedUnitId, setSubmittedUnitId] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0]
@@ -88,17 +89,57 @@ export default function UploadEquipment() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const newId = await uploadEquipmentByUser({
-      name, category, qty, size, material, maxReuse, pricingType,
-      price: pricingType === 'sale' ? parseInt(salePrice || 0) : parseInt(price || 0),
-      salePrice: parseInt(salePrice || 0), bankInfo: bankAccount, condition, description, 
-      imagePreview, circularScore,
-      initialLocation, initialStoragePhoto: storagePhotoPreview,
-      ownerOrg: appContext.currentUserName || 'Prasmulyan Organization',
-      status: 'pending_approval'
-    })
-    setSubmittedUnitId(newId)
-    setSubmitted(true)
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      const normalizedPrice = pricingType === 'free'
+        ? 0
+        : pricingType === 'sale'
+        ? Math.max(0, parseInt(salePrice || 0, 10))
+        : Math.max(0, parseInt(price || 0, 10))
+      const normalizedSalePrice = pricingType === 'sale' ? Math.max(0, parseInt(salePrice || 0, 10)) : 0
+
+      const newId = await uploadEquipmentByUser({
+        name: name.trim(),
+        category,
+        qty: Math.max(1, parseInt(qty || 1, 10)),
+        size: size.trim(),
+        material,
+        maxReuse,
+        pricingType,
+        price: normalizedPrice,
+        salePrice: normalizedSalePrice,
+        bankInfo: pricingType === 'free' ? '' : bankAccount.trim(),
+        condition,
+        description: description.trim(),
+        imagePreview,
+        circularScore,
+        initialLocation: initialLocation.trim(),
+        initialStoragePhoto: storagePhotoPreview,
+        ownerOrg: appContext.currentUserName || 'Prasmulyan Organization',
+        status: 'pending_approval'
+      })
+      setSubmittedUnitId(newId)
+      setSubmitted(true)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleResetForm = () => {
+    setName('')
+    setQty('1')
+    setSize('')
+    setPrice('')
+    setSalePrice('')
+    setDescription('')
+    setImagePreview(null)
+    setImageFileName('')
+    setInitialLocation('')
+    setStoragePhotoPreview(null)
+    setStorageFileName('')
+    setSubmittedUnitId('')
+    setSubmitted(false)
   }
 
   return (
@@ -276,13 +317,13 @@ export default function UploadEquipment() {
                 {pricingType === 'rental' && (
                   <div className="mt-3 p-4 bg-emerald-50/30 rounded-xl border border-emerald-100 space-y-2">
                     <label className="block text-xs font-semibold text-slate-700">Tarif Sewa per Hari (Rp)</label>
-                    <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="cozy-input !bg-white max-w-xs" />
+                    <input type="number" min="0" required value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Contoh: 25000" className="cozy-input !bg-white max-w-xs" />
                   </div>
                 )}
                 {pricingType === 'sale' && (
                   <div className="mt-3 p-4 bg-emerald-50/30 rounded-xl border border-emerald-100 space-y-2">
                     <label className="block text-xs font-semibold text-slate-700">Harga Jual Preloved (Rp)</label>
-                    <input type="number" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} className="cozy-input !bg-white max-w-xs" />
+                    <input type="number" min="0" required value={salePrice} onChange={(e) => setSalePrice(e.target.value)} placeholder="Contoh: 120000" className="cozy-input !bg-white max-w-xs" />
                   </div>
                 )}
 
@@ -302,9 +343,9 @@ export default function UploadEquipment() {
                 <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="cozy-input resize-none" />
               </div>
 
-              <button type="submit" className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 cursor-pointer">
+              <button type="submit" disabled={isSubmitting} className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 cursor-pointer">
                 <Upload className="w-4 h-4" />
-                <span>Kirim Pengajuan ke Admin</span>
+                <span>{isSubmitting ? 'Mengirim Pengajuan...' : 'Kirim Pengajuan ke Admin'}</span>
               </button>
             </form>
           </div>
@@ -374,7 +415,7 @@ export default function UploadEquipment() {
               <span>Lihat Barang Saya</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
-            <button onClick={() => setSubmitted(false)} className="btn-secondary text-xs !py-2.5 !px-5 cursor-pointer">
+            <button onClick={handleResetForm} className="btn-secondary text-xs !py-2.5 !px-5 cursor-pointer">
               Upload Barang Lain
             </button>
           </div>

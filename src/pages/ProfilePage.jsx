@@ -62,18 +62,39 @@ export default function ProfilePage() {
 
           if (data) {
             if (data.full_name) setFullName(data.full_name)
-            if (data.nim) setNim(data.nim)
+            if (data.nim) {
+              setNim(data.nim)
+              try { localStorage.setItem('eventloop_user_nim', data.nim) } catch (e) {}
+            }
           }
 
           if (meta) {
             if (meta.full_name && !data?.full_name) setFullName(meta.full_name)
-            if (meta.nim && !data?.nim) setNim(meta.nim)
+            if (meta.nim && !data?.nim) {
+              setNim(meta.nim)
+              try { localStorage.setItem('eventloop_user_nim', meta.nim) } catch (e) {}
+            }
             if (meta.prodi_name) setProdi(meta.prodi_name)
-            if (meta.org_name) setOrgName(meta.org_name)
-            if (meta.phone) setPhone(meta.phone)
-            if (meta.bank_name) setBankName(meta.bank_name)
-            if (meta.bank_account) setAccountNumber(meta.bank_account)
-            if (meta.bank_holder) setAccountHolder(meta.bank_holder)
+            if (meta.org_name) {
+              setOrgName(meta.org_name)
+              try { localStorage.setItem('eventloop_user_org', meta.org_name) } catch (e) {}
+            }
+            if (meta.phone) {
+              setPhone(meta.phone)
+              try { localStorage.setItem('eventloop_user_phone', meta.phone) } catch (e) {}
+            }
+            if (meta.bank_name) {
+              setBankName(meta.bank_name)
+              try { localStorage.setItem('eventloop_payout_bank', meta.bank_name) } catch (e) {}
+            }
+            if (meta.bank_account) {
+              setAccountNumber(meta.bank_account)
+              try { localStorage.setItem('eventloop_payout_acc_number', meta.bank_account) } catch (e) {}
+            }
+            if (meta.bank_holder) {
+              setAccountHolder(meta.bank_holder)
+              try { localStorage.setItem('eventloop_payout_acc_holder', meta.bank_holder) } catch (e) {}
+            }
           }
         } catch (e) {
           console.warn('Load profile notice:', e)
@@ -85,24 +106,35 @@ export default function ProfilePage() {
 
   const userEmail = sessionUser?.email || (nim ? `${nim}@student.prasetiyamulya.ac.id` : '-')
 
-  // Hitung dampak sirkular ormawa murni dari transaksi/reservasi nyata tanpa data rekaan
+  // Hitung dampak sirkular ormawa murni dari transaksi/reservasi nyata tanpa data rekaan atau double-count
   const userTxns = transactions.filter(t => {
     if (t.itemName?.startsWith('[RETURN_REQ]') || t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')) return false
+    const qLow = (t.qrisStatus || '').toLowerCase()
+    if (qLow.includes('reject') || qLow.includes('tolak') || qLow.includes('cancel') || qLow.includes('batal')) return false
+    if (sessionUser?.id && t.userId) return t.userId === sessionUser.id
     return (
       (fullName && t.borrowerName && t.borrowerName.toLowerCase().includes(fullName.toLowerCase())) ||
       (orgName && t.buyerOrg && t.buyerOrg.toLowerCase().includes(orgName.toLowerCase()))
     )
   })
 
-  const eventsCount = userTxns.length + (activeReservation?.eventName ? 1 : 0)
+  const activeAlreadyInTxns = Boolean(activeReservation?.txnId && userTxns.some(t => String(t.id) === String(activeReservation.txnId)))
+  const eventsCount = userTxns.length + (activeReservation?.eventName && !activeAlreadyInTxns ? 1 : 0)
   const estimatedSaved = eventsCount > 0 ? eventsCount * 450000 : 0
   const estimatedWasteAvoided = eventsCount > 0 ? Number((eventsCount * 6.5).toFixed(1)) : 0
+  const hasAnyBankInput = Boolean(bankName.trim() || accountNumber.trim() || accountHolder.trim())
 
   const handleSave = async (e) => {
     e.preventDefault()
     setSaving(true)
     setSuccessMsg('')
     setErrorMsg('')
+
+    if (hasAnyBankInput && (!bankName.trim() || !accountNumber.trim() || !accountHolder.trim())) {
+      setErrorMsg('Jika ingin menyimpan rekening pencairan dana, mohon lengkapi Pilihan Bank, Nomor Rekening, dan Nama Pemilik Rekening.')
+      setSaving(false)
+      return
+    }
 
     try {
       if (fullName.trim()) {
@@ -124,7 +156,7 @@ export default function ProfilePage() {
 
       if (sessionUser?.id) {
         // 1. Simpan ke tabel profiles (kolom valid: id, full_name, nim, email, updated_at)
-        await supabase.from('profiles').upsert({
+        const { error: profErr } = await supabase.from('profiles').upsert({
           id: sessionUser.id,
           email: sessionUser.email || (nim ? `${nim.trim()}@student.prasetiyamulya.ac.id` : ''),
           full_name: fullName.trim(),
@@ -133,7 +165,7 @@ export default function ProfilePage() {
         })
 
         // 2. Simpan metadata lengkap ke user_metadata akun Supabase Auth
-        await supabase.auth.updateUser({
+        const { error: authErr } = await supabase.auth.updateUser({
           data: {
             full_name: fullName.trim(),
             nim: nim.trim(),
@@ -145,6 +177,10 @@ export default function ProfilePage() {
             bank_holder: accountHolder.trim()
           }
         })
+
+        if (profErr || authErr) {
+          throw new Error(profErr?.message || authErr?.message || 'Gagal sinkronisasi ke cloud database')
+        }
       }
 
       setSuccessMsg('Profil dan data rekening berhasil disimpan ke database!')
@@ -353,9 +389,10 @@ export default function ProfilePage() {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Pilihan Bank *
+                Pilihan Bank {hasAnyBankInput ? '*' : '(Opsional)'}
               </label>
               <select
+                required={hasAnyBankInput}
                 value={bankName}
                 onChange={(e) => setBankName(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-emerald-50/25 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500"
@@ -374,11 +411,11 @@ export default function ProfilePage() {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Nomor Rekening Bank *
+                Nomor Rekening Bank {hasAnyBankInput ? '*' : '(Opsional)'}
               </label>
               <input
                 type="text"
-                required
+                required={hasAnyBankInput}
                 value={accountNumber}
                 onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))}
                 placeholder="Contoh: 8012345678"
@@ -388,11 +425,11 @@ export default function ProfilePage() {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Nama Pemilik Rekening (a.n) *
+                Nama Pemilik Rekening (a.n) {hasAnyBankInput ? '*' : '(Opsional)'}
               </label>
               <input
                 type="text"
-                required
+                required={hasAnyBankInput}
                 value={accountHolder}
                 onChange={(e) => setAccountHolder(e.target.value)}
                 placeholder="Contoh: BEM Prasmul / Bendahara Acara"

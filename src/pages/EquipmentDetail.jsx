@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useApp, parseFlexibleDate, formatIdDate, normalizeStorageLocation } from '../context/AppContext'
+import Spinner from '../components/Spinner'
 import { 
   ArrowLeft, 
   MapPin, 
@@ -27,6 +28,7 @@ export default function EquipmentDetail() {
     cartItems, 
     addToCart, 
     removeFromCart, 
+    loadingDb,
     userPaymentStatus,
     effectivePaymentStatus: ctxPaymentStatus,
     currentUserRole, 
@@ -36,13 +38,24 @@ export default function EquipmentDetail() {
     hasOngoingRental
   } = useApp()
 
-  const [futureStartDate, setFutureStartDate] = useState('2026-11-20')
-  const [futureEndDate, setFutureEndDate] = useState('2026-11-22')
+  const getOffsetDateStr = (daysOffset) => {
+    const d = new Date()
+    d.setDate(d.getDate() + daysOffset)
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
+
+  const [futureStartDate, setFutureStartDate] = useState(() => getOffsetDateStr(1))
+  const [futureEndDate, setFutureEndDate] = useState(() => getOffsetDateStr(3))
 
   const item = equipments.find(eq => eq.id.toString() === id)
   const effectiveStatus = ctxPaymentStatus || userPaymentStatus
   const isLockedByActivePayment = currentUserRole === 'user' && (typeof hasOngoingRental === 'boolean' ? hasOngoingRental : effectiveStatus !== 'idle')
   
+  if (loadingDb && !item) return <Spinner />
+
   if (!item) {
     return (
       <div className="text-center p-12 space-y-4">
@@ -198,7 +211,7 @@ export default function EquipmentDetail() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className={item.listingType === 'sale' ? 'badge-warm' : 'badge-sage'}>
-                  {item.listingType === 'sale' ? 'Beli Preloved' : 'Sewa Harian'}
+                  {item.listingType === 'sale' ? 'Beli Preloved' : item.listingType === 'free' ? 'Pinjam Gratis' : 'Sewa Harian'}
                 </span>
                 <span className="text-xs text-slate-500 font-medium">
                   Tersedia {item.available} dari {item.total} unit
@@ -211,11 +224,15 @@ export default function EquipmentDetail() {
               
               <div className="mt-3 flex items-baseline gap-1.5">
                 <span className="text-2xl font-bold text-emerald-700">
-                  Rp{(item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price).toLocaleString('id-ID')}
+                  {item.listingType === 'free'
+                    ? 'Gratis'
+                    : `Rp${(item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price).toLocaleString('id-ID')}`}
                 </span>
-                <span className="text-xs text-slate-500">
-                  {item.listingType === 'sale' ? '/ unit (beli lepas)' : '/ unit / hari'}
-                </span>
+                {item.listingType !== 'free' && (
+                  <span className="text-xs text-slate-500">
+                    {item.listingType === 'sale' ? '/ unit (beli lepas)' : '/ unit / hari'}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -308,7 +325,13 @@ export default function EquipmentDetail() {
                   <input
                     type="date"
                     value={futureStartDate}
-                    onChange={(e) => setFutureStartDate(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setFutureStartDate(val)
+                      if (val && futureEndDate && new Date(futureEndDate) < new Date(val)) {
+                        setFutureEndDate(val)
+                      }
+                    }}
                     className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
                 </div>
@@ -318,6 +341,7 @@ export default function EquipmentDetail() {
                   </label>
                   <input
                     type="date"
+                    min={futureStartDate}
                     value={futureEndDate}
                     onChange={(e) => setFutureEndDate(e.target.value)}
                     className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"

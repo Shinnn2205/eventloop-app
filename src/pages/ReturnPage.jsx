@@ -508,7 +508,7 @@ export default function ReturnPage() {
                                 'Barang bersih, terawat, dan berfungsi 100% normal',
                                 {
                                   location: currentOriginLocation,
-                                  borrower: currentUserName || 'Jason Lim Surya',
+                                  borrower: currentUserName || 'Prasmulyan',
                                   itemCode: `ITEM-${currentItem?.id}`
                                 }
                               )
@@ -582,7 +582,7 @@ export default function ReturnPage() {
                                 `Perlengkapan telah ditempatkan kembali pada rak asal (${currentItem?.name})`,
                                 {
                                   location: currentOriginLocation,
-                                  borrower: currentUserName || 'Jason Lim Surya',
+                                  borrower: currentUserName || 'Prasmulyan',
                                   itemCode: `ITEM-${currentItem?.id}`
                                 }
                               )

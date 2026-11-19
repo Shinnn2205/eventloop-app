@@ -366,6 +366,7 @@ export function AppProvider({ children }) {
   })
 
   const [pendingReturns, setPendingReturns] = useState(() => safeParseStorage('eventloop_pending_returns', []))
+  const [approvedReturns, setApprovedReturns] = useState([])
 
   const [campusImpact, setCampusImpact] = useState(() => ({
     itemsReused: impactData.totalItemsReused || 0,
@@ -856,6 +857,8 @@ export function AppProvider({ children }) {
                 ownerBank: meta.ownerBank || localMatch?.ownerBank || 'BCA 8012345678 a.n Owner',
                 payoutAmount: Math.round((Number(t.amount) || 0) * 0.95),
                 adminFee: Math.round((Number(t.amount) || 0) * 0.05),
+                cycleCompleted: Boolean(meta.cycleCompleted),
+                createdAt: t.created_at || null
               }
             })
             return normalizedTxn
@@ -937,9 +940,30 @@ export function AppProvider({ children }) {
                   }
                 })
 
+                const remainingRented = parsedItems.filter(i => i.listingType !== 'sale')
+                if (remainingRented.length === 0 && parsedItems.length === 0) {
+                  setUserPaymentStatus('idle')
+                  try {
+                    localStorage.removeItem('eventloop_active_reservation')
+                    localStorage.setItem('eventloop_user_payment_status', 'idle')
+                    localStorage.setItem('eventloop_cleared_txn_id', String(matchedUserTxn.id))
+                  } catch (e) {}
+                  return null
+                }
+
                 let m = {}
                 if (matchedUserTxn.payout_status?.startsWith('{')) {
                   try { m = JSON.parse(matchedUserTxn.payout_status) } catch (e) {}
+                }
+
+                if (m.cycleCompleted) {
+                  setUserPaymentStatus('idle')
+                  try {
+                    localStorage.removeItem('eventloop_active_reservation')
+                    localStorage.setItem('eventloop_user_payment_status', 'idle')
+                    localStorage.setItem('eventloop_cleared_txn_id', String(matchedUserTxn.id))
+                  } catch (e) {}
+                  return null
                 }
 
                 return {
@@ -947,9 +971,9 @@ export function AppProvider({ children }) {
                   eventName: m.eventName || prev?.eventName || 'Kegiatan Kampus Prasmul',
                   org: matchedUserTxn.buyer_org || prev?.org || 'Prasmulyan',
                   borrowerName: m.borrowerName || resolvedUserName || 'Prasmulyan',
-                  startDateLabel: m.startDate || prev?.startDateLabel || '04 Nov 2026',
-                  endDateLabel: m.endDate || prev?.endDateLabel || '06 Nov 2026',
-                  eventDate: (m.startDate && m.endDate) ? `${m.startDate} – ${m.endDate}` : (prev?.eventDate || '04 Nov 2026 – 06 Nov 2026'),
+                  startDateLabel: m.startDate || prev?.startDateLabel || formatIdDate(new Date()),
+                  endDateLabel: m.endDate || prev?.endDateLabel || formatIdDate(new Date()),
+                  eventDate: (m.startDate && m.endDate) ? `${m.startDate} – ${m.endDate}` : (prev?.eventDate || formatIdDate(new Date())),
                   durationDays: m.durationDays || prev?.durationDays || 1,
                   location: m.eventLocation || prev?.location || 'Auditorium Kampus BSD',
                   items: parsedItems,
@@ -1114,6 +1138,24 @@ export function AppProvider({ children }) {
         (t.qris_status || '').toLowerCase().includes('approved')
       )
 
+      const parsedApprovedReturns = approvedReturnTxns.map(t => {
+        let meta = {}
+        if (t.payout_status && t.payout_status.startsWith('{')) {
+          try { meta = JSON.parse(t.payout_status) } catch (e) {}
+        }
+        const parts = (t.item_names || '').replace(/\[RETURN_REQ\]\s*/, '').split(':::')
+        return {
+          id: t.id,
+          userId: meta.userId || null,
+          borrower: meta.borrower || t.buyer_org || '',
+          equipmentId: meta.equipmentId || parts[0] || '',
+          itemName: meta.itemName || parts[1] || '',
+          returnedQty: Number(meta.returnedQty || parts[2] || t.amount) || 1,
+          createdAt: t.created_at || null
+        }
+      })
+      setApprovedReturns(parsedApprovedReturns)
+
       let totalOrderUnits = 0
       approvedOrderTxns.forEach(t => {
         const matches = [...(t.item_names || '').matchAll(/\((\d+)x\)/g)]
@@ -1124,7 +1166,7 @@ export function AppProvider({ children }) {
         }
       })
 
-      // Unit bersirkulasi murni dari barang yang disewa + barang yang dipulangkan ke gudang
+      // Unit bersirkulasi murni dari barang yang disewa + barang yang dipulangkan ke penyimpanan
       const dynamicReused = totalOrderUnits + approvedReturnTxns.length
       const dynamicEvents = approvedOrderTxns.length
       const dynamicWasteKg = Math.round(dynamicReused * 1.6)
@@ -1138,15 +1180,41 @@ export function AppProvider({ children }) {
         circularScore: 91
       })
 
-      // 7. Agregasi Kontributor Sirkular (Dari transaksi nyata jika tersedia, fallback ke baseline pilot ringan)
-      setOrgImpacts(
-        (impactData.topOrganizations || []).map((o, idx) => ({
+      // 7. Agregasi Kontributor Sirkular secara dinamis dari transaksi disetujui di database
+      const orgAggMap = new Map()
+      approvedOrderTxns.forEach(t => {
+        const orgLabel = (t.buyer_org || 'Organisasi Kampus').trim()
+        const matches = [...(t.item_names || '').matchAll(/\((\d+)x\)/g)]
+        const units = matches.length > 0
+          ? matches.reduce((s, m) => s + parseInt(m[1], 10), 0)
+          : 1
+        const prevOrg = orgAggMap.get(orgLabel) || { org_name: orgLabel, events_count: 0, items_reused: 0 }
+        prevOrg.events_count += 1
+        prevOrg.items_reused += units
+        orgAggMap.set(orgLabel, prevOrg)
+      })
+
+      const realOrgImpacts = Array.from(orgAggMap.values())
+        .sort((a, b) => b.items_reused - a.items_reused || b.events_count - a.events_count)
+        .slice(0, 5)
+        .map((o, idx) => ({
           id: idx + 1,
-          org_name: o.name,
-          events_count: o.events,
-          items_reused: o.reused,
-          circular_score: o.score
+          org_name: o.org_name,
+          events_count: o.events_count,
+          items_reused: o.items_reused,
+          circular_score: Math.min(98, 84 + Math.min(14, o.items_reused * 2 + o.events_count))
         }))
+
+      setOrgImpacts(
+        realOrgImpacts.length > 0
+          ? realOrgImpacts
+          : (impactData.topOrganizations || []).map((o, idx) => ({
+              id: idx + 1,
+              org_name: o.name,
+              events_count: o.events,
+              items_reused: o.reused,
+              circular_score: o.score
+            }))
       )
     } catch (err) {
       console.warn('Gagal memuat data dari Supabase, menggunakan data lokal:', err)
@@ -1229,7 +1297,13 @@ export function AppProvider({ children }) {
 
   // --- CART ACTIONS ---
   const addToCart = (equipment, qty = 1) => {
-    if (userPaymentStatus !== 'idle') return
+    const isLocked = Boolean(
+      activeReservation?.eventName && (
+        userPaymentStatus === 'pending_admin_approval' ||
+        (userPaymentStatus === 'approved' && (activeReservation.items || []).some(i => i.listingType !== 'sale'))
+      )
+    )
+    if (isLocked) return
     setCartItems(prev => {
       const existing = prev.find(item => item.id === equipment.id)
       if (existing) {
@@ -1399,19 +1473,21 @@ export function AppProvider({ children }) {
     const isObjectArg = typeof arg1 === 'object' && arg1 !== null
     const totalAmount = isObjectArg ? arg1.totalAmount : Number(arg1) || 0
     const paymentProofPhoto = isObjectArg ? arg1.paymentProofPhoto : arg2 || null
+    const itemsToCheckout = cartItems.length > 0 ? cartItems : (activeReservation?.items || [])
+    if (itemsToCheckout.length === 0) return
 
     const txnId = `TXN-QRIS-${Math.floor(100 + Math.random() * 900)}`
     
     // Potong ketersediaan stok di state lokal dan sinkronkan ke database Supabase
     setEquipments(prev => prev.map(eq => {
-      const reservedItem = cartItems.find(cart => cart.id === eq.id)
+      const reservedItem = itemsToCheckout.find(cart => String(cart.id) === String(eq.id))
       if (reservedItem) {
         return { ...eq, available: Math.max(0, (eq.available ?? 0) - reservedItem.qty) }
       }
       return eq
     }))
 
-    for (const item of cartItems) {
+    for (const item of itemsToCheckout) {
       const currentEq = equipments.find(e => String(e.id) === String(item.id))
       if (currentEq) {
         const newAvail = Math.max(0, (currentEq.available ?? 0) - (item.qty || 1))
@@ -1435,20 +1511,22 @@ export function AppProvider({ children }) {
       }
     }
 
-    const firstCartItem = cartItems[0]
+    const firstCartItem = itemsToCheckout[0]
     const detectedOwnerOrg = firstCartItem?.owner || 'Organisasi Pemilik Barang'
     const detectedOwnerBank = firstCartItem?.ownerBank || 'BCA 8012345678 a.n Owner'
-    const itemNamesSummary = cartItems.map(i => `${i.name} (${i.qty}x)`).join(', ') || 'Reservasi Perlengkapan Event'
+    const itemNamesSummary = itemsToCheckout.map(i => `${i.name} (${i.qty}x)`).join(', ') || 'Reservasi Perlengkapan Event'
 
-    const startDateLabel = activeReservation?.startDateLabel || activeReservation?.startDate || '04 Nov 2026'
-    const endDateLabel = activeReservation?.endDateLabel || activeReservation?.endDate || '06 Nov 2026'
+    const todayLabel = formatIdDate(new Date())
+    const startDateLabel = activeReservation?.startDateLabel || activeReservation?.startDate || todayLabel
+    const endDateLabel = activeReservation?.endDateLabel || activeReservation?.endDate || todayLabel
     const durationDays = Math.max(1, Number(activeReservation?.durationDays) || 1)
     const activeUserId = session?.user?.id || null
 
-    const borrowedSnapshot = cartItems.map(item => ({
+    const borrowedSnapshot = itemsToCheckout.map(item => ({
       id: item.id,
       name: item.name,
       qty: item.qty,
+      listingType: item.listingType || 'rental',
       image: item.image || '📦',
       owner: item.owner,
       uploader: item.uploader,
@@ -1528,7 +1606,7 @@ export function AppProvider({ children }) {
       eventDate: `${startDateLabel} – ${endDateLabel}`,
       durationDays,
       location: activeReservation?.location || 'Auditorium Kampus BSD',
-      items: cartItems.map(item => ({
+      items: itemsToCheckout.map(item => ({
         ...item,
         lastLocation: normalizeStorageLocation(item.lastLocation || item.initialLocation)
       })), 
@@ -1556,7 +1634,7 @@ export function AppProvider({ children }) {
         const cloudRes = {
           user_id: activeUserId,
           item_name: JSON.stringify(activeReservationPayload),
-          quantity: cartItems.length,
+          quantity: itemsToCheckout.length,
           status: 'pending_admin_approval',
           start_date: activeReservation?.startDate || activeReservation?.startDateLabel || new Date().toISOString()
         }
@@ -1609,14 +1687,7 @@ export function AppProvider({ children }) {
           .eq('id', txnId)
 
         if (updErr) {
-          console.warn('Update transaksi spesifik gagal, update status pending:', updErr)
-          await supabase
-            .from('transactions')
-            .update({
-              qris_status: 'Payment Approved by Admin (Lunas)',
-              payout_status: 'Pending Transfer'
-            })
-            .eq('qris_status', 'Pending Admin Verification')
+          console.warn('Update transaksi spesifik gagal:', updErr)
         }
 
         // Update HANYA row reservations yang terhubung ke txnId ini (tidak memengaruhi user lain)
@@ -1664,6 +1735,97 @@ export function AppProvider({ children }) {
     if (activeReservation?.txnId && (!txnId || String(activeReservation.txnId) === String(txnId))) {
       setUserPaymentStatus('approved')
       try { localStorage.setItem('eventloop_user_payment_status', 'approved') } catch (e) {}
+    }
+  }
+
+  const rejectPaymentByAdmin = async (txnId, reason = '') => {
+    const targetTxn = transactions.find(t => String(t.id) === String(txnId))
+    try {
+      if (txnId) {
+        let nextPayoutStatus = 'Rejected'
+        try {
+          const { data: existingRow } = await supabase
+            .from('transactions')
+            .select('payout_status')
+            .eq('id', txnId)
+            .maybeSingle()
+
+          if (existingRow?.payout_status && existingRow.payout_status.startsWith('{')) {
+            const parsedMeta = JSON.parse(existingRow.payout_status)
+            nextPayoutStatus = JSON.stringify({
+              ...parsedMeta,
+              status: 'Rejected',
+              rejectReason: reason || 'Bukti pembayaran tidak sesuai / ditolak Admin'
+            })
+          }
+        } catch (e) {}
+
+        await supabase
+          .from('transactions')
+          .update({
+            qris_status: 'Payment Rejected by Admin (Ditolak)',
+            payout_status: nextPayoutStatus
+          })
+          .eq('id', txnId)
+
+        // Pulihkan stok barang yang sempat terpotong saat mahasiswa mengirim bukti pembayaran
+        const itemsToRestore = targetTxn?.borrowedItems || []
+        for (const item of itemsToRestore) {
+          const currentEq = equipments.find(e => String(e.id) === String(item.id))
+          if (currentEq) {
+            const nextAvail = Math.min(Number(currentEq.total) || 99, (Number(currentEq.available) || 0) + (Number(item.qty) || 1))
+            if (!isNaN(item.id)) {
+              await supabase.from('equipments').update({ available: nextAvail }).eq('id', item.id)
+            }
+            if (currentEq.dbTxnId) {
+              await supabase.from('transactions').update({ payout_status: JSON.stringify({ ...currentEq, available: nextAvail }) }).eq('id', currentEq.dbTxnId)
+            }
+          }
+        }
+
+        const { data: matchingRes } = await supabase
+          .from('reservations')
+          .select('id, item_name')
+          .ilike('item_name', `%${txnId}%`)
+
+        if (matchingRes && matchingRes.length > 0) {
+          for (const row of matchingRes) {
+            let nextItemName = row.item_name
+            try {
+              const p = JSON.parse(row.item_name)
+              nextItemName = JSON.stringify({ ...p, paymentStatus: 'rejected' })
+            } catch (e) {}
+            await supabase
+              .from('reservations')
+              .update({ status: 'rejected', item_name: nextItemName })
+              .eq('id', row.id)
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Gagal menolak pembayaran di Supabase:', err)
+    }
+
+    if (targetTxn?.borrowedItems?.length > 0) {
+      setEquipments(prev => prev.map(eq => {
+        const match = targetTxn.borrowedItems.find(it => String(it.id) === String(eq.id))
+        if (!match) return eq
+        return {
+          ...eq,
+          available: Math.min(Number(eq.total) || 99, (Number(eq.available) || 0) + (Number(match.qty) || 1))
+        }
+      }))
+    }
+
+    setTransactions(prev => prev.map(t => (
+      String(t.id) === String(txnId)
+        ? { ...t, qrisStatus: 'Payment Rejected by Admin (Ditolak)', payoutStatus: 'Rejected' }
+        : t
+    )))
+
+    if (activeReservation?.txnId && String(activeReservation.txnId) === String(txnId)) {
+      setUserPaymentStatus('rejected')
+      try { localStorage.setItem('eventloop_user_payment_status', 'rejected') } catch (e) {}
     }
   }
 
@@ -1719,6 +1881,51 @@ export function AppProvider({ children }) {
 
   // --- BATALKAN / RESET EVENT AKTIF ---
   const clearActiveEvent = async () => {
+    const pendingCancelTxnId = (userPaymentStatus === 'pending_admin_approval' && activeReservation?.txnId)
+      ? activeReservation.txnId
+      : null
+    const itemsToRestore = pendingCancelTxnId ? (activeReservation?.items || []) : []
+
+    if (pendingCancelTxnId) {
+      try {
+        await supabase
+          .from('transactions')
+          .update({ qris_status: 'Payment Cancelled by User (Dibatalkan)' })
+          .eq('id', pendingCancelTxnId)
+
+        for (const item of itemsToRestore) {
+          const currentEq = equipments.find(e => String(e.id) === String(item.id))
+          if (currentEq) {
+            const nextAvail = Math.min(Number(currentEq.total) || 99, (Number(currentEq.available) || 0) + (Number(item.qty) || 1))
+            if (!isNaN(item.id)) {
+              await supabase.from('equipments').update({ available: nextAvail }).eq('id', item.id)
+            }
+            if (currentEq.dbTxnId) {
+              await supabase.from('transactions').update({ payout_status: JSON.stringify({ ...currentEq, available: nextAvail }) }).eq('id', currentEq.dbTxnId)
+            }
+          }
+        }
+      } catch (cancelErr) {
+        console.warn('Gagal membatalkan transaksi pending di Supabase:', cancelErr)
+      }
+
+      if (itemsToRestore.length > 0) {
+        setEquipments(prev => prev.map(eq => {
+          const match = itemsToRestore.find(it => String(it.id) === String(eq.id))
+          if (!match) return eq
+          return {
+            ...eq,
+            available: Math.min(Number(eq.total) || 99, (Number(eq.available) || 0) + (Number(match.qty) || 1))
+          }
+        }))
+      }
+      setTransactions(prev => prev.map(t => (
+        String(t.id) === String(pendingCancelTxnId)
+          ? { ...t, qrisStatus: 'Payment Cancelled by User (Dibatalkan)', payoutStatus: 'Cancelled' }
+          : t
+      )))
+    }
+
     try {
       const orderTxns = (transactions || []).filter(t => 
         !t.item_names?.startsWith('[RETURN_REQ]') && !t.item_names?.startsWith('[EQUIPMENT_UPLOAD]') &&
@@ -1785,13 +1992,19 @@ export function AppProvider({ children }) {
   }
 
   const deleteEquipment = async (id) => {
+    const targetEq = equipments.find(item => String(item.id) === String(id))
     try {
       if (!isNaN(id)) {
         await supabase.from('equipments').delete().eq('id', id)
       }
-      // Hanya hapus/tandai baris upload barang yang cocok tepat dengan :::id agar tidak menghapus transaksi sewa biasa
-      await supabase.from('transactions').delete().ilike('item_names', `[EQUIPMENT_UPLOAD]%:::${id}%`)
-      await supabase.from('transactions').update({ qris_status: 'Equipment Deleted' }).ilike('item_names', `[EQUIPMENT_UPLOAD]%:::${id}%`)
+      // Hapus / tandai baris upload barang berdasarkan dbTxnId atau pola item_names
+      if (targetEq?.dbTxnId) {
+        await supabase.from('transactions').delete().eq('id', targetEq.dbTxnId)
+        await supabase.from('transactions').update({ qris_status: 'Equipment Deleted' }).eq('id', targetEq.dbTxnId)
+      } else {
+        await supabase.from('transactions').delete().ilike('item_names', `[EQUIPMENT_UPLOAD]%:::${id}%`)
+        await supabase.from('transactions').update({ qris_status: 'Equipment Deleted' }).ilike('item_names', `[EQUIPMENT_UPLOAD]%:::${id}%`)
+      }
     } catch (err) {
       console.warn('Gagal hapus equipment di Supabase:', err)
     }
@@ -1983,6 +2196,23 @@ export function AppProvider({ children }) {
                       status: nextCloudStatus
                     })
                     .eq('id', resRow.id)
+
+                  if (remainingRentedCount === 0 && parsed.txnId) {
+                    try {
+                      const { data: orderRow } = await supabase
+                        .from('transactions')
+                        .select('payout_status')
+                        .eq('id', parsed.txnId)
+                        .maybeSingle()
+                      if (orderRow?.payout_status && orderRow.payout_status.startsWith('{')) {
+                        const orderMeta = JSON.parse(orderRow.payout_status)
+                        await supabase
+                          .from('transactions')
+                          .update({ payout_status: JSON.stringify({ ...orderMeta, cycleCompleted: true }) })
+                          .eq('id', parsed.txnId)
+                      }
+                    } catch (ordErr) {}
+                  }
                 }
               } catch (parseErr) {}
             }
@@ -2122,11 +2352,18 @@ export function AppProvider({ children }) {
       }
     }
 
-    // 2. Dari transaksi aktual yang tercatat di database
+    // 2. Dari transaksi aktual yang tercatat di database (hanya yang aktif dipinjam, bukan yang sudah kembali/ditolak/dibatalkan)
+    const remainingReturnsPool = approvedReturns.map(r => ({ ...r }))
+
     transactions.forEach((txn, idx) => {
       if (activeReservation?.txnId && txn.id === activeReservation.txnId) return
       if (txn.itemName?.startsWith('[RETURN_REQ]') || txn.itemName?.startsWith('[EQUIPMENT_UPLOAD]')) return
-      const parsedItems = txn.borrowedItems && txn.borrowedItems.length > 0
+      if (txn.cycleCompleted) return
+
+      const qLow = (txn.qrisStatus || '').toLowerCase()
+      if (qLow.includes('reject') || qLow.includes('tolak') || qLow.includes('cancel') || qLow.includes('batal')) return
+
+      const rawItems = txn.borrowedItems && txn.borrowedItems.length > 0
         ? txn.borrowedItems
         : (txn.itemName || 'Perlengkapan Event').split(',').map((part, pIdx) => {
             const matchQty = part.match(/\((\d+)x\)/)
@@ -2135,10 +2372,34 @@ export function AppProvider({ children }) {
               id: `txn-item-${idx}-${pIdx}`,
               name: cleanName,
               qty: matchQty ? parseInt(matchQty[1], 10) : 1,
+              listingType: 'rental',
               image: '📦',
               originLocation: DEFAULT_STORAGE_LOCATION
             }
           })
+
+      // Saring item yang hanya sewa (bukan beli putus) & belum dikembalikan
+      const activeRentedItems = rawItems.filter(it => {
+        if (it.listingType === 'sale') return false
+        const tBorrowerLow = (txn.borrowerName || txn.buyerOrg || '').toLowerCase().trim()
+        const itNameLow = (it.name || '').toLowerCase().trim()
+        const matchedRetIdx = remainingReturnsPool.findIndex(ret => {
+          const sameUser = (txn.userId && ret.userId)
+            ? txn.userId === ret.userId
+            : (tBorrowerLow && ret.borrower && ret.borrower.toLowerCase().trim() === tBorrowerLow)
+          if (!sameUser) return false
+          const sameItem = (it.id && ret.equipmentId && String(it.id) === String(ret.equipmentId)) ||
+            (itNameLow && ret.itemName && ret.itemName.toLowerCase().trim() === itNameLow)
+          return sameItem
+        })
+        if (matchedRetIdx !== -1) {
+          remainingReturnsPool.splice(matchedRetIdx, 1)
+          return false
+        }
+        return true
+      })
+
+      if (activeRentedItems.length === 0) return
 
       list.push({
         id: txn.id || `EVT-TXN-${idx}`,
@@ -2146,17 +2407,17 @@ export function AppProvider({ children }) {
         eventName: txn.eventName || 'Kegiatan Kemahasiswaan Prasmul',
         org: txn.buyerOrg || 'Organisasi Kampus',
         borrowerName: txn.borrowerName || txn.buyerOrg || 'Panitia Mahasiswa',
-        startDate: txn.startDate || '03 Nov 2026',
-        endDate: txn.endDate || '05 Nov 2026',
+        startDate: txn.startDate || formatIdDate(new Date()),
+        endDate: txn.endDate || formatIdDate(new Date()),
         durationDays: txn.durationDays || 2,
         location: txn.eventLocation || 'Atrium Gedung PMBS BSD',
         status: txn.qrisStatus?.includes('Pending') ? 'Verifikasi Pembayaran' : 'Sedang Berjalan (Dipinjam)',
-        items: parsedItems
+        items: activeRentedItems
       })
     })
 
     return list
-  }, [activeReservation, cartItems, currentUserName, effectivePaymentStatus, transactions])
+  }, [activeReservation, approvedReturns, cartItems, currentUserName, effectivePaymentStatus, transactions])
 
   // Helper untuk mengecek siapa saja yang sedang meminjam suatu barang (dipakai di MyEquipment & EquipmentDetail)
   const getEquipmentBorrowings = useCallback((equipmentId, equipmentName) => {
@@ -2232,7 +2493,7 @@ export function AppProvider({ children }) {
       returnStatus, pendingReturns, isMyPendingReturn,
       ongoingCampusEvents, getEquipmentBorrowings,
       cartItems, addToCart, removeFromCart, updateCartQty,
-      uploadEquipmentByUser, approveEquipmentByAdmin, rejectEquipmentByAdmin, submitUserQrisPayment, approvePaymentByAdmin,
+      uploadEquipmentByUser, approveEquipmentByAdmin, rejectEquipmentByAdmin, submitUserQrisPayment, approvePaymentByAdmin, rejectPaymentByAdmin,
       transferPayoutToOwner, updateEquipmentPriceAndStock, deleteEquipment, deletePendingEquipment, setUserPaymentStatus, submitUserReturnProof, approveReturnByAdmin,
       setReturnStatus
     }}>

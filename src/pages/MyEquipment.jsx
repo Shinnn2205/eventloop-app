@@ -41,7 +41,7 @@ export default function MyEquipment() {
     if (!nameLow || nameLow === 'prasmulyan') {
       return uLow === 'currentuser' || uLow === 'prasmulyan'
     }
-    return uLow === 'currentuser' || uLow.includes(nameLow) || nameLow.includes(uLow)
+    return uLow === 'currentuser' || uLow === nameLow || (nameLow.length >= 3 && uLow.includes(nameLow))
   }
 
   const myApprovedEquipments = equipments.filter(item => isMine(item.uploader))
@@ -118,8 +118,12 @@ export default function MyEquipment() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => deletePendingEquipment && deletePendingEquipment(item.id)}
-                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors flex-shrink-0"
+                  onClick={() => {
+                    if (window.confirm(`Batalkan pengajuan barang "${item.name}" dari antrean verifikasi Admin?`)) {
+                      deletePendingEquipment && deletePendingEquipment(item.id)
+                    }
+                  }}
+                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors flex-shrink-0 cursor-pointer"
                   title="Batalkan pengajuan barang"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -167,7 +171,11 @@ export default function MyEquipment() {
                       <div className="min-w-0 flex-1">
                         <h4 className="font-bold text-slate-900 text-sm leading-snug">{item.name}</h4>
                         <div className="text-[11px] text-slate-500 mt-0.5">
-                          Total Inventaris: <strong className="text-slate-700">{item.total} unit</strong> · Rp{(item.price || 0).toLocaleString('id-ID')}/hari
+                          Total Inventaris: <strong className="text-slate-700">{item.total} unit</strong> · {item.listingType === 'free'
+                            ? 'Pinjam Gratis'
+                            : item.listingType === 'sale'
+                            ? `Rp${(item.salePrice || item.price || 0).toLocaleString('id-ID')} (Preloved)`
+                            : `Rp${(item.price || 0).toLocaleString('id-ID')}/hari`}
                         </div>
                         <div className="flex items-center gap-1 text-[11px] text-emerald-700 mt-1 truncate">
                           <MapPin className="w-3 h-3 text-emerald-600 flex-shrink-0" />
@@ -240,15 +248,12 @@ export default function MyEquipment() {
                         <div className="font-bold text-slate-900 flex items-center justify-between">
                           <span className="flex items-center gap-1.5">
                             <User className="w-3.5 h-3.5 text-emerald-600" />
-                            Panitia Mahasiswa Prasmul
+                            Sedang Digunakan di Kegiatan Kampus
                           </span>
                           <span className="badge-sage !py-0.5 !px-2 !text-[10px]">{borrowedQty} unit</span>
                         </div>
                         <div className="text-[11px] text-slate-600">
-                          🎪 Event: <strong>Kegiatan Kampus Berjalan</strong>
-                        </div>
-                        <div className="text-[11px] text-emerald-800 font-medium">
-                          📅 Dipinjam: <strong>03 Nov 2026</strong> s/d <strong>06 Nov 2026</strong>
+                          Tercatat {borrowedQty} unit belum kembali ke lokasi penyimpanan asal.
                         </div>
                       </div>
                     ) : (

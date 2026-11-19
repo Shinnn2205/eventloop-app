@@ -24,6 +24,7 @@ import {
 export default function ImpactDashboard() {
   const { loadingDb, campusImpact, orgImpacts, currentUserName } = useApp()
   const [showReportModal, setShowReportModal] = useState(false)
+  const docNumber = useMemo(() => `LPJ-EL/${new Date().getFullYear()}/XI/${Math.floor(10000 + Math.random() * 90000)}`, [])
 
   const totalItemsReused = campusImpact?.itemsReused ?? impactData.totalItemsReused ?? 0
   const totalEventsSupported = campusImpact?.eventsSupported ?? impactData.totalEventsSupported ?? 0
@@ -276,8 +277,8 @@ export default function ImpactDashboard() {
 
       {/* MODAL SERTIFIKAT & LAPORAN LPJ HIJAU (PRINT-READY PDF) */}
       {showReportModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-emerald-100 space-y-6 relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto print-modal-overlay">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-emerald-100 space-y-6 relative max-h-[90vh] overflow-y-auto print-modal-card">
             {/* Action Bar (Top) */}
             <div className="flex items-center justify-between pb-4 border-b border-emerald-100 print:hidden">
               <div className="flex items-center gap-2 text-xs font-bold text-emerald-900">
@@ -325,7 +326,7 @@ export default function ImpactDashboard() {
                   </div>
                 </div>
                 <div className="text-right text-[10px] text-slate-500 font-mono">
-                  <div>No. Dok: LPJ-EL/2026/XI/{Date.now().toString().slice(-5)}</div>
+                  <div>No. Dok: {docNumber}</div>
                   <div>Tanggal: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
                 </div>
               </div>
@@ -375,7 +376,7 @@ export default function ImpactDashboard() {
               {/* Pernyataan Verifikasi */}
               <div className="text-xs text-slate-600 leading-relaxed space-y-2 bg-white/80 p-4 rounded-xl border border-emerald-100">
                 <p>
-                  Dengan ini diterangkan bahwa peminjaman perlengkapan kegiatan telah memenuhi standar sistem <strong>Circular Score (Indeks: {campusImpact?.circularScore || 87}/100)</strong>, dengan mengedepankan prinsip pakai ulang (*reuse*), modularitas komponen (*repairable*), dan peniadaan limbah padat sekali pakai (*zero-waste*).
+                  Dengan ini diterangkan bahwa peminjaman perlengkapan kegiatan telah memenuhi standar sistem <strong>Circular Score (Indeks: {campusImpact?.circularScore || 87}/100)</strong>, dengan mengedepankan prinsip pakai ulang (<em>reuse</em>), modularitas komponen (<em>repairable</em>), dan peniadaan limbah padat sekali pakai (<em>zero-waste</em>).
                 </p>
                 <p className="text-[11px] text-slate-500">
                   Data ini tervalidasi secara komputasional melalui pelacakan transaksi dan foto serah terima penyimpanan di Auditorium Lantai M PMBS pada platform EventLoop Universitas Prasetiya Mulya.

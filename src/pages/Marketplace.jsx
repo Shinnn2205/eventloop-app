@@ -47,11 +47,14 @@ export default function Marketplace() {
       selectedListingType === 'All' || 
       (selectedListingType === 'rental' && item.listingType !== 'sale') ||
       (selectedListingType === 'sale' && item.listingType === 'sale')
-    const q = searchQuery.toLowerCase()
-    const matchSearch = 
+    const q = searchQuery.toLowerCase().trim()
+    const locStr = normalizeStorageLocation(item.lastLocation || item.initialLocation).toLowerCase()
+    const matchSearch = !q ||
       (item.name || '').toLowerCase().includes(q) ||
       (item.owner || '').toLowerCase().includes(q) ||
-      (item.material || '').toLowerCase().includes(q)
+      (item.material || '').toLowerCase().includes(q) ||
+      (item.category || '').toLowerCase().includes(q) ||
+      locStr.includes(q)
     return matchCategory && matchType && matchSearch
   })
 
@@ -197,6 +200,26 @@ export default function Marketplace() {
       </div>
 
       {/* Equipment Grid */}
+      {filteredItems.length === 0 ? (
+        <div className="card p-10 text-center space-y-3">
+          <Search className="w-8 h-8 text-emerald-400 mx-auto" />
+          <h3 className="text-base font-bold text-slate-800">Tidak Ada Perlengkapan yang Cocok</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            Coba ubah kata kunci pencarian, kategori, atau skema transaksi untuk melihat perlengkapan lain yang tersedia.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedCategory('All')
+              setSelectedListingType('All')
+              setSearchQuery('')
+            }}
+            className="btn-secondary text-xs !py-2 !px-4 cursor-pointer"
+          >
+            Reset Filter & Pencarian
+          </button>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {filteredItems.map((item) => {
           const reserved = isInCart(item.id)
@@ -219,7 +242,7 @@ export default function Marketplace() {
                   {/* Top Left Type Tag */}
                   <div className="absolute top-3 left-3">
                     <span className={item.listingType === 'sale' ? 'badge-warm' : 'badge-sage'}>
-                      {item.listingType === 'sale' ? 'Preloved' : 'Sewa / Hari'}
+                      {item.listingType === 'sale' ? 'Preloved' : item.listingType === 'free' ? 'Pinjam Gratis' : 'Sewa / Hari'}
                     </span>
                   </div>
 
@@ -257,12 +280,14 @@ export default function Marketplace() {
               <div className="px-5 py-3.5 bg-emerald-50/25 border-t border-emerald-100/70 flex items-center justify-between gap-2">
                 <div>
                   <span className="text-[10px] text-slate-400 block">
-                    {item.listingType === 'sale' ? 'Harga Beli' : 'Tarif Sewa'}
+                    {item.listingType === 'sale' ? 'Harga Beli' : item.listingType === 'free' ? 'Pinjam' : 'Tarif Sewa'}
                   </span>
                   <span className="text-sm font-bold text-emerald-700">
-                    Rp{(item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price).toLocaleString('id-ID')}
+                    {item.listingType === 'free'
+                      ? 'Gratis'
+                      : `Rp${(item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price).toLocaleString('id-ID')}`}
                   </span>
-                  {item.listingType !== 'sale' && (
+                  {item.listingType !== 'sale' && item.listingType !== 'free' && (
                     <span className="text-[11px] text-slate-400"> / hari</span>
                   )}
                 </div>
@@ -309,6 +334,7 @@ export default function Marketplace() {
           )
         })}
       </div>
+      )}
 
       {/* Soft Floating Bottom Cart Bar (No Harsh Dark Contrast) */}
       {currentUserRole === 'user' && cartItems.length > 0 && !isLockedByActivePayment && (

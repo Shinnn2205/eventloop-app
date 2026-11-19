@@ -186,7 +186,7 @@ export default function LoginPage() {
     setSuccessMsg('')
     setLoading(true)
 
-    let loginEmail = email.trim()
+    let loginEmail = email.trim().toLowerCase()
     // Jika mahasiswa memasukkan 11 digit NIM, konversi otomatis ke email SSO kampus
     if (/^\d{11}$/.test(loginEmail)) {
       loginEmail = `${loginEmail}@student.prasetiyamulya.ac.id`
@@ -217,6 +217,15 @@ export default function LoginPage() {
           console.warn('Gagal ambil data profil:', fetchErr)
         }
 
+        if (isAdminEmail(loginEmail)) {
+          const adminName = getAdminDisplayName(loginEmail) || 'Admin Kampus'
+          setCurrentUserRole('admin')
+          setCurrentUserName(adminName)
+        } else {
+          setCurrentUserRole('user')
+          setCurrentUserName(userDisplayName)
+        }
+
         // Refresh data Supabase secara instan agar reservasi, event aktif, dan barang sewa sinkron antar-perangkat
         if (refetchData) {
           try {
@@ -226,16 +235,7 @@ export default function LoginPage() {
           }
         }
 
-        if (isAdminEmail(loginEmail)) {
-          const adminName = getAdminDisplayName(loginEmail) || 'Admin Kampus'
-          setCurrentUserRole('admin')
-          setCurrentUserName(adminName)
-          navigate('/admin', { replace: true })
-        } else {
-          setCurrentUserRole('user')
-          setCurrentUserName(userDisplayName)
-          navigate('/dashboard', { replace: true })
-        }
+        navigate(isAdminEmail(loginEmail) ? '/admin' : '/dashboard', { replace: true })
       }
     } catch (err) {
       setErrorMsg('Gagal terhubung ke server. Silakan coba lagi.')
@@ -287,6 +287,26 @@ export default function LoginPage() {
           }
         }
       })
+
+      if (signUpErr) {
+        const msg = (signUpErr.message || '').toLowerCase()
+        if (msg.includes('already registered') || msg.includes('already exists')) {
+          setErrorMsg('NIM/Email ini sudah terdaftar di EventLoop. Silakan masuk di tab "Masuk (Login)" atau gunakan fitur "Lupa Password?".')
+          setLoading(false)
+          return
+        }
+        if (!msg.includes('rate') && !msg.includes('seconds') && signUpErr.status !== 429) {
+          setErrorMsg('Gagal mendaftarkan akun: ' + signUpErr.message)
+          setLoading(false)
+          return
+        }
+      }
+
+      if (signUpData?.user && Array.isArray(signUpData.user.identities) && signUpData.user.identities.length === 0) {
+        setErrorMsg('NIM/Email ini sudah terdaftar dan aktif. Silakan langsung masuk melalui tab "Masuk (Login)".')
+        setLoading(false)
+        return
+      }
 
       // 2. Simpan juga ke tabel profiles di database (id, email, full_name, nim, updated_at)
       if (signUpData?.user?.id) {
@@ -397,17 +417,6 @@ export default function LoginPage() {
         }
       }
 
-      if (!activeSession) {
-        // Coba verifikasi dengan sign in password jika akun sudah aktif di auth.users
-        const { data: passData } = await supabase.auth.signInWithPassword({
-          email: studentEmail,
-          password
-        })
-        if (passData?.session) {
-          activeSession = passData.session
-        }
-      }
-
       if (activeSession) {
         // Hapus penanda sesi pending OTP di browser
         sessionStorage.removeItem('eventloop_pending_signup_otp')
@@ -454,6 +463,32 @@ export default function LoginPage() {
       }
     } catch (err) {
       setErrorMsg('Terjadi kesalahan saat memverifikasi kode OTP: ' + (err.message || ''))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSignUpResendOtp = async () => {
+    if (resendTimer > 0 || loading) return
+    const nimValidation = validateNimStructure(nim)
+    if (!nimValidation.isValid) return
+
+    setLoading(true)
+    setErrorMsg('')
+    setSuccessMsg('')
+    try {
+      const { error: otpErr } = await supabase.auth.signInWithOtp({
+        email: nimValidation.generatedEmail,
+        options: { shouldCreateUser: true }
+      })
+      if (otpErr) {
+        setErrorMsg('Gagal mengirim ulang kode OTP: ' + otpErr.message)
+      } else {
+        setResendTimer(60)
+        setSuccessMsg(`Kode OTP baru berhasil dikirim ulang ke ${nimValidation.generatedEmail}.`)
+      }
+    } catch (err) {
+      setErrorMsg('Gagal mengirim ulang kode OTP.')
     } finally {
       setLoading(false)
     }
@@ -1129,7 +1164,7 @@ export default function LoginPage() {
                     <button
                       type="button"
                       disabled={resendTimer > 0 || loading}
-                      onClick={handleSignUpRequestOtp}
+                      onClick={handleSignUpResendOtp}
                       className={`font-semibold cursor-pointer ${
                         resendTimer > 0 
                           ? 'text-slate-400 cursor-not-allowed' 

@@ -270,7 +270,7 @@ export default function Dashboard() {
               {greeting}, <span className="text-emerald-800">{currentUserName || 'Prasmulyan'}</span> 🌿
             </h2>
             <p className="text-slate-600 text-sm max-w-xl leading-relaxed">
-              Kelola peminjaman perlengkapan acara kampus secara sirkular, pantau lokasi barang secara *real-time*, dan jadwalkan kegiatan berikutnya dengan nyaman.
+              Kelola peminjaman perlengkapan acara kampus secara sirkular, pantau lokasi barang secara <em>real-time</em>, dan jadwalkan kegiatan berikutnya dengan nyaman.
             </p>
           </div>
 
@@ -283,7 +283,7 @@ export default function Dashboard() {
                 <PlusCircle className="w-4 h-4" />
                 <span>Mulai Buat Event</span>
               </Link>
-            ) : userPaymentStatus === 'idle' ? (
+            ) : effectivePaymentStatus === 'idle' ? (
               <Link 
                 to={hasItems ? "/reservation" : "/marketplace"} 
                 className="btn-primary text-xs !py-2.5 !px-5 flex items-center gap-2"
@@ -314,8 +314,8 @@ export default function Dashboard() {
         <div className="relative z-10 mt-6 pt-5 border-t border-emerald-200/60">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             {steps.map((s) => {
-              const isDone = currentStep > s.num || isEventCompleted || (s.num === 4 && effectivePaymentStatus === 'approved' && !hasItems)
-              const isCurrent = !isEventCompleted && currentStep === s.num
+              const isDone = currentStep > s.num || isPurchaseOnlyCompleted || (s.num === 4 && effectivePaymentStatus === 'approved' && !hasItems)
+              const isCurrent = !isPurchaseOnlyCompleted && currentStep === s.num
               return (
                 <Link
                   key={s.num}
@@ -426,12 +426,16 @@ export default function Dashboard() {
                     ? 'badge-sage' 
                     : effectivePaymentStatus === 'pending_admin_approval'
                     ? 'badge-warm'
+                    : effectivePaymentStatus === 'rejected'
+                    ? 'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200'
                     : 'badge-stone'
                 }>
                   {effectivePaymentStatus === 'approved' 
                     ? 'Pembayaran Terverifikasi' 
                     : effectivePaymentStatus === 'pending_admin_approval'
                     ? 'Menunggu Verifikasi Admin'
+                    : effectivePaymentStatus === 'rejected'
+                    ? 'Pembayaran Ditolak'
                     : 'Belum Dibayar'}
                 </span>
               )}

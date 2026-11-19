@@ -115,6 +115,9 @@ function App() {
               </ProtectedRoute>
             } />
           </Route>
+
+          {/* Fallback untuk URL yang tidak ditemukan */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </AppProvider>

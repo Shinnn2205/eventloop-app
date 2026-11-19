@@ -43,11 +43,24 @@ export default function CreateEvent() {
     activeReservation?.eventName && effectivePaymentStatus === 'idle'
   )
 
+  const toLocalYmd = (dateObj) => {
+    const yyyy = dateObj.getFullYear()
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0')
+    const dd = String(dateObj.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
+
+  const getDefaultOffsetYmd = (daysOffset) => {
+    const d = new Date()
+    d.setDate(d.getDate() + daysOffset)
+    return toLocalYmd(d)
+  }
+
   const [eventName, setEventName] = useState(() => activeReservation?.eventName || '')
   const [orgName, setOrgName] = useState(() => activeReservation?.org || localStorage.getItem('eventloop_user_org') || (currentUserName !== 'Prasmulyan' ? currentUserName : '') || '')
   const [eventType, setEventType] = useState(() => activeReservation?.type || 'Seminar')
-  const [startDate, setStartDate] = useState(() => activeReservation?.startDate || '2026-11-25')
-  const [endDate, setEndDate] = useState(() => activeReservation?.endDate || '2026-11-27')
+  const [startDate, setStartDate] = useState(() => activeReservation?.startDate || getDefaultOffsetYmd(2))
+  const [endDate, setEndDate] = useState(() => activeReservation?.endDate || getDefaultOffsetYmd(4))
   const [durationDays, setDurationDays] = useState(() => activeReservation?.durationDays || 2)
   const [location, setLocation] = useState(() => activeReservation?.location || 'Auditorium Kampus BSD')
   const [attendees, setAttendees] = useState('250')
@@ -96,14 +109,14 @@ export default function CreateEvent() {
   }
 
   const handleDurationChange = (daysVal) => {
-    const d = Math.max(1, parseInt(daysVal, 10) || 1)
+    const d = Math.max(1, Math.min(30, parseInt(daysVal, 10) || 1))
     setDurationDays(d)
     if (startDate) {
-      const s = new Date(startDate)
-      if (!isNaN(s.getTime())) {
-        const e = new Date(s)
-        e.setDate(s.getDate() + d)
-        setEndDate(e.toISOString().split('T')[0])
+      const parts = startDate.split('-').map(Number)
+      if (parts.length === 3 && parts.every(n => !isNaN(n))) {
+        const e = new Date(parts[0], parts[1] - 1, parts[2])
+        e.setDate(e.getDate() + d)
+        setEndDate(toLocalYmd(e))
       }
     }
   }
@@ -182,6 +195,19 @@ export default function CreateEvent() {
   }
 
   const handleApplyPackage = () => {
+    updateActiveEventDetails({
+      eventName: eventName.trim() || `${eventType} Kampus Prasmul`,
+      org: orgName.trim(),
+      borrowerName: currentUserName || 'Prasmulyan',
+      startDate,
+      endDate,
+      startDateLabel,
+      endDateLabel,
+      eventDate: `${startDateLabel} – ${endDateLabel}`,
+      durationDays: Math.max(1, Math.min(30, Number(durationDays) || 1)),
+      type: eventType,
+      location: location.trim()
+    })
     if (dynamicRecommendations.length === 0) {
       navigate('/marketplace')
       return
@@ -503,7 +529,11 @@ export default function CreateEvent() {
                           </div>
                           <div className="text-[11px] text-slate-500 truncate">{rec.reason}</div>
                           <div className="text-[10px] text-emerald-700 font-medium">
-                            Stok: {rec.equipment.available} unit · Rp{(rec.equipment.price || 0).toLocaleString('id-ID')}/hari
+                            Stok: {rec.equipment.available} unit · {rec.equipment.listingType === 'free'
+                              ? 'Gratis'
+                              : rec.equipment.listingType === 'sale'
+                              ? `Rp${(rec.equipment.salePrice || rec.equipment.price || 0).toLocaleString('id-ID')} (Beli)`
+                              : `Rp${(rec.equipment.price || 0).toLocaleString('id-ID')}/hari`}
                           </div>
                         </div>
                       </div>

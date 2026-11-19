@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useApp, normalizeStorageLocation } from '../context/AppContext'
+import { useApp, normalizeStorageLocation, formatIdDate, parseFlexibleDate } from '../context/AppContext'
 import { compressImageFile } from '../utils/imageCompression'
 import { 
   ClipboardCheck, 
@@ -37,12 +37,14 @@ export default function Reservation() {
   const [paymentModal, setPaymentModal] = useState(false)
   const [paymentProofPhoto, setPaymentProofPhoto] = useState(null)
   const [proofPreviewModal, setProofPreviewModal] = useState(null)
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false)
 
-  const durationDays = Math.max(1, Number(activeReservation?.durationDays) || 1)
+  const durationDays = Math.max(1, Math.min(30, Number(activeReservation?.durationDays) || 1))
   const displayItems = cartItems.length > 0 ? cartItems : (activeReservation?.items || [])
+  const hasRentedItems = displayItems.some(i => i.listingType !== 'sale')
 
   const totalCost = displayItems.reduce((sum, item) => {
-    const unitPrice = item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price
+    const unitPrice = item.listingType === 'free' ? 0 : item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price
     const dayMultiplier = item.listingType === 'sale' ? 1 : durationDays
     return sum + unitPrice * item.qty * dayMultiplier
   }, 0)
@@ -50,13 +52,41 @@ export default function Reservation() {
   const adminFee = Math.round(totalCost * 0.05)
   const grandTotal = totalCost + adminFee
 
-  const handlePayQris = () => {
+  const handlePayQris = async () => {
+    if (isSubmittingPayment) return
     if (grandTotal > 0 && !paymentProofPhoto) return
-    submitUserQrisPayment(grandTotal, paymentProofPhoto)
-    setPaymentModal(false)
+    setIsSubmittingPayment(true)
+    try {
+      await submitUserQrisPayment(grandTotal, paymentProofPhoto)
+      setPaymentModal(false)
+      setPaymentProofPhoto(null)
+    } finally {
+      setIsSubmittingPayment(false)
+    }
+  }
+
+  const handleDurationUpdate = (rawVal) => {
+    const d = Math.max(1, Math.min(30, parseInt(rawVal, 10) || 1))
+    const updates = { durationDays: d }
+    const baseStart = parseFlexibleDate(activeReservation?.startDate || activeReservation?.startDateLabel)
+    if (baseStart) {
+      const endObj = new Date(baseStart)
+      endObj.setDate(endObj.getDate() + d)
+      const yyyy = endObj.getFullYear()
+      const mm = String(endObj.getMonth() + 1).padStart(2, '0')
+      const dd = String(endObj.getDate()).padStart(2, '0')
+      const startLbl = formatIdDate(baseStart)
+      const endLbl = formatIdDate(endObj)
+      updates.endDate = `${yyyy}-${mm}-${dd}`
+      updates.startDateLabel = startLbl
+      updates.endDateLabel = endLbl
+      updates.eventDate = `${startLbl} – ${endLbl}`
+    }
+    updateActiveEventDetails(updates)
   }
 
   const effectivePaymentStatus = ctxPaymentStatus || userPaymentStatus
+  const canEditOrder = effectivePaymentStatus === 'idle' || effectivePaymentStatus === 'rejected'
   const proofPhotoSource = activeOrderTxn?.paymentProofPhoto || activeReservation?.paymentProofPhoto || paymentProofPhoto
 
   return (
@@ -100,6 +130,35 @@ export default function Reservation() {
               <span>Lihat Bukti Bayar</span>
             </button>
           )}
+        </div>
+      )}
+
+      {effectivePaymentStatus === 'rejected' && (
+        <div className="p-5 bg-rose-50 border border-rose-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-white text-rose-600 flex items-center justify-center flex-shrink-0 border border-rose-200">
+              <X className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 mb-1">
+                Pembayaran Ditolak Admin
+              </span>
+              <h3 className="text-sm font-bold text-rose-950">
+                Bukti Pembayaran Perlu Dikirim Ulang
+              </h3>
+              <p className="text-xs text-rose-800 mt-0.5 leading-relaxed">
+                Admin menolak verifikasi pembayaran sebelumnya (nominal atau bukti transfer belum sesuai). Stok telah dipulihkan; silakan periksa pesanan Anda dan kirim ulang bukti transfer yang valid.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPaymentModal(true)}
+            className="btn-primary !bg-rose-600 hover:!bg-rose-700 text-xs !py-2 !px-4 flex items-center gap-1.5 flex-shrink-0 cursor-pointer"
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            <span>Kirim Ulang Bukti QRIS</span>
+          </button>
         </div>
       )}
 
@@ -168,17 +227,14 @@ export default function Reservation() {
                 <Clock className="w-4 h-4 text-emerald-600" />
                 <div className="text-xs">
                   <span className="text-slate-500 block text-[10px]">Durasi Sewa</span>
-                  {effectivePaymentStatus === 'idle' ? (
+                  {canEditOrder ? (
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
                         min="1"
                         max="30"
                         value={durationDays}
-                        onChange={(e) => {
-                          const d = Math.max(1, parseInt(e.target.value) || 1)
-                          updateActiveEventDetails({ durationDays: d })
-                        }}
+                        onChange={(e) => handleDurationUpdate(e.target.value)}
                         className="w-12 px-1.5 py-0.5 bg-white border border-emerald-200 rounded text-center font-bold text-emerald-800 text-xs"
                       />
                       <span className="font-semibold text-emerald-800">Hari</span>
@@ -191,7 +247,7 @@ export default function Reservation() {
             </div>
 
             {/* Tombol Ubah / Batalkan Event Sebelum Bayar */}
-            {effectivePaymentStatus === 'idle' && activeReservation?.eventName && (
+            {canEditOrder && activeReservation?.eventName && (
               <div className="pt-2.5 border-t border-emerald-100/70 flex items-center justify-between text-xs">
                 <span className="text-slate-500 text-[11px]">Mau ganti nama atau tanggal kegiatan?</span>
                 <div className="flex items-center gap-2">
@@ -226,13 +282,13 @@ export default function Reservation() {
                   Daftar Perlengkapan ({displayItems.length} Jenis)
                 </h3>
                 <span className="badge-sage">
-                  Dikali {durationDays} Hari Sewa
+                  {hasRentedItems ? `Sewa ${durationDays} Hari` : 'Pembelian Preloved'}
                 </span>
               </div>
 
               <div className="divide-y divide-emerald-100/60">
                 {displayItems.map((item) => {
-                  const unitPrice = item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price
+                  const unitPrice = item.listingType === 'free' ? 0 : item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price
                   const dayMultiplier = item.listingType === 'sale' ? 1 : durationDays
                   const subtotal = unitPrice * item.qty * dayMultiplier
                   const originLocation = normalizeStorageLocation(item.lastLocation || item.initialLocation)
@@ -250,7 +306,7 @@ export default function Reservation() {
                         <div className="space-y-1">
                           <div className="font-bold text-slate-900 text-sm">{item.name}</div>
                           <div className="text-xs text-slate-500">
-                            Pemilik: {item.owner} · Rp{unitPrice.toLocaleString('id-ID')} {item.listingType === 'sale' ? '(Beli)' : '/ hari'}
+                            Pemilik: {item.owner} · {item.listingType === 'free' ? 'Gratis' : `Rp${unitPrice.toLocaleString('id-ID')} ${item.listingType === 'sale' ? '(Beli)' : '/ hari'}`}
                           </div>
                           <div className="inline-flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-100">
                             <MapPin className="w-3 h-3" />
@@ -331,7 +387,9 @@ export default function Reservation() {
 
             <div className="space-y-2.5 text-xs">
               <div className="flex justify-between text-slate-500">
-                <span>Subtotal ({displayItems.reduce((a, b) => a + b.qty, 0)} unit × {durationDays} hari)</span>
+                <span>
+                  Subtotal ({displayItems.reduce((a, b) => a + b.qty, 0)} unit{hasRentedItems ? ` · ${durationDays} hari` : ''})
+                </span>
                 <span className="font-semibold text-slate-800">Rp{totalCost.toLocaleString('id-ID')}</span>
               </div>
               <div className="flex justify-between text-slate-500">
@@ -368,14 +426,14 @@ export default function Reservation() {
               </p>
             </div>
 
-            {effectivePaymentStatus === 'idle' ? (
+            {canEditOrder ? (
               <button
-                disabled={displayItems.length === 0}
+                disabled={displayItems.length === 0 || isSubmittingPayment}
                 onClick={() => setPaymentModal(true)}
                 className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <QrCode className="w-4 h-4" />
-                <span>Bayar via QRIS & Upload Bukti</span>
+                <span>{effectivePaymentStatus === 'rejected' ? 'Kirim Ulang Bukti Pembayaran QRIS' : 'Bayar via QRIS & Upload Bukti'}</span>
               </button>
             ) : (
               <div className="space-y-2">
@@ -481,13 +539,15 @@ export default function Reservation() {
             )}
 
             <button
-              disabled={grandTotal > 0 && !paymentProofPhoto}
+              disabled={isSubmittingPayment || (grandTotal > 0 && !paymentProofPhoto)}
               onClick={handlePayQris}
               className="w-full btn-primary text-xs !py-3 flex items-center justify-center gap-2 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>
-                {grandTotal === 0
+                {isSubmittingPayment
+                  ? 'Mengirim Pembayaran...'
+                  : grandTotal === 0
                   ? 'Ajukan Konfirmasi Pinjam Gratis'
                   : paymentProofPhoto
                   ? 'Kirim Bukti Pembayaran'
