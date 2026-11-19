@@ -304,13 +304,27 @@ export default function Reservation() {
                           )}
                         </div>
                         <div className="space-y-1">
-                          <div className="font-bold text-slate-900 text-sm">{item.name}</div>
-                          <div className="text-xs text-slate-500">
-                            Pemilik: {item.owner} · {item.listingType === 'free' ? 'Gratis' : `Rp${unitPrice.toLocaleString('id-ID')} ${item.listingType === 'sale' ? '(Beli)' : '/ hari'}`}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-bold text-slate-900 text-sm">{item.name}</span>
+                            {item.listingType === 'sale' && (
+                              <span className="badge-warm !py-0.5 !px-2 !text-[10px]">
+                                Beli Preloved · Milik Anda
+                              </span>
+                            )}
                           </div>
-                          <div className="inline-flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-100">
+                          <div className="text-xs text-slate-500">
+                            Pemilik: {item.owner} · {item.listingType === 'free' ? 'Gratis' : `Rp${unitPrice.toLocaleString('id-ID')} ${item.listingType === 'sale' ? '(Beli Lepas)' : '/ hari'}`}
+                          </div>
+                          <div className={`inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-md border ${
+                            item.listingType === 'sale'
+                              ? 'text-amber-800 bg-amber-50 border-amber-200/80'
+                              : 'text-emerald-700 bg-emerald-50 border-emerald-100'
+                          }`}>
                             <MapPin className="w-3 h-3" />
-                            <span>Lokasi Asal & Return: <strong>{originLocation}</strong></span>
+                            <span>
+                              {item.listingType === 'sale' ? 'Ambil di (Tidak Perlu Return):' : 'Lokasi Asal & Return:'}{' '}
+                              <strong>{originLocation}</strong>
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -340,7 +354,11 @@ export default function Reservation() {
                           <div className="font-bold text-emerald-700 text-sm">
                             Rp{subtotal.toLocaleString('id-ID')}
                           </div>
-                          {item.listingType !== 'sale' && (
+                          {item.listingType === 'sale' ? (
+                            <div className="text-[10px] text-amber-700 font-medium">
+                              Beli lepas (tidak kembali)
+                            </div>
+                          ) : (
                             <div className="text-[10px] text-slate-400">
                               {item.qty} unit × {durationDays} hari
                             </div>

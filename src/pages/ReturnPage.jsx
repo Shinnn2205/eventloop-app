@@ -95,6 +95,7 @@ export default function ReturnPage() {
   const effectivePaymentStatus = ctxPaymentStatus || userPaymentStatus
 
   const rentedItems = activeReservation?.items?.filter(item => item.listingType !== 'sale') || []
+  const purchasedItems = activeReservation?.items?.filter(item => item.listingType === 'sale') || []
   const hasActiveEvent = Boolean(activeReservation?.eventName)
   
   const [selectedItemId, setSelectedItemId] = useState(rentedItems[0]?.id || '')
@@ -435,6 +436,27 @@ export default function ReturnPage() {
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-500 leading-relaxed flex items-start gap-2">
                     <AlertCircle className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />
                     <span>Lampirkan foto kondisi fisik dan foto penempatan di lokasi asal untuk diverifikasi Admin.</span>
+                  </div>
+                </div>
+              )}
+
+              {purchasedItems.length > 0 && (
+                <div className="pt-4 border-t border-emerald-100/80 space-y-2">
+                  <div className="text-[11px] font-bold text-amber-800 flex items-center justify-between">
+                    <span>Barang Dibeli Preloved ({purchasedItems.length})</span>
+                    <span className="text-[10px] font-semibold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                      Tidak Perlu Return
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {purchasedItems.map(pItem => (
+                      <div key={pItem.id} className="p-2.5 rounded-xl bg-amber-50/50 border border-amber-200/70 text-xs">
+                        <div className="font-semibold text-slate-800 truncate">{pItem.name}</div>
+                        <div className="text-[10px] text-amber-800/90 mt-0.5">
+                          {pItem.qty} unit · Beli putus (menjadi milik Anda)
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
