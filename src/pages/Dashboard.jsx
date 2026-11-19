@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useApp, parseFlexibleDate, normalizeStorageLocation, DEFAULT_STORAGE_LOCATION } from '../context/AppContext'
+import { useApp, parseFlexibleDate, normalizeStorageLocation, DEFAULT_STORAGE_LOCATION, buildWaLink } from '../context/AppContext'
 import { 
   Recycle, 
   Calendar, 
@@ -40,7 +40,8 @@ export default function Dashboard() {
     pendingReturns = [],
     isMyPendingReturn,
     completedEventNotice,
-    dismissCompletedEventNotice
+    dismissCompletedEventNotice,
+    resolveContactPhone
   } = useApp()
   
   const [trackingSearch, setTrackingSearch] = useState('')
@@ -756,9 +757,10 @@ export default function Dashboard() {
                 <div className="pt-2 border-t border-emerald-100/60 flex items-center justify-between">
                   <span className="text-[10px] text-slate-400">Koordinasi pemakaian bersama:</span>
                   <a
-                    href={`https://wa.me/?text=${encodeURIComponent(
+                    href={buildWaLink(
+                      ev.borrowerPhone || resolveContactPhone?.({ userId: ev.userId, name: ev.borrowerName, org: ev.org }),
                       `Halo ${ev.borrowerName} (${ev.org}), saya ingin bertanya mengenai peminjaman perlengkapan di event "${ev.eventName}" yang sedang berjalan via EventLoop Prasmul.`
-                    )}`}
+                    )}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-100/70 hover:bg-emerald-200/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"

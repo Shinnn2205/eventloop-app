@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useApp, normalizeStorageLocation } from '../context/AppContext'
+import { Link } from 'react-router-dom'
+import { useApp, normalizeStorageLocation, isSystemMetaTxn } from '../context/AppContext'
 import { compressImageFile } from '../utils/imageCompression'
 import { 
   ShieldCheck, 
@@ -32,7 +33,8 @@ export default function AdminPanel() {
     rejectPaymentByAdmin,
     transferPayoutToOwner,
     pendingReturns = [], 
-    approveReturnByAdmin 
+    approveReturnByAdmin,
+    adminWaPhone
   } = useApp()
   
   const [transferSuccessMsg, setTransferSuccessMsg] = useState('')
@@ -122,7 +124,7 @@ export default function AdminPanel() {
     }
   }
 
-  const validOrderTransactions = transactions.filter(t => !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]'))
+  const validOrderTransactions = transactions.filter(t => !isSystemMetaTxn(t.itemName))
   const getTxnOwnerPayouts = (txn) => {
     if (Array.isArray(txn.ownerPayouts) && txn.ownerPayouts.length > 0) return txn.ownerPayouts
     const gross = Number(txn.amount) || 0
@@ -202,6 +204,17 @@ export default function AdminPanel() {
           <button onClick={() => setTransferSuccessMsg('')} className="text-emerald-700 hover:text-emerald-950 p-1">
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {!adminWaPhone && (
+        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-amber-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <span>
+            <strong>Nomor WhatsApp Admin belum diatur.</strong> Simpan nomor WA Anda di halaman Profil agar tombol <em>Kontak Admin (WhatsApp)</em> mahasiswa langsung membuka chat ke WA Anda.
+          </span>
+          <Link to="/profile" className="btn-secondary !py-1.5 !px-3 text-[11px] font-bold whitespace-nowrap self-start sm:self-auto">
+            Atur WA Admin di Profil →
+          </Link>
         </div>
       )}
 

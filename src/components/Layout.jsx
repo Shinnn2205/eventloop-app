@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom'
-import { useApp } from '../context/AppContext'
+import { useApp, isSystemMetaTxn } from '../context/AppContext'
 import { supabase } from '../lib/supabaseClient'
 import { 
   LayoutDashboard, 
@@ -40,6 +40,7 @@ export default function Layout() {
     currentUserName, 
     currentUserStudyProgram, 
     sessionUser,
+    isProfileComplete,
     cartItems = [],
     activeReservation,
     userPaymentStatus,
@@ -55,7 +56,7 @@ export default function Layout() {
 
   const pendingAdminTasks = 
     transactions.reduce((acc, t) => {
-      if (t.itemName?.startsWith('[RETURN_REQ]') || t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')) return acc
+      if (isSystemMetaTxn(t.itemName)) return acc
       const qLow = (t.qrisStatus || '').toLowerCase()
       if (qLow.includes('reject') || qLow.includes('tolak') || qLow.includes('cancel') || qLow.includes('batal')) return acc
       if (qLow.includes('pending')) return acc + 1
@@ -138,6 +139,8 @@ export default function Layout() {
                   }
                 } else if (item.path === '/return' && effectivePaymentStatus === 'approved' && rentedItemsCount > 0) {
                   badgeText = `${rentedItemsCount}`
+                } else if (item.path === '/profile' && !isProfileComplete) {
+                  badgeText = 'Wajib'
                 }
 
                 return (

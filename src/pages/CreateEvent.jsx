@@ -28,6 +28,8 @@ export default function CreateEvent() {
     effectivePaymentStatus: ctxPaymentStatus,
     currentUserRole,
     currentUserName,
+    currentUserOrg,
+    currentUserPhone,
     hasOngoingRental
   } = useApp()
 
@@ -57,7 +59,7 @@ export default function CreateEvent() {
   }
 
   const [eventName, setEventName] = useState(() => activeReservation?.eventName || '')
-  const [orgName, setOrgName] = useState(() => activeReservation?.org || localStorage.getItem('eventloop_user_org') || (currentUserName !== 'Prasmulyan' ? currentUserName : '') || '')
+  const [orgName, setOrgName] = useState(() => activeReservation?.org || currentUserOrg || localStorage.getItem('eventloop_user_org') || (currentUserName !== 'Prasmulyan' ? currentUserName : '') || '')
   const [eventType, setEventType] = useState(() => activeReservation?.type || 'Seminar')
   const [startDate, setStartDate] = useState(() => activeReservation?.startDate || getDefaultOffsetYmd(2))
   const [endDate, setEndDate] = useState(() => activeReservation?.endDate || getDefaultOffsetYmd(4))
@@ -180,6 +182,7 @@ export default function CreateEvent() {
       eventName: eventName.trim() || `${eventType} Kampus Prasmul`,
       org: orgName.trim(),
       borrowerName: currentUserName || 'Prasmulyan',
+      borrowerPhone: currentUserPhone || localStorage.getItem('eventloop_user_phone') || '',
       startDate,
       endDate,
       startDateLabel,
@@ -199,6 +202,7 @@ export default function CreateEvent() {
       eventName: eventName.trim() || `${eventType} Kampus Prasmul`,
       org: orgName.trim(),
       borrowerName: currentUserName || 'Prasmulyan',
+      borrowerPhone: currentUserPhone || localStorage.getItem('eventloop_user_phone') || '',
       startDate,
       endDate,
       startDateLabel,

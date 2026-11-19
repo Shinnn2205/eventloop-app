@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useApp, normalizeStorageLocation, formatIdDate, parseFlexibleDate } from '../context/AppContext'
+import { useApp, normalizeStorageLocation, formatIdDate, parseFlexibleDate, buildWaLink } from '../context/AppContext'
 import { compressImageFile } from '../utils/imageCompression'
 import { 
   ClipboardCheck, 
@@ -31,7 +31,8 @@ export default function Reservation() {
     userPaymentStatus,
     effectivePaymentStatus: ctxPaymentStatus,
     activeOrderTxn,
-    submitUserQrisPayment
+    submitUserQrisPayment,
+    adminWaPhone
   } = useApp()
 
   const [paymentModal, setPaymentModal] = useState(false)
@@ -461,9 +462,10 @@ export default function Reservation() {
                     : '⏳ Menunggu Verifikasi Admin'}
                 </div>
                 <a
-                  href={`https://wa.me/?text=${encodeURIComponent(
+                  href={buildWaLink(
+                    adminWaPhone,
                     `Halo Admin EventLoop, saya PIC event "${activeReservation?.eventName || 'Kegiatan Mahasiswa'}". Ingin konfirmasi status verifikasi pembayaran & jadwal pengambilan perlengkapan.`
-                  )}`}
+                  )}
                   target="_blank"
                   rel="noreferrer"
                   className="w-full btn-secondary text-xs !py-2.5 flex items-center justify-center gap-2 cursor-pointer"

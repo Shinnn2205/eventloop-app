@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useApp, normalizeStorageLocation } from '../context/AppContext'
+import { useApp, normalizeStorageLocation, buildWaLink, isSystemMetaTxn } from '../context/AppContext'
 import { 
   ArrowLeft,
   Clock,
@@ -27,7 +27,8 @@ export default function MyEquipment() {
     transactions, 
     getEquipmentBorrowings,
     deleteEquipment,
-    deletePendingEquipment 
+    deletePendingEquipment,
+    resolveContactPhone
   } = useApp()
   const [viewingPayoutProof, setViewingPayoutProof] = useState(null)
   const [itemToDelete, setItemToDelete] = useState(null)
@@ -49,7 +50,7 @@ export default function MyEquipment() {
 
   // Ekstrak rincian payout khusus untuk bagian barang milik akun ini (mendukung pesanan multi-pemilik)
   const myPayoutTransactions = (transactions || []).flatMap(txn => {
-    if (txn.itemName?.startsWith('[RETURN_REQ]') || txn.itemName?.startsWith('[EQUIPMENT_UPLOAD]')) return []
+    if (isSystemMetaTxn(txn.itemName)) return []
     const qLow = (txn.qrisStatus || '').toLowerCase()
     if (qLow.includes('reject') || qLow.includes('tolak') || qLow.includes('cancel') || qLow.includes('batal')) return []
 
@@ -274,9 +275,10 @@ export default function MyEquipment() {
                             </div>
 
                             <a
-                              href={`https://wa.me/?text=${encodeURIComponent(
+                              href={buildWaLink(
+                                b.borrowerPhone || resolveContactPhone?.({ userId: b.userId, name: b.borrowerName, org: b.org }),
                                 `Halo ${b.borrowerName} (${b.org}), saya pemilik inventaris "${item.name}" di EventLoop. Ingin koordinasi terkait pengembalian perlengkapan event "${b.eventName}" pada tanggal ${b.endDate} ke ${normalizeStorageLocation(item.lastLocation)}.`
-                              )}`}
+                              )}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-100/70 hover:bg-emerald-200/80 px-2.5 py-1 rounded-lg transition-colors mt-1 cursor-pointer"

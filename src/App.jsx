@@ -18,7 +18,7 @@ import { AppProvider, useApp } from './context/AppContext'
 
 // Komponen penangkap sesi untuk otomatis melempar ke dashboard jika user SUDAH login saat membuka halaman /login atau klik link email
 function AuthHandler() {
-  const { sessionUser, currentUserRole } = useApp()
+  const { sessionUser, currentUserRole, isProfileComplete } = useApp()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -35,6 +35,8 @@ function AuthHandler() {
       setTimeout(() => {
         if (currentUserRole === 'admin') {
           navigate('/admin', { replace: true })
+        } else if (!isProfileComplete) {
+          navigate('/profile?required=1', { replace: true })
         } else {
           navigate('/dashboard', { replace: true })
         }
@@ -45,18 +47,20 @@ function AuthHandler() {
     if (sessionUser && location.pathname === '/login') {
       if (currentUserRole === 'admin') {
         navigate('/admin', { replace: true })
+      } else if (!isProfileComplete) {
+        navigate('/profile?required=1', { replace: true })
       } else {
         navigate('/dashboard', { replace: true })
       }
     }
-  }, [sessionUser, currentUserRole, location, navigate])
+  }, [sessionUser, currentUserRole, isProfileComplete, location, navigate])
 
   return null
 }
 
 // Protected Route: Mengharuskan pengguna untuk Login / Buat Akun terlebih dahulu sebelum membuka halaman dalam aplikasi
 function ProtectedRoute({ children, adminOnly = false }) {
-  const { sessionUser, currentUserRole, loadingDb } = useApp()
+  const { sessionUser, currentUserRole, loadingDb, isProfileComplete } = useApp()
   const location = useLocation()
 
   if (loadingDb) {
@@ -76,6 +80,11 @@ function ProtectedRoute({ children, adminOnly = false }) {
   // Jika halaman khusus admin tapi yang login bukan admin
   if (adminOnly && currentUserRole !== 'admin') {
     return <Navigate to="/dashboard" replace />
+  }
+
+  // Wajib melengkapi profil (Nama, Organisasi, & Nomor WhatsApp) sebelum mengakses fitur aplikasi
+  if (currentUserRole === 'user' && !isProfileComplete && location.pathname !== '/profile') {
+    return <Navigate to="/profile?required=1" state={{ from: location }} replace />
   }
 
   return children

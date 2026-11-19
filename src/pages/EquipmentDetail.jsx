@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useApp, parseFlexibleDate, formatIdDate, normalizeStorageLocation } from '../context/AppContext'
+import { useApp, parseFlexibleDate, formatIdDate, normalizeStorageLocation, buildWaLink } from '../context/AppContext'
 import Spinner from '../components/Spinner'
 import { 
   ArrowLeft, 
@@ -35,7 +35,9 @@ export default function EquipmentDetail() {
     getEquipmentBorrowings,
     activeReservation,
     updateActiveEventDetails,
-    hasOngoingRental
+    hasOngoingRental,
+    resolveContactPhone,
+    adminWaPhone
   } = useApp()
 
   const getOffsetDateStr = (daysOffset) => {
@@ -136,7 +138,14 @@ export default function EquipmentDetail() {
     navigate('/reservation')
   }
 
-  const ownerWaText = encodeURIComponent(
+  const ownerPhone = item.ownerPhone || resolveContactPhone?.({
+    userId: item.ownerUserId,
+    name: item.uploader,
+    org: item.owner
+  }) || adminWaPhone
+
+  const ownerWaHref = buildWaLink(
+    ownerPhone,
     `Halo PIC ${item.owner || 'Inventaris Kampus'}, saya tertarik untuk meminjam perlengkapan "${item.name}" melalui platform EventLoop Universitas Prasetiya Mulya. Apakah unit siap diambil di lokasi ${normalizeStorageLocation(item.lastLocation)}?`
   )
 
@@ -447,7 +456,7 @@ export default function EquipmentDetail() {
 
                 {/* Tombol Hubungi Pemilik via WhatsApp */}
                 <a
-                  href={`https://wa.me/?text=${ownerWaText}`}
+                  href={ownerWaHref}
                   target="_blank"
                   rel="noreferrer"
                   className="w-full py-2.5 rounded-xl border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100/70 text-emerald-900 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"

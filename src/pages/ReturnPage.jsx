@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useApp, parseFlexibleDate, normalizeStorageLocation, DEFAULT_STORAGE_LOCATION } from '../context/AppContext'
+import { useApp, parseFlexibleDate, normalizeStorageLocation, DEFAULT_STORAGE_LOCATION, buildWaLink } from '../context/AppContext'
 import { compressImageFile } from '../utils/imageCompression'
 import { 
   RotateCcw, 
@@ -89,7 +89,8 @@ export default function ReturnPage() {
     userPaymentStatus,
     effectivePaymentStatus: ctxPaymentStatus,
     completedEventNotice,
-    fetchSupabaseData
+    fetchSupabaseData,
+    adminWaPhone
   } = useApp()
   
   const effectivePaymentStatus = ctxPaymentStatus || userPaymentStatus
@@ -268,9 +269,10 @@ export default function ReturnPage() {
           </div>
 
           <a
-            href={`https://wa.me/?text=${encodeURIComponent(
+            href={buildWaLink(
+              adminWaPhone,
               `Halo Admin EventLoop, saya PIC event "${activeReservation?.eventName}". Ingin konfirmasi jadwal serah terima pengembalian perlengkapan ke lokasi penyimpanan (${currentOriginLocation || DEFAULT_STORAGE_LOCATION}).`
-            )}`}
+            )}
             target="_blank"
             rel="noreferrer"
             className="btn-secondary !py-2 !px-3 text-[11px] flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"

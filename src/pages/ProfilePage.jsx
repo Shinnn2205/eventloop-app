@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { useApp } from '../context/AppContext'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useApp, formatIndonesianWaNumber, isSystemMetaTxn } from '../context/AppContext'
 import { supabase } from '../lib/supabaseClient'
 import { 
   User, 
@@ -20,23 +21,34 @@ import {
 } from 'lucide-react'
 
 export default function ProfilePage() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
   const { 
     currentUserName, 
     setCurrentUserName,
     currentUserStudyProgram, 
     setCurrentUserStudyProgram,
+    currentUserOrg,
+    setCurrentUserOrg,
+    currentUserPhone,
+    setCurrentUserPhone,
+    isProfileComplete,
+    saveUserContactToDirectory,
     currentUserRole, 
     sessionUser,
     activeReservation,
     transactions = []
   } = useApp()
 
+  const isForcedOnboarding = currentUserRole === 'user' && (!isProfileComplete || searchParams.get('required') === '1')
+
   // Form states - Dikosongkan secara default sebelum diisi dan disimpan pengguna
   const [fullName, setFullName] = useState(currentUserName !== 'Prasmulyan' ? (currentUserName || '') : '')
-  const [orgName, setOrgName] = useState(() => localStorage.getItem('eventloop_user_org') || '')
+  const [orgName, setOrgName] = useState(() => currentUserOrg || localStorage.getItem('eventloop_user_org') || '')
   const [prodi, setProdi] = useState(currentUserStudyProgram !== 'Prasetiya Mulya' ? (currentUserStudyProgram || '') : '')
   const [nim, setNim] = useState(() => localStorage.getItem('eventloop_user_nim') || '')
-  const [phone, setPhone] = useState(() => localStorage.getItem('eventloop_user_phone') || '')
+  const [phone, setPhone] = useState(() => currentUserPhone || localStorage.getItem('eventloop_user_phone') || '')
   
   // Payout bank account - Kosong secara default sebelum diatur
   const [bankName, setBankName] = useState(() => localStorage.getItem('eventloop_payout_bank') || '')
@@ -108,7 +120,7 @@ export default function ProfilePage() {
 
   // Hitung dampak sirkular ormawa murni dari transaksi/reservasi nyata tanpa data rekaan atau double-count
   const userTxns = transactions.filter(t => {
-    if (t.itemName?.startsWith('[RETURN_REQ]') || t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')) return false
+    if (isSystemMetaTxn(t.itemName)) return false
     const qLow = (t.qrisStatus || '').toLowerCase()
     if (qLow.includes('reject') || qLow.includes('tolak') || qLow.includes('cancel') || qLow.includes('batal')) return false
     if (sessionUser?.id && t.userId) return t.userId === sessionUser.id
@@ -130,11 +142,19 @@ export default function ProfilePage() {
     setSuccessMsg('')
     setErrorMsg('')
 
+    if (!formatIndonesianWaNumber(phone)) {
+      setErrorMsg('Nomor WhatsApp tidak valid. Masukkan minimal 10 digit nomor aktif (contoh: 0812xxxxxxxx atau 62812xxxxxxxx).')
+      setSaving(false)
+      return
+    }
+
     if (hasAnyBankInput && (!bankName.trim() || !accountNumber.trim() || !accountHolder.trim())) {
       setErrorMsg('Jika ingin menyimpan rekening pencairan dana, mohon lengkapi Pilihan Bank, Nomor Rekening, dan Nama Pemilik Rekening.')
       setSaving(false)
       return
     }
+
+    const wasIncomplete = currentUserRole === 'user' && !isProfileComplete
 
     try {
       if (fullName.trim()) {
@@ -146,6 +166,8 @@ export default function ProfilePage() {
         setCurrentUserStudyProgram(prodi.trim())
         sessionStorage.setItem('eventloop_user_prodi', prodi.trim())
       }
+      if (setCurrentUserOrg) setCurrentUserOrg(orgName.trim())
+      if (setCurrentUserPhone) setCurrentUserPhone(phone.trim())
 
       localStorage.setItem('eventloop_user_org', orgName.trim())
       localStorage.setItem('eventloop_user_nim', nim.trim())
@@ -183,8 +205,26 @@ export default function ProfilePage() {
         }
       }
 
-      setSuccessMsg('Profil dan data rekening berhasil disimpan ke database!')
-      setTimeout(() => setSuccessMsg(''), 4000)
+      // 3. Simpan nomor WA ke direktori kontak cloud agar tombol "Kontak WhatsApp" lintas akun langsung tertuju ke WA Anda
+      if (saveUserContactToDirectory) {
+        await saveUserContactToDirectory({
+          userId: sessionUser?.id || null,
+          fullName: fullName.trim(),
+          orgName: orgName.trim(),
+          phone: phone.trim(),
+          role: currentUserRole
+        })
+      }
+
+      setSuccessMsg('Profil & nomor WhatsApp berhasil disimpan! Tombol kontak WhatsApp kini otomatis terhubung ke nomor Anda.')
+      if (wasIncomplete || searchParams.get('required') === '1') {
+        const dest = location.state?.from?.pathname && location.state.from.pathname !== '/profile'
+          ? location.state.from.pathname
+          : '/dashboard'
+        setTimeout(() => navigate(dest, { replace: true }), 900)
+      } else {
+        setTimeout(() => setSuccessMsg(''), 4000)
+      }
     } catch (err) {
       setErrorMsg('Gagal menyimpan profil: ' + (err.message || ''))
     } finally {
@@ -194,6 +234,20 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
+      {/* Banner Wajib Lengkapi Profil & Nomor WhatsApp */}
+      {isForcedOnboarding && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs flex items-start gap-3 animate-fade-in shadow-2xs">
+          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <strong className="block text-sm font-bold text-amber-950">
+              📋 Wajib Lengkapi Profil &amp; Nomor WhatsApp Aktif Sebelum Melanjutkan
+            </strong>
+            <p className="leading-relaxed text-amber-900/90">
+              Mohon lengkapi <strong>Nama Lengkap PIC</strong>, <strong>Nama Organisasi / Kepanitiaan</strong>, dan <strong>Nomor WhatsApp Aktif</strong> terlebih dahulu. Nomor WhatsApp Anda akan digunakan agar panitia lain, pemilik barang, atau Admin dapat menghubungi Anda langsung melalui tombol <em>Kontak WhatsApp</em>.
+            </p>
+          </div>
+        </div>
+      )}
       {/* Header Profile */}
       <div className="bg-gradient-to-br from-emerald-50/95 via-green-50/75 to-teal-50/80 border border-emerald-200/70 rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative z-10">
