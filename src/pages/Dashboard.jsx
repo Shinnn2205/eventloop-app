@@ -21,7 +21,8 @@ import {
   Clock,
   MessageSquare,
   AlertTriangle,
-  AlertCircle
+  AlertCircle,
+  X
 } from 'lucide-react'
 
 export default function Dashboard() {
@@ -37,7 +38,9 @@ export default function Dashboard() {
     campusImpact,
     ongoingCampusEvents = [],
     pendingReturns = [],
-    isMyPendingReturn
+    isMyPendingReturn,
+    completedEventNotice,
+    dismissCompletedEventNotice
   } = useApp()
   
   const [trackingSearch, setTrackingSearch] = useState('')
@@ -52,7 +55,7 @@ export default function Dashboard() {
     !pendingReturns.some(r => String(r.equipmentId) === String(item.id) && (!isMyPendingReturn || isMyPendingReturn(r)))
   )
   const isAllPendingReturn = remainingRentedItems.length > 0 && unreturnedItems.length === 0
-  const isEventCompleted = Boolean(hasActiveEvent && effectivePaymentStatus === 'approved' && remainingRentedItems.length === 0)
+  const isPurchaseOnlyCompleted = Boolean(hasActiveEvent && effectivePaymentStatus === 'approved' && remainingRentedItems.length === 0)
 
   // Sapaan waktu
   const hour = new Date().getHours()
@@ -61,7 +64,7 @@ export default function Dashboard() {
   // Tahap alur saat ini
   const currentStep = !hasActiveEvent 
     ? 1 
-    : isEventCompleted
+    : isPurchaseOnlyCompleted
     ? 5
     : !hasItems && effectivePaymentStatus !== 'approved'
     ? 2 
@@ -123,7 +126,7 @@ export default function Dashboard() {
       effectivePaymentStatus !== 'approved' || 
       remainingRentedItems.length === 0 || 
       unreturnedItems.length === 0 ||
-      isEventCompleted || 
+      isPurchaseOnlyCompleted || 
       isAllPendingReturn
     ) return null
 
@@ -143,35 +146,39 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      {/* NOTIFIKASI EVENT SELESAI / SELURUH BARANG TELAH DIKEMBALIKAN */}
-      {isEventCompleted && (
+      {/* NOTIFIKASI EVENT SELESAI OTOMATIS SETELAH ADMIN MENYETUJUI PENGEMBALIAN */}
+      {completedEventNotice && (
         <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in shadow-2xs">
           <div className="flex items-start gap-2.5">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
             <div>
               <strong className="block text-sm font-bold text-emerald-950">
-                🌿 Seluruh Perlengkapan Event "{activeReservation.eventName}" Telah Dikembalikan!
+                🌿 Pengembalian Event "{completedEventNotice.eventName}" Selesai & Disetujui Admin!
               </strong>
-              Pengembalian telah diverifikasi dan disetujui oleh admin gudang kampus. Terima kasih telah menjaga sirkularitas perlengkapan! Anda dapat menyelesaikan siklus ini untuk membuat event baru.
+              Seluruh perlengkapan telah dikembalikan ke gudang kampus dan peminjaman Anda otomatis dinyatakan selesai. Anda bisa langsung membuat event baru kapan saja.
             </div>
           </div>
           <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
+            <Link
+              to="/create-event"
+              className="btn-primary !bg-emerald-600 hover:!bg-emerald-700 !py-2 !px-4 text-xs font-bold whitespace-nowrap shadow-xs"
+            >
+              Buat Event Baru
+            </Link>
             <button
               type="button"
-              onClick={() => {
-                clearActiveEvent()
-                window.location.href = '/create-event'
-              }}
-              className="btn-primary !bg-emerald-600 hover:!bg-emerald-700 !py-2 !px-4 text-xs font-bold whitespace-nowrap cursor-pointer shadow-xs"
+              onClick={dismissCompletedEventNotice}
+              title="Tutup notifikasi"
+              className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
             >
-              Selesaikan Siklus & Buat Event Baru
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
       )}
 
       {/* NOTIFIKASI PENGEMBALIAN SEDANG DIVERIFIKASI ADMIN */}
-      {isAllPendingReturn && !isEventCompleted && (
+      {isAllPendingReturn && (
         <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in shadow-2xs">
           <div className="flex items-start gap-2.5">
             <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5 animate-pulse" />
@@ -456,37 +463,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {isEventCompleted ? (
-                  <div className="p-6 rounded-2xl bg-emerald-50/60 border border-emerald-200 text-center space-y-3">
-                    <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center mx-auto">
-                      <CheckCircle2 className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h5 className="font-bold text-emerald-950 text-sm">
-                        Siklus Peminjaman Event Telah Selesai 🌿
-                      </h5>
-                      <p className="text-xs text-slate-600 max-w-md mx-auto mt-1 leading-relaxed">
-                        Seluruh perlengkapan sewa untuk kegiatan <strong>"{activeReservation.eventName}"</strong> telah dikembalikan ke lokasi gudang kampus dan disetujui admin.
-                      </p>
-                    </div>
-                    <div className="pt-1 flex flex-wrap justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          clearActiveEvent()
-                          window.location.href = '/create-event'
-                        }}
-                        className="btn-primary text-xs !py-2.5 !px-5 flex items-center gap-2 cursor-pointer shadow-xs"
-                      >
-                        <PlusCircle className="w-4 h-4" />
-                        <span>Selesaikan Siklus & Buat Event Baru</span>
-                      </button>
-                      <Link to="/marketplace" className="btn-secondary text-xs !py-2.5 !px-4">
-                        Buka Katalog Marketplace
-                      </Link>
-                    </div>
-                  </div>
-                ) : hasItems ? (
+                {hasItems ? (
                   <div className="space-y-2">
                     <div className="text-xs font-semibold text-slate-600">
                       Perlengkapan Dipesan ({displayItems.length} jenis)
@@ -524,18 +501,16 @@ export default function Dashboard() {
 
                 <div className="pt-2 flex flex-wrap items-center justify-between gap-2.5">
                   <div className="flex flex-wrap gap-2.5">
-                    {!isEventCompleted && (
-                      <Link to="/reservation" className="btn-primary text-xs !py-2.5 !px-4 flex items-center gap-1.5">
-                        <ClipboardList className="w-3.5 h-3.5" />
-                        <span>{effectivePaymentStatus === 'idle' ? 'Lanjutkan Pembayaran' : 'Lihat Detail Reservasi'}</span>
-                      </Link>
-                    )}
+                    <Link to="/reservation" className="btn-primary text-xs !py-2.5 !px-4 flex items-center gap-1.5">
+                      <ClipboardList className="w-3.5 h-3.5" />
+                      <span>{effectivePaymentStatus === 'idle' ? 'Lanjutkan Pembayaran' : 'Lihat Detail Reservasi'}</span>
+                    </Link>
                     {effectivePaymentStatus === 'idle' && (
                       <Link to="/create-event" className="btn-secondary text-xs !py-2.5 !px-3.5 flex items-center gap-1.5">
                         <span>Ubah Data Event</span>
                       </Link>
                     )}
-                    {effectivePaymentStatus === 'approved' && !isEventCompleted && (
+                    {effectivePaymentStatus === 'approved' && !isPurchaseOnlyCompleted && (
                       <Link to="/return" className="btn-secondary text-xs !py-2.5 !px-4 flex items-center gap-1.5">
                         <RotateCcw className="w-3.5 h-3.5" />
                         <span>Kembalikan Barang</span>
@@ -556,13 +531,13 @@ export default function Dashboard() {
                       Batalkan Event
                     </button>
                   )}
-                  {isEventCompleted && (
+                  {isPurchaseOnlyCompleted && (
                     <button
                       type="button"
                       onClick={clearActiveEvent}
                       className="text-xs text-slate-500 hover:text-slate-800 font-medium py-1.5 px-2.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                     >
-                      Tutup Siklus Event
+                      Tutup Nota Pembelian
                     </button>
                   )}
                 </div>

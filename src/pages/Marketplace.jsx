@@ -29,7 +29,8 @@ export default function Marketplace() {
     userPaymentStatus,
     effectivePaymentStatus: ctxPaymentStatus,
     currentUserRole,
-    activeReservation
+    activeReservation,
+    hasOngoingRental
   } = useApp()
 
   const [selectedCategory, setSelectedCategory] = useState('All')
@@ -37,7 +38,7 @@ export default function Marketplace() {
   const [searchQuery, setSearchQuery] = useState('')
 
   const effectiveStatus = ctxPaymentStatus || userPaymentStatus
-  const isLockedByActivePayment = currentUserRole === 'user' && effectiveStatus !== 'idle'
+  const isLockedByActivePayment = currentUserRole === 'user' && (typeof hasOngoingRental === 'boolean' ? hasOngoingRental : effectiveStatus !== 'idle')
   const durationDays = Math.max(1, Number(activeReservation?.durationDays) || 1)
 
   const filteredItems = equipments.filter((item) => {

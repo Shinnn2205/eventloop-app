@@ -79,6 +79,7 @@ const generateSampleReturnPhoto = (title, subtitle, info) => {
 export default function ReturnPage() {
   const navigate = useNavigate()
   const { 
+    returnStatus,
     setReturnStatus, 
     submitUserReturnProof, 
     activeReservation, 
@@ -87,7 +88,7 @@ export default function ReturnPage() {
     currentUserName,
     userPaymentStatus,
     effectivePaymentStatus: ctxPaymentStatus,
-    clearActiveEvent,
+    completedEventNotice,
     fetchSupabaseData
   } = useApp()
   
@@ -296,6 +297,29 @@ export default function ReturnPage() {
             </Link>
           </div>
         </div>
+      ) : (returnStatus === 'approved_success' || Boolean(completedEventNotice)) && !hasActiveEvent ? (
+        <div className="card p-10 text-center space-y-4">
+          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto border border-emerald-200">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900">
+            Pengembalian Selesai & Terverifikasi Admin 🌿
+          </h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+            {completedEventNotice?.eventName
+              ? `Terima kasih! Seluruh perlengkapan sewa untuk event "${completedEventNotice.eventName}" telah kembali ke gudang kampus dan diverifikasi admin. Peminjaman Anda telah otomatis selesai sehingga Anda dapat langsung membuat event baru.`
+              : 'Terima kasih! Seluruh perlengkapan sewa Anda telah dikembalikan dan diverifikasi Admin. Anda dapat langsung membuat event baru.'}
+          </p>
+          <div className="pt-2 flex flex-wrap justify-center gap-2.5">
+            <Link to="/create-event" className="btn-primary text-xs !py-2.5 !px-5 inline-flex items-center gap-2">
+              <PlusCircle className="w-4 h-4" />
+              <span>Buat Event Baru</span>
+            </Link>
+            <Link to="/marketplace" className="btn-secondary text-xs !py-2.5 !px-5">
+              Buka Marketplace
+            </Link>
+          </div>
+        </div>
       ) : effectivePaymentStatus !== 'approved' ? (
         <div className="card p-10 text-center space-y-4">
           <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto border border-emerald-200">
@@ -319,37 +343,22 @@ export default function ReturnPage() {
           </div>
         </div>
       ) : rentedItems.length === 0 ? (
-        /* KONDISI 2: TIDAK ADA TANGGUNGAN BARANG / SEMUA SUDAH DIKEMBALIKAN */
+        /* KONDISI 2: TIDAK ADA TANGGUNGAN BARANG SEWA */
         <div className="card p-10 text-center space-y-4">
           <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto border border-emerald-200">
             <CheckCircle2 className="w-6 h-6" />
           </div>
           <h3 className="text-lg font-bold text-slate-900">
-            {hasActiveEvent ? 'Seluruh Perlengkapan Event Telah Dikembalikan 🌿' : 'Tidak Ada Tanggungan Pengembalian'}
+            Tidak Ada Tanggungan Pengembalian 🌿
           </h3>
           <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-            {hasActiveEvent 
-              ? `Terima kasih! Seluruh perlengkapan sewa untuk event "${activeReservation.eventName}" telah dikembalikan ke lokasi asalnya. Anda dapat menutup siklus kegiatan ini untuk membuat event baru.`
-              : 'Anda belum memiliki pinjaman perlengkapan aktif saat ini. Silakan daftarkan kegiatan dan pilih perlengkapan di Marketplace.'}
+            Seluruh perlengkapan sewa telah dikembalikan atau pesanan Anda tidak memiliki item sewa yang perlu dipulangkan. Anda dapat langsung membuat event baru atau menjelajahi Marketplace.
           </p>
           <div className="pt-2 flex flex-wrap justify-center gap-2.5">
-            {hasActiveEvent ? (
-              <button
-                type="button"
-                onClick={() => {
-                  clearActiveEvent()
-                  navigate('/create-event')
-                }}
-                className="btn-primary text-xs !py-2.5 !px-5 flex items-center gap-2 cursor-pointer"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>Selesaikan Siklus Event & Buat Event Baru</span>
-              </button>
-            ) : (
-              <Link to="/create-event" className="btn-primary text-xs !py-2.5 !px-5">
-                Buat Event Baru
-              </Link>
-            )}
+            <Link to="/create-event" className="btn-primary text-xs !py-2.5 !px-5 inline-flex items-center gap-2">
+              <PlusCircle className="w-4 h-4" />
+              <span>Buat Event Baru</span>
+            </Link>
             <Link to="/marketplace" className="btn-secondary text-xs !py-2.5 !px-5">
               Buka Marketplace
             </Link>

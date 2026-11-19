@@ -348,6 +348,7 @@ export function AppProvider({ children }) {
   })
 
   const [activeReservation, setActiveReservation] = useState(() => safeParseStorage('eventloop_active_reservation', null))
+  const [completedEventNotice, setCompletedEventNotice] = useState(null)
 
   const [returnStatus, setReturnStatus] = useState(() => {
     return localStorage.getItem('eventloop_return_status') || 'idle'
@@ -546,28 +547,64 @@ export function AppProvider({ children }) {
             if (parsedRes) {
               hasCloudReservation = true
               const normalizedStatus = userRes.status || parsedRes.paymentStatus || 'idle'
-              const resWithOwner = {
-                ...parsedRes,
-                ownerUserId: currentUserId
+              const remainingRented = (parsedRes.items || []).filter(i => i.listingType !== 'sale')
+              const isCycleFinished =
+                normalizedStatus === 'completed' ||
+                (normalizedStatus === 'approved' && remainingRented.length === 0 && (parsedRes.items || []).length === 0)
+
+              if (isCycleFinished) {
+                // Otomatis akhiri siklus saat semua barang sudah kembali & diverifikasi admin (tanpa memaksa klik "Selesaikan Siklus")
+                lastSyncedResHashRef.current = ''
+                setActiveReservation(null)
+                setUserPaymentStatus('idle')
+                try {
+                  localStorage.removeItem('eventloop_active_reservation')
+                  localStorage.setItem('eventloop_user_payment_status', 'idle')
+                  if (parsedRes.txnId) {
+                    localStorage.setItem('eventloop_cleared_txn_id', String(parsedRes.txnId))
+                  }
+                  const dismissedId = sessionStorage.getItem('eventloop_dismissed_completed_id')
+                  if (dismissedId !== String(userRes.id) && parsedRes.eventName) {
+                    setCompletedEventNotice({
+                      id: String(userRes.id),
+                      eventName: parsedRes.eventName
+                    })
+                  }
+                } catch (e) {}
+
+                if (userRes.status !== 'completed') {
+                  try {
+                    await supabase
+                      .from('reservations')
+                      .update({ status: 'completed' })
+                      .eq('id', userRes.id)
+                  } catch (e) {}
+                }
+              } else {
+                setCompletedEventNotice(null)
+                const resWithOwner = {
+                  ...parsedRes,
+                  ownerUserId: currentUserId
+                }
+                const serializedCloud = JSON.stringify({
+                  ...resWithOwner,
+                  paymentStatus: normalizedStatus
+                })
+                lastSyncedResHashRef.current = `${currentUserId}:::${normalizedStatus}:::${serializedCloud}`
+
+                setActiveReservation(prev => {
+                  if (prev && JSON.stringify(prev) === JSON.stringify(resWithOwner)) return prev
+                  return resWithOwner
+                })
+                try {
+                  localStorage.setItem('eventloop_active_reservation', JSON.stringify(resWithOwner))
+                } catch (e) {}
+
+                setUserPaymentStatus(normalizedStatus)
+                try {
+                  localStorage.setItem('eventloop_user_payment_status', normalizedStatus)
+                } catch (e) {}
               }
-              const serializedCloud = JSON.stringify({
-                ...resWithOwner,
-                paymentStatus: normalizedStatus
-              })
-              lastSyncedResHashRef.current = `${currentUserId}:::${normalizedStatus}:::${serializedCloud}`
-
-              setActiveReservation(prev => {
-                if (prev && JSON.stringify(prev) === JSON.stringify(resWithOwner)) return prev
-                return resWithOwner
-              })
-              try {
-                localStorage.setItem('eventloop_active_reservation', JSON.stringify(resWithOwner))
-              } catch (e) {}
-
-              setUserPaymentStatus(normalizedStatus)
-              try {
-                localStorage.setItem('eventloop_user_payment_status', normalizedStatus)
-              } catch (e) {}
             }
           }
         } catch (resErr) {
@@ -603,11 +640,35 @@ export function AppProvider({ children }) {
               try {
                 const parsed = JSON.parse(matchedRes.item_name)
                 hasCloudReservation = true
-                setActiveReservation(prev => (prev && JSON.stringify(prev) === JSON.stringify(parsed)) ? prev : parsed)
-                try { localStorage.setItem('eventloop_active_reservation', JSON.stringify(parsed)) } catch (e) {}
-                if (matchedRes.status) {
-                  setUserPaymentStatus(matchedRes.status)
-                  try { localStorage.setItem('eventloop_user_payment_status', matchedRes.status) } catch (e) {}
+                const fbStatus = matchedRes.status || parsed.paymentStatus || 'idle'
+                const fbRemainingRented = (parsed.items || []).filter(i => i.listingType !== 'sale')
+                const fbFinished =
+                  fbStatus === 'completed' ||
+                  (fbStatus === 'approved' && fbRemainingRented.length === 0 && (parsed.items || []).length === 0)
+
+                if (fbFinished) {
+                  lastSyncedResHashRef.current = ''
+                  setActiveReservation(null)
+                  setUserPaymentStatus('idle')
+                  try {
+                    localStorage.removeItem('eventloop_active_reservation')
+                    localStorage.setItem('eventloop_user_payment_status', 'idle')
+                    const dismissedId = sessionStorage.getItem('eventloop_dismissed_completed_id')
+                    if (dismissedId !== String(matchedRes.id) && parsed.eventName) {
+                      setCompletedEventNotice({
+                        id: String(matchedRes.id),
+                        eventName: parsed.eventName
+                      })
+                    }
+                  } catch (e) {}
+                } else {
+                  setCompletedEventNotice(null)
+                  setActiveReservation(prev => (prev && JSON.stringify(prev) === JSON.stringify(parsed)) ? prev : parsed)
+                  try { localStorage.setItem('eventloop_active_reservation', JSON.stringify(parsed)) } catch (e) {}
+                  if (matchedRes.status) {
+                    setUserPaymentStatus(matchedRes.status)
+                    try { localStorage.setItem('eventloop_user_payment_status', matchedRes.status) } catch (e) {}
+                  }
                 }
               } catch (pe) {}
             }
@@ -1649,6 +1710,7 @@ export function AppProvider({ children }) {
     } catch (e) {}
     lastSyncedResHashRef.current = ''
     setActiveReservation(null)
+    setCompletedEventNotice(null)
     setUserPaymentStatus('idle')
     setCartItems([])
     setReturnStatus('idle')
@@ -1885,14 +1947,19 @@ export function AppProvider({ children }) {
                 const hasItem = (parsed.items || []).some(i => String(i.id) === String(equipmentId))
                 if (hasItem) {
                   const updatedItems = (parsed.items || []).filter(i => String(i.id) !== String(equipmentId))
+                  const remainingRentedCount = updatedItems.filter(i => i.listingType !== 'sale').length
+                  const nextCloudStatus = remainingRentedCount === 0 ? 'completed' : resRow.status
+
                   await supabase
                     .from('reservations')
                     .update({
                       item_name: JSON.stringify({
                         ...parsed,
-                        items: updatedItems
+                        items: updatedItems,
+                        paymentStatus: nextCloudStatus
                       }),
-                      quantity: updatedItems.length
+                      quantity: updatedItems.length,
+                      status: nextCloudStatus
                     })
                     .eq('id', resRow.id)
                 }
@@ -1925,19 +1992,42 @@ export function AppProvider({ children }) {
       return item
     }))
 
-    // Hapus dari activeReservation lokal hanya jika milik peminjam yang return-nya baru disetujui
+    // Hapus dari activeReservation lokal hanya jika milik peminjam yang return-nya baru disetujui.
+    // Jika seluruh barang sewa telah kembali, otomatis tutup siklus event tanpa memaksa klik tombol manual!
     const matchesLocalOwner = !returnData?.userId || !session?.user?.id || returnData.userId === session.user.id
-    if (matchesLocalOwner) {
-      setActiveReservation(prev => {
-        if (!prev || !prev.items) return prev
-        const remainingItems = prev.items.filter(item => String(item.id) !== String(equipmentId))
-        return {
-          ...prev,
-          items: remainingItems
+    if (matchesLocalOwner && activeReservation?.items) {
+      const remainingItems = activeReservation.items.filter(item => String(item.id) !== String(equipmentId))
+      const remainingRented = remainingItems.filter(item => item.listingType !== 'sale')
+      if (remainingRented.length === 0) {
+        const finishedEventName = activeReservation.eventName || returnData?.itemName || 'Kegiatan Kampus'
+        lastSyncedResHashRef.current = ''
+        if (activeReservation.txnId) {
+          try { localStorage.setItem('eventloop_cleared_txn_id', String(activeReservation.txnId)) } catch (e) {}
         }
-      })
+        setActiveReservation(null)
+        setUserPaymentStatus('idle')
+        setCompletedEventNotice({
+          id: String(activeReservation.txnId || returnId),
+          eventName: finishedEventName
+        })
+        try {
+          localStorage.removeItem('eventloop_active_reservation')
+          localStorage.setItem('eventloop_user_payment_status', 'idle')
+        } catch (e) {}
+      } else {
+        setActiveReservation(prev => (prev ? { ...prev, items: remainingItems } : prev))
+      }
     }
   }
+
+  const dismissCompletedEventNotice = useCallback(() => {
+    setCompletedEventNotice(prev => {
+      if (prev?.id) {
+        try { sessionStorage.setItem('eventloop_dismissed_completed_id', String(prev.id)) } catch (e) {}
+      }
+      return null
+    })
+  }, [])
 
   // Status pembayaran efektif terpusat khusus untuk event aktif pengguna saat ini
   const activeOrderTxn = useMemo(() => {
@@ -1955,6 +2045,17 @@ export function AppProvider({ children }) {
     }
     return userPaymentStatus
   }, [userPaymentStatus, activeOrderTxn, activeReservation?.txnId])
+
+  // Benar-benar terkunci hanya jika masih menunggu ACC bayar atau masih ada barang sewa yang belum kembali
+  const hasOngoingRental = useMemo(() => {
+    if (!activeReservation?.eventName) return false
+    if (effectivePaymentStatus === 'pending_admin_approval') return true
+    if (effectivePaymentStatus === 'approved') {
+      const rented = (activeReservation.items || []).filter(i => i.listingType !== 'sale')
+      return rented.length > 0
+    }
+    return false
+  }, [activeReservation, effectivePaymentStatus])
 
   const isMyPendingReturn = useCallback((ret) => {
     if (!ret) return false
@@ -2077,6 +2178,7 @@ export function AppProvider({ children }) {
     setCurrentUserName('Prasmulyan')
     setCurrentUserStudyProgram('Prasetiya Mulya')
     setActiveReservation(null)
+    setCompletedEventNotice(null)
     setUserPaymentStatus('idle')
     setCartItems([])
     setReturnStatus('idle')
@@ -2086,6 +2188,7 @@ export function AppProvider({ children }) {
     sessionStorage.removeItem('eventloop_user_prodi')
     sessionStorage.removeItem('eventloop_sso_user')
     sessionStorage.removeItem('eventloop_last_active')
+    sessionStorage.removeItem('eventloop_dismissed_completed_id')
     localStorage.removeItem('eventloop_session')
     localStorage.removeItem('eventloop_role')
     localStorage.removeItem('eventloop_user_prodi')
@@ -2102,8 +2205,10 @@ export function AppProvider({ children }) {
       session, ssoUser, setSsoUser, sessionUser: session?.user || ssoUser || null, 
       logout, loadingDb, refetchData: fetchSupabaseData, fetchSupabaseData,
       campusImpact, orgImpacts,
-      equipments, pendingApprovals, transactions, userPaymentStatus, effectivePaymentStatus, activeOrderTxn,
-      activeReservation, setActiveReservation, updateActiveEventDetails, clearActiveEvent, returnStatus, pendingReturns, isMyPendingReturn,
+      equipments, pendingApprovals, transactions, userPaymentStatus, effectivePaymentStatus, activeOrderTxn, hasOngoingRental,
+      activeReservation, setActiveReservation, updateActiveEventDetails, clearActiveEvent,
+      completedEventNotice, dismissCompletedEventNotice,
+      returnStatus, pendingReturns, isMyPendingReturn,
       ongoingCampusEvents, getEquipmentBorrowings,
       cartItems, addToCart, removeFromCart, updateCartQty,
       uploadEquipmentByUser, approveEquipmentByAdmin, rejectEquipmentByAdmin, submitUserQrisPayment, approvePaymentByAdmin,

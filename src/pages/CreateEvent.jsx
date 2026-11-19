@@ -27,21 +27,17 @@ export default function CreateEvent() {
     userPaymentStatus,
     effectivePaymentStatus: ctxPaymentStatus,
     currentUserRole,
-    currentUserName
+    currentUserName,
+    hasOngoingRental
   } = useApp()
 
   const effectivePaymentStatus = ctxPaymentStatus || userPaymentStatus
-  const remainingRentedItems = (activeReservation?.items || []).filter(item => item.listingType !== 'sale')
-  const isEventCycleCompleted = Boolean(
-    currentUserRole === 'user' &&
-    activeReservation?.eventName &&
-    effectivePaymentStatus === 'approved' &&
-    remainingRentedItems.length === 0
-  )
 
-  // Sesi terkunci hanya jika pembayaran sudah dikirim atau disetujui
+  // Sesi terkunci hanya jika pembayaran/peminjaman barang sewa masih berjalan
   const isPaidEvent = currentUserRole === 'user' && Boolean(
-    activeReservation?.eventName && (effectivePaymentStatus === 'approved' || effectivePaymentStatus === 'pending_admin_approval')
+    typeof hasOngoingRental === 'boolean'
+      ? hasOngoingRental
+      : (activeReservation?.eventName && (effectivePaymentStatus === 'approved' || effectivePaymentStatus === 'pending_admin_approval'))
   )
   const isDraftEvent = currentUserRole === 'user' && Boolean(
     activeReservation?.eventName && effectivePaymentStatus === 'idle'
@@ -214,20 +210,17 @@ export default function CreateEvent() {
         <div className="card p-7 sm:p-8 space-y-6">
           <div className="flex items-start gap-4">
             <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0 border border-emerald-200/70">
-              {isEventCycleCompleted ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <Lock className="w-5 h-5" />}
+              <Lock className="w-5 h-5" />
             </div>
             <div>
               <span className="badge-sage mb-2">
-                {isEventCycleCompleted ? 'Siklus Peminjaman Selesai 🌿' : '1 Akun · 1 Event Aktif'}
+                1 Akun · 1 Event Aktif
               </span>
               <h2 className="text-xl font-bold text-slate-900">
-                {isEventCycleCompleted ? 'Seluruh Perlengkapan Event Telah Dikembalikan' : 'Kegiatan Anda Sedang Berjalan'}
+                Kegiatan Anda Sedang Berjalan
               </h2>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                {isEventCycleCompleted
-                  ? `Terima kasih! Seluruh barang untuk kegiatan "${activeReservation.eventName}" sudah kembali dan diverifikasi admin. Klik tombol di bawah untuk menutup siklus ini dan membuat event baru.`
-                  : <>Pembayaran untuk kegiatan <strong>"{activeReservation.eventName}"</strong> telah dikirimkan / disetujui. Selesaikan pengembalian perlengkapan kegiatan ini terlebih dahulu sebelum membuat event baru.</>
-                }
+                Pembayaran untuk kegiatan <strong>"{activeReservation?.eventName}"</strong> telah dikirimkan / disetujui. Selesaikan pengembalian perlengkapan kegiatan ini terlebih dahulu sebelum membuat event baru.
               </p>
             </div>
           </div>
@@ -235,16 +228,16 @@ export default function CreateEvent() {
           <div className="p-5 bg-emerald-50/40 rounded-2xl border border-emerald-100 space-y-3 text-xs">
             <div className="flex justify-between py-1 border-b border-emerald-100/70">
               <span className="text-slate-500">Nama Kegiatan</span>
-              <strong className="text-slate-900">{activeReservation.eventName}</strong>
+              <strong className="text-slate-900">{activeReservation?.eventName}</strong>
             </div>
             <div className="flex justify-between py-1 border-b border-emerald-100/70">
               <span className="text-slate-500">Penyelenggara</span>
-              <strong className="text-slate-800">{activeReservation.org}</strong>
+              <strong className="text-slate-800">{activeReservation?.org}</strong>
             </div>
             <div className="flex justify-between py-1 border-b border-emerald-100/70">
               <span className="text-slate-500">Periode Peminjaman</span>
               <strong className="text-emerald-700">
-                {activeReservation.startDateLabel ? `${activeReservation.startDateLabel} s/d ${activeReservation.endDateLabel}` : activeReservation.eventDate} ({activeReservation.durationDays || 1} Hari)
+                {activeReservation?.startDateLabel ? `${activeReservation.startDateLabel} s/d ${activeReservation.endDateLabel}` : activeReservation?.eventDate} ({activeReservation?.durationDays || 1} Hari)
               </strong>
             </div>
             <div className="flex justify-between py-1">
@@ -254,9 +247,7 @@ export default function CreateEvent() {
                   ? 'badge-sage'
                   : 'badge-warm'
               }>
-                {isEventCycleCompleted
-                  ? 'Selesai & Dikembalikan'
-                  : effectivePaymentStatus === 'approved'
+                {effectivePaymentStatus === 'approved'
                   ? 'Lunas / Sedang Dipinjam'
                   : 'Menunggu Verifikasi Admin'}
               </span>
@@ -265,31 +256,14 @@ export default function CreateEvent() {
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <div className="flex flex-wrap gap-2.5">
-              {isEventCycleCompleted ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    clearActiveEvent()
-                    setEventName('')
-                    setShowRecommendation(false)
-                  }}
-                  className="btn-primary text-xs flex items-center gap-2 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Selesaikan Siklus & Buat Event Baru</span>
-                </button>
-              ) : (
-                <>
-                  <Link to="/reservation" className="btn-primary text-xs flex items-center gap-2">
-                    <ClipboardList className="w-4 h-4" />
-                    <span>Lihat Tiket Reservasi</span>
-                  </Link>
-                  <Link to="/return" className="btn-secondary text-xs flex items-center gap-2">
-                    <RotateCcw className="w-4 h-4" />
-                    <span>Halaman Pengembalian</span>
-                  </Link>
-                </>
-              )}
+              <Link to="/reservation" className="btn-primary text-xs flex items-center gap-2">
+                <ClipboardList className="w-4 h-4" />
+                <span>Lihat Tiket Reservasi</span>
+              </Link>
+              <Link to="/return" className="btn-secondary text-xs flex items-center gap-2">
+                <RotateCcw className="w-4 h-4" />
+                <span>Halaman Pengembalian</span>
+              </Link>
             </div>
 
             {effectivePaymentStatus === 'pending_admin_approval' && (

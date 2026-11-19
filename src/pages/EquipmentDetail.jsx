@@ -32,7 +32,8 @@ export default function EquipmentDetail() {
     currentUserRole, 
     getEquipmentBorrowings,
     activeReservation,
-    updateActiveEventDetails 
+    updateActiveEventDetails,
+    hasOngoingRental
   } = useApp()
 
   const [futureStartDate, setFutureStartDate] = useState('2026-11-20')
@@ -40,7 +41,7 @@ export default function EquipmentDetail() {
 
   const item = equipments.find(eq => eq.id.toString() === id)
   const effectiveStatus = ctxPaymentStatus || userPaymentStatus
-  const isLockedByActivePayment = currentUserRole === 'user' && effectiveStatus !== 'idle'
+  const isLockedByActivePayment = currentUserRole === 'user' && (typeof hasOngoingRental === 'boolean' ? hasOngoingRental : effectiveStatus !== 'idle')
   
   if (!item) {
     return (
