@@ -28,6 +28,7 @@ function clearUserLocalStorage() {
 const AppContext = createContext()
 
 export const DEFAULT_STORAGE_LOCATION = 'Auditorium Lantai M PMBS'
+export const PLATFORM_FEE_RATE = 0.05
 
 export const normalizeStorageLocation = (loc) => {
   const raw = String(loc || '').trim()
@@ -36,6 +37,134 @@ export const normalizeStorageLocation = (loc) => {
     return DEFAULT_STORAGE_LOCATION
   }
   return raw
+}
+
+export const deriveOverallPayoutStatus = (ownerPayouts = [], fallbackStatus = 'Waiting Admin Approval') => {
+  if (!Array.isArray(ownerPayouts) || ownerPayouts.length === 0) return fallbackStatus
+  const statuses = ownerPayouts.map(op => op.status || fallbackStatus)
+  if (statuses.every(s => s === 'Transferred' || s === 'Settled (Gratis)')) return 'Transferred'
+  if (statuses.some(s => s === 'Transferred')) return 'Partial Transfer'
+  if (statuses.some(s => s === 'Pending Transfer')) return 'Pending Transfer'
+  if (statuses.every(s => s === 'Rejected')) return 'Rejected'
+  if (statuses.every(s => s === 'Cancelled')) return 'Cancelled'
+  return fallbackStatus
+}
+
+export const buildOwnerPayouts = ({
+  items = [],
+  durationDays = 1,
+  catalogMap = null,
+  defaultStatus = 'Waiting Admin Approval',
+  fallbackOwnerOrg = 'Organisasi Pemilik & EventLoop',
+  fallbackOwnerBank = 'BCA 8012345678 a.n Owner',
+  fallbackTotalAmount = 0,
+  fallbackProofPhoto = null,
+  fallbackPayoutRef = null,
+  fallbackTransferredAt = null
+}) => {
+  const days = Math.max(1, Number(durationDays) || 1)
+  if (!Array.isArray(items) || items.length === 0) {
+    const gross = Math.max(0, Math.round(Number(fallbackTotalAmount) || 0))
+    const fee = Math.round(gross * PLATFORM_FEE_RATE)
+    const net = Math.max(0, gross - fee)
+    const isFree = gross === 0 && defaultStatus === 'Pending Transfer'
+    return [{
+      ownerKey: 'owner-0',
+      ownerOrg: fallbackOwnerOrg,
+      ownerBank: fallbackOwnerBank,
+      uploader: fallbackOwnerOrg,
+      itemsSummary: 'Perlengkapan Event',
+      items: [],
+      grossAmount: gross,
+      adminFee: fee,
+      payoutAmount: net,
+      status: isFree ? 'Settled (Gratis)' : defaultStatus,
+      payoutRef: fallbackPayoutRef,
+      transferredAt: fallbackTransferredAt,
+      payoutProofPhoto: fallbackProofPhoto
+    }]
+  }
+
+  const groupMap = new Map()
+  items.forEach((rawItem) => {
+    const catEq = catalogMap
+      ? (catalogMap.get(String(rawItem.id)) || Array.from(catalogMap.values()).find(e => e.name?.toLowerCase().trim() === rawItem.name?.toLowerCase().trim()))
+      : null
+    const listingType = rawItem.listingType || catEq?.listingType || 'rental'
+    const unitPrice = rawItem.unitPrice !== undefined
+      ? Number(rawItem.unitPrice)
+      : listingType === 'free'
+      ? 0
+      : listingType === 'sale'
+      ? Number(rawItem.salePrice ?? catEq?.salePrice ?? ((rawItem.price ?? catEq?.price ?? 0) * 5))
+      : Number(rawItem.price ?? catEq?.price ?? 0)
+    const qty = Math.max(1, Number(rawItem.qty) || 1)
+    const dayMult = listingType === 'sale' ? 1 : days
+    const itemSubtotal = rawItem.subtotal !== undefined
+      ? Math.max(0, Math.round(Number(rawItem.subtotal) || 0))
+      : Math.max(0, Math.round(unitPrice * qty * dayMult))
+
+    const ownerOrg = (rawItem.owner || catEq?.owner || fallbackOwnerOrg || 'Organisasi Pemilik').trim()
+    const ownerBank = (rawItem.ownerBank || catEq?.ownerBank || fallbackOwnerBank || 'BCA 8012345678 a.n Owner').trim()
+    const uploader = (rawItem.uploader || catEq?.uploader || ownerOrg).trim()
+    const normKey = ownerOrg.toLowerCase()
+
+    if (!groupMap.has(normKey)) {
+      groupMap.set(normKey, {
+        ownerKey: `owner-${groupMap.size}-${normKey.replace(/[^a-z0-9]+/g, '-').slice(0, 24)}`,
+        ownerOrg,
+        ownerBank,
+        uploader,
+        items: [],
+        grossAmount: 0
+      })
+    }
+    const g = groupMap.get(normKey)
+    g.items.push({
+      id: rawItem.id,
+      name: rawItem.name,
+      qty,
+      listingType,
+      subtotal: itemSubtotal
+    })
+    g.grossAmount += itemSubtotal
+  })
+
+  const groups = Array.from(groupMap.values())
+  const computedTotalGross = groups.reduce((s, g) => s + g.grossAmount, 0)
+
+  if (computedTotalGross === 0 && Number(fallbackTotalAmount) > 0 && groups.length > 0) {
+    const share = Math.round(Number(fallbackTotalAmount) / groups.length)
+    groups.forEach((g, idx) => {
+      g.grossAmount = idx === groups.length - 1
+        ? Math.max(0, Number(fallbackTotalAmount) - share * (groups.length - 1))
+        : share
+    })
+  }
+
+  return groups.map((g, idx) => {
+    const gross = Math.max(0, Math.round(g.grossAmount))
+    const fee = Math.round(gross * PLATFORM_FEE_RATE)
+    const net = Math.max(0, gross - fee)
+    const itemSummary = g.items.map(i => `${i.name} (${i.qty}x)`).join(', ')
+    const isFree = gross === 0 && defaultStatus === 'Pending Transfer'
+    const isLegacySingleTransferred = groups.length === 1 && defaultStatus === 'Transferred'
+    return {
+      ownerKey: g.ownerKey || `owner-${idx}`,
+      ownerOrg: g.ownerOrg,
+      ownerBank: g.ownerBank,
+      uploader: g.uploader,
+      itemsSummary: itemSummary,
+      items: g.items,
+      grossAmount: gross,
+      adminFee: fee,
+      payoutAmount: net,
+      status: isFree ? 'Settled (Gratis)' : defaultStatus,
+      payoutRef: isLegacySingleTransferred ? fallbackPayoutRef : null,
+      transferredAt: isLegacySingleTransferred ? fallbackTransferredAt : null,
+      payoutProofPhoto: isLegacySingleTransferred ? fallbackProofPhoto : null
+    }
+  })
 }
 
 export const ADMIN_DISPLAY_NAMES = {
@@ -832,6 +961,66 @@ export function AppProvider({ children }) {
                 : (!t.payout_status?.startsWith('{') ? (t.payout_status || 'Waiting Admin Approval') : 'Waiting Admin Approval')
 
               const localMatch = prevLocal.find(lt => lt.id === t.id || (lt.itemName === t.item_names && lt.amount === Number(t.amount)))
+              const resolvedBorrowed = meta.borrowedItems || localMatch?.borrowedItems || []
+              const resolvedDuration = meta.durationDays || localMatch?.durationDays || 1
+              const resolvedOwnerOrg = meta.ownerOrg || localMatch?.ownerOrg || 'Organisasi Pemilik & EventLoop'
+              const resolvedOwnerBank = meta.ownerBank || localMatch?.ownerBank || 'BCA 8012345678 a.n Owner'
+
+              let resolvedOwnerPayouts = []
+              if (Array.isArray(meta.ownerPayouts) && meta.ownerPayouts.length > 0) {
+                resolvedOwnerPayouts = meta.ownerPayouts.map((op, idx) => {
+                  const gross = Math.max(0, Math.round(Number(op.grossAmount) || 0))
+                  const fee = op.adminFee !== undefined ? Math.round(Number(op.adminFee)) : Math.round(gross * PLATFORM_FEE_RATE)
+                  const net = op.payoutAmount !== undefined ? Math.round(Number(op.payoutAmount)) : Math.max(0, gross - fee)
+                  return {
+                    ...op,
+                    ownerKey: op.ownerKey || `owner-${idx}`,
+                    grossAmount: gross,
+                    adminFee: fee,
+                    payoutAmount: net,
+                    status: op.status || payoutStr
+                  }
+                })
+              } else {
+                // Rekonstruksi pembagian payout per-pemilik secara otomatis untuk transaksi multi-pemilik lama
+                let itemsForSplit = resolvedBorrowed
+                if ((!itemsForSplit || itemsForSplit.length === 0) && t.item_names) {
+                  itemsForSplit = t.item_names.split(',').map((part) => {
+                    const mQty = part.match(/\((\d+)x\)/)
+                    const cleanName = part.replace(/\(\d+x\)/, '').trim()
+                    const foundEq = Array.from(catalogMap.values()).find(e => e.name?.toLowerCase().trim() === cleanName.toLowerCase())
+                    return {
+                      id: foundEq?.id || cleanName,
+                      name: cleanName,
+                      qty: mQty ? parseInt(mQty[1], 10) : 1,
+                      listingType: foundEq?.listingType || 'rental',
+                      price: foundEq?.price || 0,
+                      salePrice: foundEq?.salePrice || null,
+                      owner: foundEq?.owner || resolvedOwnerOrg,
+                      ownerBank: foundEq?.ownerBank || resolvedOwnerBank,
+                      uploader: foundEq?.uploader || foundEq?.owner || resolvedOwnerOrg
+                    }
+                  })
+                }
+                resolvedOwnerPayouts = buildOwnerPayouts({
+                  items: itemsForSplit,
+                  durationDays: resolvedDuration,
+                  catalogMap,
+                  defaultStatus: payoutStr,
+                  fallbackOwnerOrg: resolvedOwnerOrg,
+                  fallbackOwnerBank: resolvedOwnerBank,
+                  fallbackTotalAmount: Number(t.amount) || 0,
+                  fallbackProofPhoto: meta.payoutProofPhoto || localMatch?.payoutProofPhoto || null,
+                  fallbackPayoutRef: meta.payoutRef || localMatch?.payoutRef || null,
+                  fallbackTransferredAt: meta.transferredAt || localMatch?.transferredAt || null
+                })
+              }
+
+              const totalAdminFee = resolvedOwnerPayouts.reduce((s, op) => s + (op.adminFee || 0), 0)
+              const totalNetPayout = resolvedOwnerPayouts.reduce((s, op) => s + (op.payoutAmount || 0), 0)
+              const derivedStatus = deriveOverallPayoutStatus(resolvedOwnerPayouts, payoutStr)
+              const combinedOwnerNames = resolvedOwnerPayouts.map(op => op.ownerOrg).join(' & ') || resolvedOwnerOrg
+
               return {
                 id: t.id,
                 userId: meta.userId || localMatch?.userId || null,
@@ -840,23 +1029,24 @@ export function AppProvider({ children }) {
                 eventName: meta.eventName || localMatch?.eventName || 'Kegiatan Kemahasiswaan Prasmul',
                 startDate: meta.startDate || localMatch?.startDate || '03 Nov 2026',
                 endDate: meta.endDate || localMatch?.endDate || '05 Nov 2026',
-                durationDays: meta.durationDays || localMatch?.durationDays || 2,
+                durationDays: resolvedDuration,
                 eventLocation: meta.eventLocation || localMatch?.eventLocation || 'Auditorium Kampus BSD',
                 itemName: t.item_names || 'Reservasi Perlengkapan',
-                borrowedItems: meta.borrowedItems || localMatch?.borrowedItems || [],
+                borrowedItems: resolvedBorrowed,
                 amount: Number(t.amount) || 0,
                 paymentProofPhoto: meta.paymentProofPhoto || localMatch?.paymentProofPhoto || null,
                 payoutProofPhoto: meta.payoutProofPhoto || localMatch?.payoutProofPhoto || null,
                 payoutRef: meta.payoutRef || localMatch?.payoutRef || null,
                 transferredAt: meta.transferredAt || localMatch?.transferredAt || null,
                 qrisStatus: t.qris_status || 'Pending Admin Verification',
-                payoutStatus: payoutStr,
+                payoutStatus: derivedStatus,
+                ownerPayouts: resolvedOwnerPayouts,
                 paidAt: t.created_at ? new Date(t.created_at).toLocaleString('id-ID') : 'Baru saja',
                 bankAdminRef: `BCA-QRIS-${String(t.id).slice(0, 6)}`,
-                ownerOrg: meta.ownerOrg || localMatch?.ownerOrg || 'Organisasi Pemilik & EventLoop',
-                ownerBank: meta.ownerBank || localMatch?.ownerBank || 'BCA 8012345678 a.n Owner',
-                payoutAmount: Math.round((Number(t.amount) || 0) * 0.95),
-                adminFee: Math.round((Number(t.amount) || 0) * 0.05),
+                ownerOrg: combinedOwnerNames,
+                ownerBank: resolvedOwnerPayouts[0]?.ownerBank || resolvedOwnerBank,
+                payoutAmount: totalNetPayout,
+                adminFee: totalAdminFee,
                 cycleCompleted: Boolean(meta.cycleCompleted),
                 createdAt: t.created_at || null
               }
@@ -1511,9 +1701,6 @@ export function AppProvider({ children }) {
       }
     }
 
-    const firstCartItem = itemsToCheckout[0]
-    const detectedOwnerOrg = firstCartItem?.owner || 'Organisasi Pemilik Barang'
-    const detectedOwnerBank = firstCartItem?.ownerBank || 'BCA 8012345678 a.n Owner'
     const itemNamesSummary = itemsToCheckout.map(i => `${i.name} (${i.qty}x)`).join(', ') || 'Reservasi Perlengkapan Event'
 
     const todayLabel = formatIdDate(new Date())
@@ -1522,16 +1709,40 @@ export function AppProvider({ children }) {
     const durationDays = Math.max(1, Number(activeReservation?.durationDays) || 1)
     const activeUserId = session?.user?.id || null
 
-    const borrowedSnapshot = itemsToCheckout.map(item => ({
-      id: item.id,
-      name: item.name,
-      qty: item.qty,
-      listingType: item.listingType || 'rental',
-      image: item.image || '📦',
-      owner: item.owner,
-      uploader: item.uploader,
-      originLocation: normalizeStorageLocation(item.lastLocation || item.initialLocation)
-    }))
+    const borrowedSnapshot = itemsToCheckout.map(item => {
+      const unitPrice = item.listingType === 'free'
+        ? 0
+        : item.listingType === 'sale'
+        ? Number(item.salePrice || (item.price || 0) * 5)
+        : Number(item.price || 0)
+      const dayMult = item.listingType === 'sale' ? 1 : durationDays
+      const qtyNum = Math.max(1, Number(item.qty) || 1)
+      return {
+        id: item.id,
+        name: item.name,
+        qty: qtyNum,
+        listingType: item.listingType || 'rental',
+        unitPrice,
+        subtotal: Math.max(0, Math.round(unitPrice * qtyNum * dayMult)),
+        image: item.image || '📦',
+        owner: item.owner || 'Organisasi Pemilik Barang',
+        ownerBank: item.ownerBank || 'BCA 8012345678 a.n Owner',
+        uploader: item.uploader || item.owner || 'Organisasi Pemilik Barang',
+        originLocation: normalizeStorageLocation(item.lastLocation || item.initialLocation)
+      }
+    })
+
+    // Kelompokkan pembayaran & potongan fee 5% secara terpisah untuk masing-masing pemilik barang
+    const ownerPayouts = buildOwnerPayouts({
+      items: borrowedSnapshot,
+      durationDays,
+      defaultStatus: 'Waiting Admin Approval',
+      fallbackTotalAmount: totalAmount
+    })
+    const detectedOwnerOrg = ownerPayouts.map(op => op.ownerOrg).join(' & ') || 'Organisasi Pemilik Barang'
+    const detectedOwnerBank = ownerPayouts[0]?.ownerBank || 'BCA 8012345678 a.n Owner'
+    const totalAdminFee = ownerPayouts.reduce((s, op) => s + (op.adminFee || 0), 0)
+    const totalNetPayout = ownerPayouts.reduce((s, op) => s + (op.payoutAmount || 0), 0)
 
     const cloudMetaPayload = {
       status: 'Waiting Admin Approval',
@@ -1546,6 +1757,7 @@ export function AppProvider({ children }) {
       borrowedItems: borrowedSnapshot,
       ownerOrg: detectedOwnerOrg,
       ownerBank: detectedOwnerBank,
+      ownerPayouts,
       paymentProofPhoto: paymentProofPhoto || null,
       payoutProofPhoto: null
     }
@@ -1570,9 +1782,10 @@ export function AppProvider({ children }) {
       bankAdminRef: `BCA-QRIS-${Math.floor(1000000 + Math.random() * 9000000)}`,
       ownerOrg: detectedOwnerOrg,
       ownerBank: detectedOwnerBank,
+      ownerPayouts,
       payoutStatus: 'Waiting Admin Approval',
-      payoutAmount: Math.round(totalAmount * 0.95),
-      adminFee: Math.round(totalAmount * 0.05),
+      payoutAmount: totalNetPayout,
+      adminFee: totalAdminFee,
     }
 
     let createdTxnId = txnId
@@ -1658,10 +1871,24 @@ export function AppProvider({ children }) {
   }
 
   const approvePaymentByAdmin = async (txnId) => {
+    const localTxn = transactions.find(t => String(t.id) === String(txnId))
+    const buildApprovedOwners = (list = []) => list.map(op => {
+      if (op.status === 'Transferred' || op.status === 'Settled (Gratis)') return op
+      return {
+        ...op,
+        status: (Number(op.grossAmount) || 0) === 0 ? 'Settled (Gratis)' : 'Pending Transfer'
+      }
+    })
+
+    let nextLocalOwnerPayouts = localTxn?.ownerPayouts ? buildApprovedOwners(localTxn.ownerPayouts) : null
+    let nextOverallStatus = nextLocalOwnerPayouts
+      ? deriveOverallPayoutStatus(nextLocalOwnerPayouts, 'Pending Transfer')
+      : 'Pending Transfer'
+
     try {
       if (txnId) {
         // Ambil payout_status sebelumnya agar bukti bayar & metadata tidak terhapus
-        let nextPayoutStatus = 'Pending Transfer'
+        let nextPayoutStatus = nextOverallStatus
         try {
           const { data: existingRow } = await supabase
             .from('transactions')
@@ -1671,9 +1898,17 @@ export function AppProvider({ children }) {
 
           if (existingRow?.payout_status && existingRow.payout_status.startsWith('{')) {
             const parsedMeta = JSON.parse(existingRow.payout_status)
+            const sourceOwners = (Array.isArray(parsedMeta.ownerPayouts) && parsedMeta.ownerPayouts.length > 0)
+              ? parsedMeta.ownerPayouts
+              : (localTxn?.ownerPayouts || [])
+            const updatedOwners = sourceOwners.length > 0 ? buildApprovedOwners(sourceOwners) : undefined
+            const derived = updatedOwners ? deriveOverallPayoutStatus(updatedOwners, 'Pending Transfer') : 'Pending Transfer'
+            nextOverallStatus = derived
+            if (updatedOwners) nextLocalOwnerPayouts = updatedOwners
             nextPayoutStatus = JSON.stringify({
               ...parsedMeta,
-              status: 'Pending Transfer'
+              status: derived,
+              ...(updatedOwners ? { ownerPayouts: updatedOwners } : {})
             })
           }
         } catch (e) {}
@@ -1724,10 +1959,13 @@ export function AppProvider({ children }) {
 
     setTransactions(prev => prev.map(t => {
       if (t.id === txnId || !txnId) {
+        const updatedOwners = nextLocalOwnerPayouts || (t.ownerPayouts ? buildApprovedOwners(t.ownerPayouts) : t.ownerPayouts)
+        const derived = updatedOwners ? deriveOverallPayoutStatus(updatedOwners, 'Pending Transfer') : nextOverallStatus
         return {
           ...t,
           qrisStatus: 'Payment Approved by Admin (Lunas)',
-          payoutStatus: 'Pending Transfer'
+          payoutStatus: derived,
+          ownerPayouts: updatedOwners
         }
       }
       return t
@@ -1752,9 +1990,13 @@ export function AppProvider({ children }) {
 
           if (existingRow?.payout_status && existingRow.payout_status.startsWith('{')) {
             const parsedMeta = JSON.parse(existingRow.payout_status)
+            const rejectedOwners = Array.isArray(parsedMeta.ownerPayouts)
+              ? parsedMeta.ownerPayouts.map(op => ({ ...op, status: 'Rejected' }))
+              : undefined
             nextPayoutStatus = JSON.stringify({
               ...parsedMeta,
               status: 'Rejected',
+              ...(rejectedOwners ? { ownerPayouts: rejectedOwners } : {}),
               rejectReason: reason || 'Bukti pembayaran tidak sesuai / ditolak Admin'
             })
           }
@@ -1819,7 +2061,12 @@ export function AppProvider({ children }) {
 
     setTransactions(prev => prev.map(t => (
       String(t.id) === String(txnId)
-        ? { ...t, qrisStatus: 'Payment Rejected by Admin (Ditolak)', payoutStatus: 'Rejected' }
+        ? {
+            ...t,
+            qrisStatus: 'Payment Rejected by Admin (Ditolak)',
+            payoutStatus: 'Rejected',
+            ownerPayouts: Array.isArray(t.ownerPayouts) ? t.ownerPayouts.map(op => ({ ...op, status: 'Rejected' })) : t.ownerPayouts
+          }
         : t
     )))
 
@@ -1829,13 +2076,34 @@ export function AppProvider({ children }) {
     }
   }
 
-  const transferPayoutToOwner = async (txnId, proofPhoto = null) => {
+  const transferPayoutToOwner = async (txnId, proofPhoto = null, ownerKey = null) => {
     const payoutRef = `TRF-BCA-${Math.floor(100000 + Math.random() * 900000)}`
     const transferredAt = `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`
+    const targetTxn = transactions.find(t => String(t.id) === String(txnId))
+
+    const applyOwnerTransfer = (ownersList = []) => {
+      if (!Array.isArray(ownersList) || ownersList.length === 0) return []
+      return ownersList.map((op, idx) => {
+        const isMatch = ownerKey
+          ? (String(op.ownerKey) === String(ownerKey) || op.ownerOrg === ownerKey)
+          : idx === 0
+        if (!isMatch) return op
+        return {
+          ...op,
+          status: 'Transferred',
+          payoutRef,
+          transferredAt,
+          payoutProofPhoto: proofPhoto || op.payoutProofPhoto || null
+        }
+      })
+    }
+
+    let updatedOwnersFinal = targetTxn?.ownerPayouts ? applyOwnerTransfer(targetTxn.ownerPayouts) : []
+    let overallStatusFinal = deriveOverallPayoutStatus(updatedOwnersFinal, 'Transferred')
 
     try {
       if (txnId) {
-        let nextPayoutPayload = 'Transferred'
+        let nextPayoutPayload = overallStatusFinal
         try {
           const { data: existingRow } = await supabase
             .from('transactions')
@@ -1847,12 +2115,24 @@ export function AppProvider({ children }) {
             ? JSON.parse(existingRow.payout_status)
             : {}
 
+          const baseOwners = (Array.isArray(baseMeta.ownerPayouts) && baseMeta.ownerPayouts.length > 0)
+            ? baseMeta.ownerPayouts
+            : (targetTxn?.ownerPayouts || [])
+
+          const nextOwners = baseOwners.length > 0 ? applyOwnerTransfer(baseOwners) : []
+          const derived = nextOwners.length > 0 ? deriveOverallPayoutStatus(nextOwners, 'Transferred') : 'Transferred'
+          updatedOwnersFinal = nextOwners.length > 0 ? nextOwners : updatedOwnersFinal
+          overallStatusFinal = derived
+
           nextPayoutPayload = JSON.stringify({
             ...baseMeta,
-            status: 'Transferred',
-            payoutRef,
-            transferredAt,
-            payoutProofPhoto: proofPhoto || baseMeta.payoutProofPhoto || null
+            status: derived,
+            ...(nextOwners.length > 0 ? { ownerPayouts: nextOwners } : {}),
+            ...(nextOwners.length <= 1 ? {
+              payoutRef,
+              transferredAt,
+              payoutProofPhoto: proofPhoto || baseMeta.payoutProofPhoto || null
+            } : {})
           })
         } catch (e) {}
 
@@ -1866,13 +2146,20 @@ export function AppProvider({ children }) {
     }
 
     setTransactions(prev => prev.map(t => {
-      if (t.id === txnId) {
+      if (String(t.id) === String(txnId)) {
+        const nextOwners = updatedOwnersFinal.length > 0
+          ? updatedOwnersFinal
+          : applyOwnerTransfer(t.ownerPayouts || [])
+        const derived = nextOwners.length > 0 ? deriveOverallPayoutStatus(nextOwners, 'Transferred') : overallStatusFinal
         return {
           ...t,
-          payoutStatus: 'Transferred',
-          payoutRef,
-          payoutProofPhoto: proofPhoto || t.payoutProofPhoto || null,
-          transferredAt
+          payoutStatus: derived,
+          ownerPayouts: nextOwners,
+          ...(nextOwners.length <= 1 ? {
+            payoutRef,
+            payoutProofPhoto: proofPhoto || t.payoutProofPhoto || null,
+            transferredAt
+          } : {})
         }
       }
       return t

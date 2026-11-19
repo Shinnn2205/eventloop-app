@@ -21,7 +21,7 @@ import {
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('payouts')
   const [viewingProof, setViewingProof] = useState(null)
-  const [payoutModalTxn, setPayoutModalTxn] = useState(null)
+  const [payoutModalTarget, setPayoutModalTarget] = useState(null)
   const [adminProofPhoto, setAdminProofPhoto] = useState(null)
   const { 
     transactions, 
@@ -38,18 +38,22 @@ export default function AdminPanel() {
   const [transferSuccessMsg, setTransferSuccessMsg] = useState('')
   const [processingKey, setProcessingKey] = useState('')
 
-  const openPayoutModal = (txn) => {
-    setPayoutModalTxn(txn)
+  const openPayoutModal = (txn, ownerPayout) => {
+    setPayoutModalTarget({ txn, ownerPayout })
     setAdminProofPhoto(null)
   }
 
   const handleConfirmPayoutWithProof = async () => {
-    if (!payoutModalTxn || !adminProofPhoto || processingKey) return
-    setProcessingKey(`payout-${payoutModalTxn.id}`)
+    if (!payoutModalTarget || !adminProofPhoto || processingKey) return
+    const { txn, ownerPayout } = payoutModalTarget
+    const ownerKey = ownerPayout?.ownerKey || null
+    setProcessingKey(`payout-${txn.id}-${ownerKey || 'single'}`)
     try {
-      await transferPayoutToOwner(payoutModalTxn.id, adminProofPhoto)
-      setTransferSuccessMsg(`Dana Rp${payoutModalTxn.payoutAmount?.toLocaleString('id-ID')} beserta bukti transfer berhasil dikirim ke ${payoutModalTxn.ownerOrg}.`)
-      setPayoutModalTxn(null)
+      await transferPayoutToOwner(txn.id, adminProofPhoto, ownerKey)
+      setTransferSuccessMsg(
+        `Dana Rp${(ownerPayout?.payoutAmount ?? txn.payoutAmount ?? 0).toLocaleString('id-ID')} (setelah potongan 5%) beserta bukti transfer berhasil dikirim ke ${ownerPayout?.ownerOrg || txn.ownerOrg}.`
+      )
+      setPayoutModalTarget(null)
       setAdminProofPhoto(null)
       setTimeout(() => setTransferSuccessMsg(''), 5000)
     } finally {
@@ -119,11 +123,43 @@ export default function AdminPanel() {
   }
 
   const validOrderTransactions = transactions.filter(t => !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]'))
+  const getTxnOwnerPayouts = (txn) => {
+    if (Array.isArray(txn.ownerPayouts) && txn.ownerPayouts.length > 0) return txn.ownerPayouts
+    const gross = Number(txn.amount) || 0
+    const fee = Math.round(gross * 0.05)
+    return [{
+      ownerKey: 'owner-0',
+      ownerOrg: txn.ownerOrg || 'Pemilik Barang',
+      ownerBank: txn.ownerBank || 'BCA 8012345678 a.n Owner',
+      itemsSummary: txn.itemName || 'Perlengkapan',
+      grossAmount: gross,
+      adminFee: fee,
+      payoutAmount: Math.max(0, gross - fee),
+      status: txn.payoutStatus || 'Waiting Admin Approval',
+      payoutRef: txn.payoutRef || null,
+      transferredAt: txn.transferredAt || null,
+      payoutProofPhoto: txn.payoutProofPhoto || null
+    }]
+  }
+
   const pendingQrisCount = validOrderTransactions.filter(t => t.qrisStatus?.includes('Pending')).length
-  const pendingPayoutCount = validOrderTransactions.filter(t => t.payoutStatus === 'Pending Transfer').length
-  const totalFundsInEscrow = validOrderTransactions
-    .filter(t => t.payoutStatus === 'Pending Transfer' || t.qrisStatus?.includes('Pending'))
-    .reduce((sum, t) => sum + (t.payoutAmount || 0), 0)
+  const pendingPayoutCount = validOrderTransactions.reduce((count, t) => {
+    const qLow = (t.qrisStatus || '').toLowerCase()
+    if (qLow.includes('pending') || qLow.includes('reject') || qLow.includes('tolak') || qLow.includes('cancel') || qLow.includes('batal')) return count
+    const owners = getTxnOwnerPayouts(t)
+    return count + owners.filter(op => op.status === 'Pending Transfer').length
+  }, 0)
+
+  const totalFundsInEscrow = validOrderTransactions.reduce((sum, t) => {
+    const qLow = (t.qrisStatus || '').toLowerCase()
+    if (qLow.includes('reject') || qLow.includes('tolak') || qLow.includes('cancel') || qLow.includes('batal')) return sum
+    if (qLow.includes('pending')) return sum + (Number(t.payoutAmount) || 0)
+    const owners = getTxnOwnerPayouts(t)
+    const unpaidSum = owners
+      .filter(op => op.status === 'Pending Transfer')
+      .reduce((s, op) => s + (Number(op.payoutAmount) || 0), 0)
+    return sum + unpaidSum
+  }, 0)
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -251,12 +287,10 @@ export default function AdminPanel() {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-emerald-100/80 bg-emerald-50/20 text-slate-500 font-semibold">
-                    <th className="p-4">ID & Waktu</th>
-                    <th className="p-4">Barang, Durasi & Penyewa</th>
-                    <th className="p-4 text-right">Total & Bukti Bayar</th>
-                    <th className="p-4">Rekening Pemilik</th>
-                    <th className="p-4 text-right">Net Payout (95%)</th>
-                    <th className="p-4 text-center">Tindakan</th>
+                    <th className="p-4">ID &amp; Waktu</th>
+                    <th className="p-4">Barang, Durasi &amp; Penyewa</th>
+                    <th className="p-4 text-right">Dibayar Penyewa</th>
+                    <th className="p-4" colSpan="3">Distribusi Payout per Pemilik (Potong Fee 5%) &amp; Bukti Transfer</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-emerald-100/60">
@@ -270,9 +304,11 @@ export default function AdminPanel() {
                     const qLow = (txn.qrisStatus || '').toLowerCase()
                     const isPendingQris = qLow.includes('pending')
                     const isRejectedOrCancelled = qLow.includes('reject') || qLow.includes('tolak') || qLow.includes('cancel') || qLow.includes('batal')
-                    const isPendingTransfer = !isRejectedOrCancelled && txn.payoutStatus === 'Pending Transfer'
+                    const ownersList = getTxnOwnerPayouts(txn)
+                    const transferredCount = ownersList.filter(op => op.status === 'Transferred' || op.status === 'Settled (Gratis)').length
+
                     return (
-                      <tr key={txn.id} className="hover:bg-emerald-50/30 transition-colors">
+                      <tr key={txn.id} className="hover:bg-emerald-50/20 transition-colors align-top">
                         <td className="p-4">
                           <div className="font-mono font-bold text-slate-900 text-xs">{txn.id}</div>
                           <div className="text-[11px] text-slate-400 mt-0.5">{txn.paidAt}</div>
@@ -285,6 +321,11 @@ export default function AdminPanel() {
                           }`}>
                             {isPendingQris ? 'Menunggu ACC' : txn.qrisStatus}
                           </span>
+                          {!isPendingQris && !isRejectedOrCancelled && ownersList.length > 1 && (
+                            <div className="text-[10px] font-semibold text-emerald-700 mt-1">
+                              Payout: {transferredCount}/{ownersList.length} Pemilik
+                            </div>
+                          )}
                         </td>
 
                         <td className="p-4">
@@ -297,9 +338,12 @@ export default function AdminPanel() {
                           </span>
                         </td>
 
-                        <td className="p-4 text-right">
+                        <td className="p-4 text-right whitespace-nowrap">
                           <div className="font-bold text-slate-900 text-sm">
-                            Rp{txn.amount?.toLocaleString('id-ID')}
+                            Rp{(txn.amount || 0).toLocaleString('id-ID')}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            Fee 5% (potong owner): Rp{(txn.adminFee || 0).toLocaleString('id-ID')}
                           </div>
                           {txn.paymentProofPhoto ? (
                             <button
@@ -307,7 +351,7 @@ export default function AdminPanel() {
                               onClick={() => setViewingProof({
                                 title: `Bukti Pembayaran QRIS (${txn.id})`,
                                 photo: txn.paymentProofPhoto,
-                                details: `Penyewa: ${txn.buyerOrg} · Nominal: Rp${txn.amount?.toLocaleString('id-ID')} (${txn.durationDays || 1} hari)`
+                                details: `Penyewa: ${txn.buyerOrg} · Nominal: Rp${(txn.amount || 0).toLocaleString('id-ID')} (${txn.durationDays || 1} hari)`
                               })}
                               className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition-colors cursor-pointer"
                             >
@@ -321,72 +365,123 @@ export default function AdminPanel() {
                           )}
                         </td>
 
-                        <td className="p-4">
-                          <div className="font-semibold text-slate-800 text-xs">{txn.ownerOrg}</div>
-                          <div className="text-[11px] font-mono text-slate-600 bg-slate-50 px-2 py-0.5 rounded-md mt-1 inline-block border border-slate-200">
-                            {txn.ownerBank}
-                          </div>
-                        </td>
-
-                        <td className="p-4 text-right">
-                          <div className="font-bold text-emerald-700 text-sm">
-                            Rp{txn.payoutAmount?.toLocaleString('id-ID')}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            Fee 5%: Rp{txn.adminFee?.toLocaleString('id-ID')}
-                          </div>
-                        </td>
-
-                        <td className="p-4 text-center">
+                        <td className="p-4" colSpan="3">
                           {isPendingQris ? (
-                            <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5">
-                              <button
-                                disabled={Boolean(processingKey)}
-                                onClick={() => handleApprovePaymentClick(txn.id)}
-                                className="btn-primary text-[11px] !py-2 !px-3 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
-                              >
-                                <BadgeCheck className="w-3.5 h-3.5" />
-                                <span>{processingKey === `approve-pay-${txn.id}` ? 'Memproses...' : 'Setujui'}</span>
-                              </button>
-                              <button
-                                disabled={Boolean(processingKey)}
-                                onClick={() => handleRejectPaymentClick(txn.id)}
-                                className="px-2.5 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
-                              >
-                                Tolak
-                              </button>
+                            <div className="space-y-2.5">
+                              <div className="space-y-1.5">
+                                {ownersList.map((op, opIdx) => (
+                                  <div key={op.ownerKey || opIdx} className="p-2.5 rounded-xl bg-slate-50/90 border border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                                    <div className="min-w-0">
+                                      <div className="font-bold text-slate-800">{op.ownerOrg}</div>
+                                      <div className="text-[10px] text-slate-500 truncate max-w-[230px]" title={op.itemsSummary}>{op.itemsSummary}</div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="font-bold text-emerald-700">Net Rp{(op.payoutAmount || 0).toLocaleString('id-ID')}</div>
+                                      <div className="text-[10px] text-slate-400">Bruto Rp{(op.grossAmount || 0).toLocaleString('id-ID')} − 5%</div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <button
+                                  disabled={Boolean(processingKey)}
+                                  onClick={() => handleApprovePaymentClick(txn.id)}
+                                  className="btn-primary text-[11px] !py-2 !px-3.5 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+                                >
+                                  <BadgeCheck className="w-3.5 h-3.5" />
+                                  <span>{processingKey === `approve-pay-${txn.id}` ? 'Memproses...' : 'Setujui Pembayaran QRIS'}</span>
+                                </button>
+                                <button
+                                  disabled={Boolean(processingKey)}
+                                  onClick={() => handleRejectPaymentClick(txn.id)}
+                                  className="px-3 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
+                                >
+                                  Tolak Pembayaran
+                                </button>
+                              </div>
                             </div>
                           ) : isRejectedOrCancelled ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
-                              <X className="w-3 h-3" /> {qLow.includes('cancel') || qLow.includes('batal') ? 'Dibatalkan' : 'Ditolak'}
+                              <X className="w-3 h-3" /> {qLow.includes('cancel') || qLow.includes('batal') ? 'Dibatalkan Penyewa' : 'Pembayaran Ditolak'}
                             </span>
-                          ) : isPendingTransfer ? (
-                            <button
-                              disabled={Boolean(processingKey)}
-                              onClick={() => openPayoutModal(txn)}
-                              className="btn-primary text-[11px] !py-2 !px-3 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
-                            >
-                              <Send className="w-3.5 h-3.5" />
-                              <span>Transfer & Upload Bukti</span>
-                            </button>
                           ) : (
-                            <div className="flex flex-col items-center gap-1">
-                              <span className="badge-sage">
-                                <CheckCircle2 className="w-3 h-3" /> Selesai
-                              </span>
-                              {txn.payoutProofPhoto && (
-                                <button
-                                  type="button"
-                                  onClick={() => setViewingProof({
-                                    title: `Bukti Payout ke ${txn.ownerOrg}`,
-                                    photo: txn.payoutProofPhoto,
-                                    details: `Ref: ${txn.payoutRef || 'TRF-DONE'} · Nominal: Rp${txn.payoutAmount?.toLocaleString('id-ID')}`
-                                  })}
-                                  className="text-[11px] font-semibold text-emerald-700 hover:underline flex items-center gap-1 mt-0.5 cursor-pointer"
-                                >
-                                  <Eye className="w-3 h-3" /> Bukti Transfer
-                                </button>
-                              )}
+                            <div className="space-y-2">
+                              {ownersList.map((op, opIdx) => {
+                                const isOwnerTransferred = op.status === 'Transferred'
+                                const isOwnerFree = op.status === 'Settled (Gratis)' || (Number(op.grossAmount) || 0) === 0
+                                return (
+                                  <div
+                                    key={op.ownerKey || opIdx}
+                                    className={`p-3 rounded-xl border flex flex-col xl:flex-row xl:items-center justify-between gap-2.5 ${
+                                      isOwnerTransferred || isOwnerFree
+                                        ? 'bg-emerald-50/40 border-emerald-200/80'
+                                        : 'bg-white border-amber-200/90'
+                                    }`}
+                                  >
+                                    <div className="space-y-0.5 min-w-0">
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="font-bold text-slate-900 text-xs">{op.ownerOrg}</span>
+                                        {ownersList.length > 1 && (
+                                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                                            Pemilik #{opIdx + 1}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-[10px] text-slate-500 truncate max-w-[260px]" title={op.itemsSummary}>
+                                        {op.itemsSummary}
+                                      </div>
+                                      <div className="text-[10px] font-mono text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-200 inline-block">
+                                        {op.ownerBank}
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between xl:justify-end gap-3 flex-shrink-0">
+                                      <div className="text-right">
+                                        <div className="font-bold text-emerald-700 text-xs">
+                                          Rp{(op.payoutAmount || 0).toLocaleString('id-ID')}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400">
+                                          Rp{(op.grossAmount || 0).toLocaleString('id-ID')} − 5% (Rp{(op.adminFee || 0).toLocaleString('id-ID')})
+                                        </div>
+                                      </div>
+
+                                      {isOwnerFree ? (
+                                        <span className="badge-sage !text-[10px]">
+                                          <CheckCircle2 className="w-3 h-3" /> Gratis
+                                        </span>
+                                      ) : isOwnerTransferred ? (
+                                        <div className="flex flex-col items-end gap-1">
+                                          <span className="badge-sage !text-[10px]">
+                                            <CheckCircle2 className="w-3 h-3" /> Terkirim
+                                          </span>
+                                          {op.payoutProofPhoto && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setViewingProof({
+                                                title: `Bukti Payout ke ${op.ownerOrg}`,
+                                                photo: op.payoutProofPhoto,
+                                                details: `Item: ${op.itemsSummary} · Ref: ${op.payoutRef || 'TRF-DONE'} · Net: Rp${(op.payoutAmount || 0).toLocaleString('id-ID')} (Bruto Rp${(op.grossAmount || 0).toLocaleString('id-ID')} − Fee 5% Rp${(op.adminFee || 0).toLocaleString('id-ID')})`
+                                              })}
+                                              className="text-[10px] font-semibold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                                            >
+                                              <Eye className="w-3 h-3" /> Bukti Transfer
+                                            </button>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <button
+                                          disabled={Boolean(processingKey)}
+                                          onClick={() => openPayoutModal(txn, op)}
+                                          className="btn-primary text-[11px] !py-1.5 !px-3 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+                                        >
+                                          <Send className="w-3 h-3" />
+                                          <span>Transfer &amp; Bukti</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
                             </div>
                           )}
                         </td>
@@ -654,8 +749,8 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* MODAL 2: TRANSFER PAYOUT & UPLOAD BUKTI TRANSFER DARI ADMIN KE OWNER */}
-      {payoutModalTxn && (
+      {/* MODAL 2: TRANSFER PAYOUT & UPLOAD BUKTI TRANSFER DARI ADMIN KE OWNER SPESIFIK */}
+      {payoutModalTarget && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl border border-emerald-100 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
@@ -664,25 +759,39 @@ export default function AdminPanel() {
                   <Send className="w-4 h-4 text-emerald-600" />
                   Kirim Payout ke Pemilik Barang
                 </h4>
-                <p className="text-xs text-slate-500 mt-0.5">ID Transaksi: {payoutModalTxn.id}</p>
+                <p className="text-xs text-slate-500 mt-0.5">ID Transaksi: {payoutModalTarget.txn.id}</p>
               </div>
-              <button onClick={() => setPayoutModalTxn(null)} className="text-slate-400 hover:text-slate-700 p-1">
+              <button onClick={() => setPayoutModalTarget(null)} className="text-slate-400 hover:text-slate-700 p-1">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="bg-emerald-50/70 border border-emerald-200 p-4 rounded-xl text-xs space-y-2 text-emerald-950">
-              <div className="flex justify-between">
-                <span className="text-emerald-800">Pemilik:</span>
-                <strong>{payoutModalTxn.ownerOrg}</strong>
+              <div className="flex justify-between gap-2">
+                <span className="text-emerald-800">Pemilik Penerima:</span>
+                <strong className="text-right">{payoutModalTarget.ownerPayout?.ownerOrg}</strong>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-2">
+                <span className="text-emerald-800 flex-shrink-0">Perlengkapan:</span>
+                <strong className="text-right text-[11px]">{payoutModalTarget.ownerPayout?.itemsSummary}</strong>
+              </div>
+              <div className="flex justify-between items-center gap-2">
                 <span className="text-emerald-800">Rekening Tujuan:</span>
-                <strong className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-200">{payoutModalTxn.ownerBank}</strong>
+                <strong className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-200 text-[11px]">{payoutModalTarget.ownerPayout?.ownerBank}</strong>
               </div>
-              <div className="flex justify-between items-baseline pt-2 border-t border-emerald-200">
-                <span className="text-emerald-800 font-semibold">Nominal Net Payout (95%):</span>
-                <span className="text-lg font-bold text-emerald-700">Rp{payoutModalTxn.payoutAmount?.toLocaleString('id-ID')}</span>
+              <div className="pt-2 border-t border-emerald-200 space-y-1">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-emerald-800">Subtotal Barang Pemilik:</span>
+                  <span>Rp{(payoutModalTarget.ownerPayout?.grossAmount || 0).toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between text-[11px] text-rose-700">
+                  <span>Potongan Fee Platform (5%):</span>
+                  <span>- Rp{(payoutModalTarget.ownerPayout?.adminFee || 0).toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between items-baseline pt-1">
+                  <span className="text-emerald-900 font-bold">Nominal Net Transfer (95%):</span>
+                  <span className="text-lg font-bold text-emerald-700">Rp{(payoutModalTarget.ownerPayout?.payoutAmount || 0).toLocaleString('id-ID')}</span>
+                </div>
               </div>
             </div>
 
@@ -690,7 +799,7 @@ export default function AdminPanel() {
               <label className="block text-xs font-semibold text-slate-800 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <Upload className="w-3.5 h-3.5 text-emerald-600" />
-                  Upload Bukti Transfer Bank
+                  Upload Bukti Transfer ke {payoutModalTarget.ownerPayout?.ownerOrg}
                 </span>
                 <span className="text-[10px] text-amber-700 font-semibold">Wajib</span>
               </label>
@@ -717,7 +826,7 @@ export default function AdminPanel() {
                 </div>
               )}
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                Bukti transfer ini akan tampil di halaman <strong>Barang Saya</strong> milik pemilik perlengkapan.
+                Bukti transfer khusus ini hanya akan tampil di halaman <strong>Barang Saya</strong> milik <strong>{payoutModalTarget.ownerPayout?.ownerOrg}</strong>.
               </p>
             </div>
 
@@ -731,7 +840,7 @@ export default function AdminPanel() {
                 <span>{processingKey ? 'Mengirim Payout...' : adminProofPhoto ? 'Konfirmasi & Kirim Bukti ke Owner' : 'Upload Bukti Transfer Terlebih Dahulu'}</span>
               </button>
               <button
-                onClick={() => setPayoutModalTxn(null)}
+                onClick={() => setPayoutModalTarget(null)}
                 className="w-full text-xs text-slate-400 hover:text-slate-700 py-1 cursor-pointer"
               >
                 Batalkan

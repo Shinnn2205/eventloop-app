@@ -47,14 +47,58 @@ export default function MyEquipment() {
   const myApprovedEquipments = equipments.filter(item => isMine(item.uploader))
   const myPendingEquipments = pendingApprovals.filter(item => isMine(item.uploader))
 
-  const myPayoutTransactions = (transactions || []).filter(txn => {
-    if (txn.itemName?.startsWith('[RETURN_REQ]') || txn.itemName?.startsWith('[EQUIPMENT_UPLOAD]')) return false
-    if (currentUserRole === 'admin') return true
-    const matchesOwner = isMine(txn.ownerOrg)
-    const matchesItem = myApprovedEquipments.some(eq =>
-      eq.name && txn.itemName && txn.itemName.toLowerCase().includes(eq.name.toLowerCase())
-    )
-    return matchesOwner || matchesItem
+  // Ekstrak rincian payout khusus untuk bagian barang milik akun ini (mendukung pesanan multi-pemilik)
+  const myPayoutTransactions = (transactions || []).flatMap(txn => {
+    if (txn.itemName?.startsWith('[RETURN_REQ]') || txn.itemName?.startsWith('[EQUIPMENT_UPLOAD]')) return []
+    const qLow = (txn.qrisStatus || '').toLowerCase()
+    if (qLow.includes('reject') || qLow.includes('tolak') || qLow.includes('cancel') || qLow.includes('batal')) return []
+
+    const ownersList = (Array.isArray(txn.ownerPayouts) && txn.ownerPayouts.length > 0)
+      ? txn.ownerPayouts
+      : [{
+          ownerKey: 'owner-0',
+          ownerOrg: txn.ownerOrg,
+          ownerBank: txn.ownerBank,
+          uploader: txn.ownerOrg,
+          itemsSummary: txn.itemName,
+          grossAmount: Number(txn.amount) || 0,
+          adminFee: txn.adminFee ?? Math.round((Number(txn.amount) || 0) * 0.05),
+          payoutAmount: txn.payoutAmount ?? Math.max(0, (Number(txn.amount) || 0) - Math.round((Number(txn.amount) || 0) * 0.05)),
+          status: txn.payoutStatus,
+          payoutRef: txn.payoutRef,
+          transferredAt: txn.transferredAt,
+          payoutProofPhoto: txn.payoutProofPhoto
+        }]
+
+    return ownersList
+      .filter(op => {
+        if (currentUserRole === 'admin') return true
+        const matchesOwner = isMine(op.ownerOrg) || isMine(op.uploader)
+        const matchesItem = myApprovedEquipments.some(eq =>
+          eq.name && op.itemsSummary && op.itemsSummary.toLowerCase().includes(eq.name.toLowerCase())
+        )
+        return matchesOwner || matchesItem
+      })
+      .map((op, idx) => ({
+        rowKey: `${txn.id}-${op.ownerKey || idx}`,
+        id: txn.id,
+        itemName: op.itemsSummary || txn.itemName,
+        borrowerName: txn.borrowerName,
+        buyerOrg: txn.buyerOrg,
+        eventName: txn.eventName,
+        startDate: txn.startDate,
+        endDate: txn.endDate,
+        durationDays: txn.durationDays,
+        ownerOrg: op.ownerOrg,
+        ownerBank: op.ownerBank || txn.ownerBank,
+        grossAmount: op.grossAmount ?? txn.amount ?? 0,
+        adminFee: op.adminFee ?? 0,
+        payoutAmount: op.payoutAmount ?? 0,
+        payoutStatus: op.status || txn.payoutStatus,
+        payoutRef: op.payoutRef || null,
+        transferredAt: op.transferredAt || null,
+        payoutProofPhoto: op.payoutProofPhoto || null
+      }))
   })
 
   return (
@@ -324,13 +368,14 @@ export default function MyEquipment() {
           <div className="space-y-3">
             {myPayoutTransactions.map(txn => {
               const isTransferred = txn.payoutStatus === 'Transferred'
+              const isFreeSettled = txn.payoutStatus === 'Settled (Gratis)' || Number(txn.grossAmount) === 0
               return (
-                <div key={txn.id} className="card p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div key={txn.rowKey || txn.id} className="card p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="badge-stone font-mono">#{txn.id}</span>
-                      <span className={isTransferred ? 'badge-sage' : 'badge-warm'}>
-                        {isTransferred ? 'Dana Telah Ditransfer Admin' : 'Menunggu Transfer Admin'}
+                      <span className={isTransferred || isFreeSettled ? 'badge-sage' : 'badge-warm'}>
+                        {isFreeSettled ? 'Pinjam Gratis (Rp0)' : isTransferred ? 'Dana Telah Ditransfer Admin' : 'Menunggu Transfer Admin'}
                       </span>
                     </div>
                     <h4 className="font-bold text-slate-900 text-sm pt-0.5">{txn.itemName}</h4>
@@ -347,13 +392,20 @@ export default function MyEquipment() {
 
                   <div className="flex md:flex-col items-end justify-between md:justify-center gap-2 border-t md:border-t-0 pt-3 md:pt-0 border-emerald-100/70">
                     <div className="text-right">
-                      <span className="text-[10px] text-slate-400 block">Total Diterima</span>
+                      <span className="text-[10px] text-slate-400 block">Total Diterima (95%)</span>
                       <span className="text-base font-bold text-emerald-700">
-                        Rp{(txn.payoutAmount || txn.amount || 0).toLocaleString('id-ID')}
+                        Rp{(txn.payoutAmount || 0).toLocaleString('id-ID')}
                       </span>
+                      {txn.grossAmount > 0 && (
+                        <span className="text-[10px] text-slate-400 block">
+                          Bruto Rp{txn.grossAmount.toLocaleString('id-ID')} − Fee 5% (Rp{(txn.adminFee || 0).toLocaleString('id-ID')})
+                        </span>
+                      )}
                     </div>
 
-                    {isTransferred && txn.payoutProofPhoto ? (
+                    {isFreeSettled ? (
+                      <span className="text-[11px] text-emerald-700 font-semibold">Selesai (Gratis)</span>
+                    ) : isTransferred && txn.payoutProofPhoto ? (
                       <button
                         onClick={() => setViewingPayoutProof(txn)}
                         className="btn-secondary text-xs !py-1.5 !px-3 flex items-center gap-1.5 cursor-pointer"
@@ -401,8 +453,16 @@ export default function MyEquipment() {
 
             <div className="p-3.5 bg-emerald-50/40 rounded-xl border border-emerald-100 text-xs space-y-1.5">
               <div className="flex justify-between">
-                <span className="text-slate-500">Nominal Payout:</span>
-                <strong className="text-emerald-700">Rp{(viewingPayoutProof.payoutAmount || viewingPayoutProof.amount || 0).toLocaleString('id-ID')}</strong>
+                <span className="text-slate-500">Subtotal Barang Anda:</span>
+                <strong className="text-slate-800">Rp{(viewingPayoutProof.grossAmount || 0).toLocaleString('id-ID')}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Potongan Platform (5%):</span>
+                <strong className="text-rose-700">- Rp{(viewingPayoutProof.adminFee || 0).toLocaleString('id-ID')}</strong>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-emerald-100">
+                <span className="text-slate-500 font-semibold">Nominal Payout Diterima (95%):</span>
+                <strong className="text-emerald-700">Rp{(viewingPayoutProof.payoutAmount || 0).toLocaleString('id-ID')}</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Rekening Tujuan:</span>

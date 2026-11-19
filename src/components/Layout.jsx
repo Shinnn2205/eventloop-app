@@ -54,7 +54,16 @@ export default function Layout() {
   const effectivePaymentStatus = ctxPaymentStatus || userPaymentStatus
 
   const pendingAdminTasks = 
-    transactions.filter(t => !t.itemName?.startsWith('[RETURN_REQ]') && !t.itemName?.startsWith('[EQUIPMENT_UPLOAD]') && (t.qrisStatus?.includes('Pending') || t.payoutStatus === 'Pending Transfer')).length +
+    transactions.reduce((acc, t) => {
+      if (t.itemName?.startsWith('[RETURN_REQ]') || t.itemName?.startsWith('[EQUIPMENT_UPLOAD]')) return acc
+      const qLow = (t.qrisStatus || '').toLowerCase()
+      if (qLow.includes('reject') || qLow.includes('tolak') || qLow.includes('cancel') || qLow.includes('batal')) return acc
+      if (qLow.includes('pending')) return acc + 1
+      if (Array.isArray(t.ownerPayouts) && t.ownerPayouts.length > 0) {
+        return acc + t.ownerPayouts.filter(op => op.status === 'Pending Transfer').length
+      }
+      return acc + (t.payoutStatus === 'Pending Transfer' || t.payoutStatus === 'Partial Transfer' ? 1 : 0)
+    }, 0) +
     pendingApprovals.length +
     pendingReturns.length
 

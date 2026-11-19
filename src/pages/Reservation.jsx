@@ -49,8 +49,8 @@ export default function Reservation() {
     return sum + unitPrice * item.qty * dayMultiplier
   }, 0)
 
-  const adminFee = Math.round(totalCost * 0.05)
-  const grandTotal = totalCost + adminFee
+  // Tidak menambah 5% ke penyewa; biaya platform 5% dipotong saat pencairan (payout) ke masing-masing pemilik barang
+  const grandTotal = totalCost
 
   const handlePayQris = async () => {
     if (isSubmittingPayment) return
@@ -411,8 +411,8 @@ export default function Reservation() {
                 <span className="font-semibold text-slate-800">Rp{totalCost.toLocaleString('id-ID')}</span>
               </div>
               <div className="flex justify-between text-slate-500">
-                <span>Biaya Layanan Platform (5%)</span>
-                <span className="font-semibold text-slate-800">Rp{adminFee.toLocaleString('id-ID')}</span>
+                <span>Biaya Layanan Penyewa</span>
+                <span className="font-semibold text-emerald-700">Rp0 (Gratis)</span>
               </div>
 
               <div className="pt-3 border-t border-emerald-100 flex justify-between items-baseline">
@@ -429,7 +429,7 @@ export default function Reservation() {
                 Rekening Bersama (Escrow)
               </div>
               <p className="leading-relaxed">
-                Dana disimpan di rekening pengelola EventLoop dan diteruskan ke pemilik barang beserta bukti transfer setelah diverifikasi.
+                Penyewa membayar sesuai harga barang tanpa tambahan biaya. Dana disimpan di rekening Escrow EventLoop dan dicairkan ke masing-masing pemilik barang setelah dikurangi biaya platform 5%.
               </p>
             </div>
 
