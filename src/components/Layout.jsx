@@ -70,12 +70,16 @@ export default function Layout() {
 
   const handleLogout = async () => {
     try {
+      try {
+        sessionStorage.removeItem('eventloop_pending_signup_otp')
+        sessionStorage.removeItem('eventloop_pending_forgot_otp')
+      } catch (storageErr) {}
       if (logout) {
         await logout()
       } else {
         await supabase.auth.signOut()
       }
-      navigate('/login')
+      navigate('/login?tab=login', { replace: true })
     } catch (e) {
       console.error('Logout error:', e)
     }

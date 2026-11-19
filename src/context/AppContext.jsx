@@ -1637,8 +1637,9 @@ export function AppProvider({ children }) {
         try {
           const parsedNim = validateNimStructure(nim)
           if (parsedNim.isValid) setCurrentUserStudyProgram(parsedNim.prodiName)
-          // Hanya sinkronkan kolom valid tabel profiles (id, email, full_name, nim, updated_at)
-          if (newSession.user?.email_confirmed_at && (parsedNim.isValid || isAdminEmail(userEmail))) {
+          const isMidSignupOtp = Boolean(typeof window !== 'undefined' && sessionStorage.getItem('eventloop_pending_signup_otp'))
+          // Hanya sinkronkan kolom valid tabel profiles (id, email, full_name, nim, updated_at) setelah proses OTP selesai
+          if (!isMidSignupOtp && newSession.user?.email_confirmed_at && (parsedNim.isValid || isAdminEmail(userEmail))) {
             await supabase.from('profiles').upsert({
               id: newSession.user.id,
               email: userEmail,
@@ -3010,6 +3011,8 @@ export function AppProvider({ children }) {
     sessionStorage.removeItem('eventloop_sso_user')
     sessionStorage.removeItem('eventloop_last_active')
     sessionStorage.removeItem('eventloop_dismissed_completed_id')
+    sessionStorage.removeItem('eventloop_pending_signup_otp')
+    sessionStorage.removeItem('eventloop_pending_forgot_otp')
     localStorage.removeItem('eventloop_session')
     localStorage.removeItem('eventloop_role')
     localStorage.removeItem('eventloop_user_prodi')

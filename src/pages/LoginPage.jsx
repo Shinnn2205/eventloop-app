@@ -38,13 +38,15 @@ export default function LoginPage() {
     }
   }, [searchParams])
   
-  // State verifikasi pendaftaran: 'form' (isi data akun) atau 'otp' (input 6-digit kode OTP)
+  // State verifikasi pendaftaran: 'form' (isi data akun) atau 'otp' (input kode OTP 6/8 digit)
   const [signUpStep, setSignUpStep] = useState('form')
+  const [otpVerifiedNeedsPassword, setOtpVerifiedNeedsPassword] = useState(false)
   
   // Field form login / signup
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showLoginPassword, setShowLoginPassword] = useState(false)
+  const [showSignUpPassword, setShowSignUpPassword] = useState(false)
   const [fullName, setFullName] = useState('')
   const [nim, setNim] = useState('')
   const [otpCode, setOtpCode] = useState('')
@@ -90,9 +92,18 @@ export default function LoginPage() {
   // Pulihkan form jika pengguna me-refresh halaman saat sedang di tahap memasukkan kode OTP
   useEffect(() => {
     try {
+      const currentTabParam = searchParams.get('tab')
+
+      // Jika pengguna secara eksplisit diarahkan ke tab login (mis. setelah logout), bersihkan sesi OTP lama agar tidak muncul mendadak
+      if (currentTabParam === 'login') {
+        sessionStorage.removeItem('eventloop_pending_signup_otp')
+        sessionStorage.removeItem('eventloop_pending_forgot_otp')
+        return
+      }
+
       // 1. Cek sesi pending pendaftaran akun
       const savedPending = sessionStorage.getItem('eventloop_pending_signup_otp')
-      if (savedPending) {
+      if (savedPending && currentTabParam !== 'forgot') {
         const parsed = JSON.parse(savedPending)
         // Masih berlaku dalam rentang waktu 15 menit
         if (parsed && parsed.email && (Date.now() - (parsed.sentAt || 0) < 15 * 60 * 1000)) {
@@ -115,7 +126,7 @@ export default function LoginPage() {
 
       // 2. Cek sesi pending lupa password
       const savedForgot = sessionStorage.getItem('eventloop_pending_forgot_otp')
-      if (savedForgot) {
+      if (savedForgot && currentTabParam !== 'signup') {
         const parsedForgot = JSON.parse(savedForgot)
         if (parsedForgot && parsedForgot.email && (Date.now() - (parsedForgot.sentAt || 0) < 15 * 60 * 1000)) {
           setActiveTab('forgot')
@@ -156,7 +167,15 @@ export default function LoginPage() {
   }
 
   // Reset pesan & update query URL saat ganti tab
-  const handleTabChange = (tab) => {
+  const handleTabChange = async (tab) => {
+    const hadPendingForgot = Boolean(sessionStorage.getItem('eventloop_pending_forgot_otp'))
+    if ((otpVerifiedNeedsPassword && tab !== 'signup') || (hadPendingForgot && tab !== 'forgot')) {
+      try {
+        const { data: sData } = await supabase.auth.getSession()
+        if (sData?.session) await supabase.auth.signOut()
+      } catch (e) {}
+      setOtpVerifiedNeedsPassword(false)
+    }
     setActiveTab(tab)
     setSearchParams({ tab })
     if (tab === 'login') {
@@ -185,6 +204,11 @@ export default function LoginPage() {
     setErrorMsg('')
     setSuccessMsg('')
     setLoading(true)
+
+    try {
+      sessionStorage.removeItem('eventloop_pending_signup_otp')
+      sessionStorage.removeItem('eventloop_pending_forgot_otp')
+    } catch (e) {}
 
     let loginEmail = email.trim().toLowerCase()
     // Jika mahasiswa memasukkan 11 digit NIM, konversi otomatis ke email SSO kampus
@@ -245,7 +269,8 @@ export default function LoginPage() {
   }
 
   // ============================================================
-  // 2. ALUR DAFTAR AKUN MAHASISWA - STEP 1: SIMPAN DATA KE DATABASE & KIRIM KODE OTP KE OUTLOOK
+  // 2. ALUR DAFTAR AKUN MAHASISWA - STEP 1: VALIDASI & KIRIM KODE OTP KE OUTLOOK
+  //    (TIDAK membuat sesi login sebelum pengguna memasukkan kode OTP yang valid!)
   // ============================================================
   const handleSignUpRequestOtp = async (e) => {
     if (e && e.preventDefault) e.preventDefault()
@@ -263,23 +288,61 @@ export default function LoginPage() {
       return
     }
 
-    if (!password || password.length < 6) {
-      setErrorMsg('Password minimal harus 6 karakter.')
+    if (!password || password.length < 8) {
+      setErrorMsg('Password minimal harus terdiri dari 8 karakter.')
       return
     }
 
     setLoading(true)
     const studentEmail = nimValidation.generatedEmail
+    const cleanNim = nim.trim()
+    const cleanName = fullName.trim()
 
     try {
-      // 1. Simpan akun & metadata langsung ke database Supabase Auth (Nama, NIM, Prodi, Password)
-      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+      // 1. Pastikan NIM / Email ini belum terdaftar aktif di tabel profiles
+      try {
+        const { data: existingProfiles } = await supabase
+          .from('profiles')
+          .select('id, email, nim')
+          .or(`email.eq.${studentEmail},nim.eq.${cleanNim}`)
+          .limit(1)
+
+        if (existingProfiles && existingProfiles.length > 0) {
+          setErrorMsg('NIM/Email ini sudah terdaftar di EventLoop. Silakan masuk di tab "Masuk (Login)" atau gunakan fitur "Lupa Password?".')
+          setLoading(false)
+          return
+        }
+      } catch (checkErr) {
+        console.warn('Catatan cek duplikasi profil:', checkErr)
+      }
+
+      // 2. Pastikan tidak ada sesi lama yang menempel sebelum mengirim OTP pendaftaran baru
+      try {
+        const { data: curSessData } = await supabase.auth.getSession()
+        if (curSessData?.session) {
+          await supabase.auth.signOut()
+        }
+      } catch (signOutErr) {}
+
+      // 3. Tandai sesi pending OTP SEBELUM request ke Supabase agar tidak pernah terjadi bypass redirect
+      const pendingData = {
+        step: 'otp',
         email: studentEmail,
+        nim: cleanNim,
+        fullName: cleanName,
         password: password,
+        sentAt: Date.now()
+      }
+      sessionStorage.setItem('eventloop_pending_signup_otp', JSON.stringify(pendingData))
+
+      // 4. Kirim kode OTP via signInWithOtp (HANYA mengirim kode ke Outlook, TIDAK membuat sesi login!)
+      const { error: otpErr } = await supabase.auth.signInWithOtp({
+        email: studentEmail,
         options: {
+          shouldCreateUser: true,
           data: {
-            full_name: fullName.trim(),
-            nim: nim.trim(),
+            full_name: cleanName,
+            nim: cleanNim,
             prodi_code: nimValidation.prodiCode,
             prodi_name: nimValidation.prodiName,
             school: nimValidation.schoolName,
@@ -288,88 +351,33 @@ export default function LoginPage() {
         }
       })
 
-      if (signUpErr) {
-        const msg = (signUpErr.message || '').toLowerCase()
-        if (msg.includes('already registered') || msg.includes('already exists')) {
-          setErrorMsg('NIM/Email ini sudah terdaftar di EventLoop. Silakan masuk di tab "Masuk (Login)" atau gunakan fitur "Lupa Password?".')
-          setLoading(false)
+      if (otpErr) {
+        const msg = (otpErr.message || '').toLowerCase()
+        const isRateLimit = otpErr.status === 429 || msg.includes('seconds') || msg.includes('rate') || msg.includes('already sent')
+        if (isRateLimit) {
+          setSignUpStep('otp')
+          setOtpVerifiedNeedsPassword(false)
+          setResendTimer(60)
+          setSuccessMsg(
+            `Kode OTP sebelumnya baru saja dikirim ke ${studentEmail}. Silakan periksa Inbox / Junk Email Outlook Anda, atau tunggu 60 detik untuk kirim ulang.`
+          )
           return
         }
-        if (!msg.includes('rate') && !msg.includes('seconds') && signUpErr.status !== 429) {
-          setErrorMsg('Gagal mendaftarkan akun: ' + signUpErr.message)
-          setLoading(false)
-          return
-        }
-      }
 
-      if (signUpData?.user && Array.isArray(signUpData.user.identities) && signUpData.user.identities.length === 0) {
-        setErrorMsg('NIM/Email ini sudah terdaftar dan aktif. Silakan langsung masuk melalui tab "Masuk (Login)".')
-        setLoading(false)
+        // Jika error nyata (bukan rate-limit), batalkan pending OTP dan tetap di form pendaftaran
+        sessionStorage.removeItem('eventloop_pending_signup_otp')
+        setErrorMsg('Gagal mengirim kode OTP ke Outlook: ' + otpErr.message)
         return
       }
 
-      // 2. Simpan juga ke tabel profiles di database (id, email, full_name, nim, updated_at)
-      if (signUpData?.user?.id) {
-        try {
-          await supabase.from('profiles').upsert({
-            id: signUpData.user.id,
-            email: studentEmail,
-            full_name: fullName.trim(),
-            nim: nim.trim(),
-            updated_at: new Date().toISOString()
-          })
-        } catch (dbErr) {
-          console.warn('Upsert profile err:', dbErr)
-        }
-      }
-
-      // 3. Kirim kode OTP via Supabase ke email Outlook mahasiswa
-      let otpSent = false
-      let otpNotice = ''
-      try {
-        const { error: otpErr } = await supabase.auth.signInWithOtp({
-          email: studentEmail,
-          options: {
-            shouldCreateUser: true
-          }
-        })
-        if (otpErr) {
-          if (otpErr.status === 429 || otpErr.message?.includes('seconds') || otpErr.message?.includes('rate')) {
-            otpSent = true // Kode sebelumnya baru saja terkirim
-            otpNotice = 'Kode verifikasi telah dikirim. Jika Anda baru saja meminta kode, silakan periksa inbox Outlook atau tunggu 60 detik.'
-          } else {
-            otpNotice = otpErr.message
-          }
-        } else {
-          otpSent = true
-        }
-      } catch (errOtp) {
-        otpNotice = errOtp.message || ''
-      }
-
-      // Simpan data pending agar form OTP tetap aktif saat refresh
-      const pendingData = {
-        step: 'otp',
-        email: studentEmail,
-        nim: nim.trim(),
-        fullName: fullName.trim(),
-        password: password,
-        sentAt: Date.now()
-      }
-      sessionStorage.setItem('eventloop_pending_signup_otp', JSON.stringify(pendingData))
       setSignUpStep('otp')
+      setOtpVerifiedNeedsPassword(false)
       setResendTimer(60)
-
-      if (otpSent) {
-        setSuccessMsg(
-          `Data akun berhasil tersimpan di database! Kode OTP telah dikirim ke ${studentEmail}. Penting: Harap cek Inbox, folder 'Junk Email' / Spam, atau tab 'Lainnya' di Outlook kampus Anda.`
-        )
-      } else {
-        setSuccessMsg(
-          `Data Nama & NIM (${nim.trim()}) berhasil dicatat ke database. ${otpNotice ? `Catatan pengiriman: ${otpNotice}` : 'Silakan masukkan kode OTP yang telah Anda terima di email Outlook.'}`
-        )
-      }
+      setSuccessMsg(
+        `Kode OTP verifikasi telah dikirim ke ${studentEmail}. Masukkan kode OTP terlebih dahulu untuk mengaktifkan akun. (Cek Inbox, folder Junk/Spam, atau tab Lainnya di Outlook kampus Anda.)`
+      )
     } catch (err) {
+      sessionStorage.removeItem('eventloop_pending_signup_otp')
       setErrorMsg('Terjadi kesalahan koneksi saat memproses pendaftaran: ' + (err.message || ''))
     } finally {
       setLoading(false)
@@ -377,16 +385,21 @@ export default function LoginPage() {
   }
 
   // ============================================================
-  // 2. ALUR DAFTAR AKUN MAHASISWA - STEP 2: VERIFIKASI KODE OTP
+  // 2. ALUR DAFTAR AKUN MAHASISWA - STEP 2: VERIFIKASI KODE OTP & SET PASSWORD
   // ============================================================
   const handleSignUpVerifyOtp = async (e) => {
     if (e && e.preventDefault) e.preventDefault()
     setErrorMsg('')
     setSuccessMsg('')
 
-    const cleanOtp = (otpCode || '').trim()
-    if (cleanOtp.length < 6) {
-      setErrorMsg('Silakan masukkan kode OTP yang diterima di email Outlook.')
+    const cleanOtp = (otpCode || '').replace(/\s+/g, '')
+    if (!otpVerifiedNeedsPassword && cleanOtp.length < 6) {
+      setErrorMsg('Silakan masukkan kode OTP (6 atau 8 digit) yang diterima di email Outlook.')
+      return
+    }
+
+    if (!password || password.length < 8) {
+      setErrorMsg('Password minimal harus terdiri dari 8 karakter.')
       return
     }
 
@@ -395,72 +408,97 @@ export default function LoginPage() {
     const studentEmail = nimValidation.generatedEmail
 
     try {
-      // 1. Verifikasi kode OTP langsung ke Supabase Auth
+      // 1. Verifikasi kode OTP langsung ke Supabase Auth (atau gunakan sesi jika OTP baru saja terverifikasi & tinggal menyimpan password)
       let activeSession = null
-      const { data: emailVerifyData, error: emailVerifyErr } = await supabase.auth.verifyOtp({
-        email: studentEmail,
-        token: cleanOtp,
-        type: 'email'
-      })
 
-      if (!emailVerifyErr && emailVerifyData?.session) {
-        activeSession = emailVerifyData.session
-      } else {
-        // Coba type 'signup' jika token bertipe konfirmasi pendaftaran
-        const { data: signupVerifyData, error: signupVerifyErr } = await supabase.auth.verifyOtp({
+      if (otpVerifiedNeedsPassword) {
+        const { data: existingSessData } = await supabase.auth.getSession()
+        activeSession = existingSessData?.session || null
+      }
+
+      if (!activeSession) {
+        const { data: emailVerifyData, error: emailVerifyErr } = await supabase.auth.verifyOtp({
           email: studentEmail,
           token: cleanOtp,
-          type: 'signup'
+          type: 'email'
         })
-        if (!signupVerifyErr && signupVerifyData?.session) {
-          activeSession = signupVerifyData.session
+
+        if (!emailVerifyErr && emailVerifyData?.session) {
+          activeSession = emailVerifyData.session
+        } else {
+          // Fallback: coba type 'signup' jika token bertipe konfirmasi pendaftaran
+          const { data: signupVerifyData, error: signupVerifyErr } = await supabase.auth.verifyOtp({
+            email: studentEmail,
+            token: cleanOtp,
+            type: 'signup'
+          })
+          if (!signupVerifyErr && signupVerifyData?.session) {
+            activeSession = signupVerifyData.session
+          }
         }
       }
 
-      if (activeSession) {
-        // Hapus penanda sesi pending OTP di browser
-        sessionStorage.removeItem('eventloop_pending_signup_otp')
-
-        // 2. Simpan password & user metadata akun
-        if (password) {
-          try {
-            await supabase.auth.updateUser({ 
-              password,
-              data: {
-                full_name: fullName.trim(),
-                nim: nim.trim(),
-                prodi_code: nimValidation.prodiCode,
-                prodi_name: nimValidation.prodiName,
-                school: nimValidation.schoolName,
-                role: 'student_org'
-              }
-            })
-          } catch (pwdErr) {
-            console.warn('Set password err:', pwdErr)
-          }
-        }
-
-        // 3. Simpan data lengkap mahasiswa ke tabel profiles di database (kolom valid: id, email, full_name, nim, updated_at)
-        if (activeSession.user?.id) {
-          try {
-            await supabase.from('profiles').upsert({
-              id: activeSession.user.id,
-              email: studentEmail,
-              full_name: fullName.trim(),
-              nim: nim.trim(),
-              updated_at: new Date().toISOString()
-            })
-          } catch (profileErr) {
-            console.warn('Gagal simpan profil:', profileErr)
-          }
-        }
-
-        setCurrentUserName(fullName.trim())
-        setCurrentUserRole('user')
-        navigate('/dashboard')
-      } else {
-        setErrorMsg('Kode verifikasi salah atau sudah kadaluarsa. Pastikan kode sesuai email terbaru di Outlook Anda.')
+      if (!activeSession) {
+        setErrorMsg('Kode verifikasi OTP salah atau sudah kadaluarsa. Pastikan kode sesuai email terbaru di Outlook Anda.')
+        return
       }
+
+      // 2. Simpan password (min. 8 karakter) & metadata identitas kampus ke akun Supabase Auth
+      const { error: pwdErr } = await supabase.auth.updateUser({
+        password,
+        data: {
+          full_name: fullName.trim(),
+          nim: nim.trim(),
+          prodi_code: nimValidation.prodiCode,
+          prodi_name: nimValidation.prodiName,
+          school: nimValidation.schoolName,
+          role: 'student_org'
+        }
+      })
+
+      if (pwdErr) {
+        const errLower = (pwdErr.message || '').toLowerCase()
+        const isSamePwd = errLower.includes('different from the old password') || errLower.includes('same_password')
+        if (!isSamePwd) {
+          setOtpVerifiedNeedsPassword(true)
+          setErrorMsg(
+            `Kode OTP sudah terverifikasi, tetapi password belum memenuhi aturan sistem (${pwdErr.message}). Silakan ubah password minimal 8 karakter di bawah lalu klik Simpan.`
+          )
+          return
+        }
+      }
+
+      // 3. Simpan data mahasiswa ke tabel profiles (kolom valid: id, email, full_name, nim, updated_at)
+      if (activeSession.user?.id) {
+        try {
+          await supabase.from('profiles').upsert({
+            id: activeSession.user.id,
+            email: studentEmail,
+            full_name: fullName.trim(),
+            nim: nim.trim(),
+            updated_at: new Date().toISOString()
+          })
+        } catch (profileErr) {
+          console.warn('Gagal simpan profil:', profileErr)
+        }
+      }
+
+      // 4. Hapus penanda pending OTP HANYA setelah OTP valid + password & profil tersimpan
+      sessionStorage.removeItem('eventloop_pending_signup_otp')
+      setOtpVerifiedNeedsPassword(false)
+
+      setCurrentUserName(fullName.trim())
+      setCurrentUserRole('user')
+
+      if (refetchData) {
+        try {
+          await refetchData()
+        } catch (syncErr) {
+          console.warn('Gagal sinkron data cloud setelah verifikasi OTP:', syncErr)
+        }
+      }
+
+      navigate('/profile?required=1', { replace: true })
     } catch (err) {
       setErrorMsg('Terjadi kesalahan saat memverifikasi kode OTP: ' + (err.message || ''))
     } finally {
@@ -479,11 +517,34 @@ export default function LoginPage() {
     try {
       const { error: otpErr } = await supabase.auth.signInWithOtp({
         email: nimValidation.generatedEmail,
-        options: { shouldCreateUser: true }
+        options: {
+          shouldCreateUser: true,
+          data: {
+            full_name: fullName.trim(),
+            nim: nim.trim(),
+            prodi_code: nimValidation.prodiCode,
+            prodi_name: nimValidation.prodiName,
+            school: nimValidation.schoolName,
+            role: 'student_org'
+          }
+        }
       })
       if (otpErr) {
         setErrorMsg('Gagal mengirim ulang kode OTP: ' + otpErr.message)
       } else {
+        try {
+          const prevRaw = sessionStorage.getItem('eventloop_pending_signup_otp')
+          const prevObj = prevRaw ? JSON.parse(prevRaw) : {}
+          sessionStorage.setItem('eventloop_pending_signup_otp', JSON.stringify({
+            ...prevObj,
+            step: 'otp',
+            email: nimValidation.generatedEmail,
+            nim: nim.trim(),
+            fullName: fullName.trim(),
+            password,
+            sentAt: Date.now()
+          }))
+        } catch (storageErr) {}
         setResendTimer(60)
         setSuccessMsg(`Kode OTP baru berhasil dikirim ulang ke ${nimValidation.generatedEmail}.`)
       }
@@ -596,8 +657,8 @@ export default function LoginPage() {
       return
     }
 
-    if (!newPassword || newPassword.length < 6) {
-      setErrorMsg('Password baru minimal terdiri dari 6 karakter.')
+    if (!newPassword || newPassword.length < 8) {
+      setErrorMsg('Password baru minimal terdiri dari 8 karakter.')
       return
     }
 
@@ -938,7 +999,7 @@ export default function LoginPage() {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Password Baru (Min 6 Karakter) *
+                      Password Baru (Min. 8 Karakter) *
                     </label>
                     <button
                       type="button"
@@ -954,10 +1015,10 @@ export default function LoginPage() {
                     <input
                       type={showNewPassword ? 'text' : 'password'}
                       required
-                      minLength={6}
+                      minLength={8}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Password baru"
+                      placeholder="Minimal 8 karakter"
                       className="w-full pl-10 pr-4 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
                     />
                   </div>
@@ -972,7 +1033,7 @@ export default function LoginPage() {
                     <input
                       type={showNewPassword ? 'text' : 'password'}
                       required
-                      minLength={6}
+                      minLength={8}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Ulangi password baru"
@@ -1075,20 +1136,43 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Buat Password Akun *
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Buat Password Akun (Min. 8 Karakter) *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowSignUpPassword(!showSignUpPassword)}
+                      className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      {showSignUpPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      <span>{showSignUpPassword ? 'Sembunyikan' : 'Lihat'}</span>
+                    </button>
+                  </div>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
-                      type="password"
+                      type={showSignUpPassword ? 'text' : 'password'}
                       required
+                      minLength={8}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Minimal 6 karakter"
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+                      placeholder="Minimal 8 karakter"
+                      className="w-full pl-10 pr-10 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
                     />
                   </div>
+                  {password.length > 0 && password.length < 8 && (
+                    <p className="mt-1 text-[11px] text-amber-700 font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>Kurang {8 - password.length} karakter lagi (minimal 8 karakter).</span>
+                    </p>
+                  )}
+                  {password.length >= 8 && (
+                    <p className="mt-1 text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Panjang password memenuhi minimal 8 karakter ({password.length} karakter).</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="pt-2">
@@ -1110,47 +1194,94 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <h4 className="text-base font-bold text-slate-900">Verifikasi Kode OTP</h4>
+                  <h4 className="text-base font-bold text-slate-900">
+                    {otpVerifiedNeedsPassword ? 'Perbarui Password Akun' : 'Verifikasi Kode OTP'}
+                  </h4>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
-                    Masukkan kode verifikasi yang dikirim ke <strong className="text-slate-800 font-mono">{nim}@student.prasetiyamulya.ac.id</strong>. Mohon periksa juga folder <em>Junk / Spam</em> Outlook.
+                    {otpVerifiedNeedsPassword
+                      ? 'Email kampus Anda sudah terverifikasi. Masukkan password baru minimal 8 karakter untuk menyelesaikan pendaftaran.'
+                      : (
+                        <>
+                          Masukkan kode verifikasi yang dikirim ke <strong className="text-slate-800 font-mono">{nim}@student.prasetiyamulya.ac.id</strong>. Mohon periksa juga folder <em>Junk / Spam</em> Outlook.
+                        </>
+                      )}
                   </p>
                 </div>
 
-                <div className="space-y-1 text-left pt-2">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider text-center">
-                    Kode OTP Verifikasi
-                  </label>
-                  <div className="relative max-w-xs mx-auto">
-                    <input
-                      type="text"
-                      maxLength={8}
-                      required
-                      autoFocus
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.trim().slice(0, 8))}
-                      placeholder="12345678"
-                      className="w-full text-center tracking-[0.25em] text-2xl font-black font-mono py-2.5 bg-emerald-50/30 border-2 border-emerald-300 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/15 rounded-2xl text-emerald-950 transition-all"
-                    />
+                {!otpVerifiedNeedsPassword ? (
+                  <div className="space-y-1 text-left pt-2">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider text-center">
+                      Kode OTP Verifikasi
+                    </label>
+                    <div className="relative max-w-xs mx-auto">
+                      <input
+                        type="text"
+                        maxLength={8}
+                        required
+                        autoFocus
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\s+/g, '').slice(0, 8))}
+                        placeholder="12345678"
+                        className="w-full text-center tracking-[0.25em] text-2xl font-black font-mono py-2.5 bg-emerald-50/30 border-2 border-emerald-300 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/15 rounded-2xl text-emerald-950 transition-all"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 text-center mt-1">
+                      {otpCode.length}/8 digit (mendukung 6 atau 8 digit)
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-400 text-center mt-1">
-                    {otpCode.length}/8 digit
-                  </p>
-                </div>
+                ) : (
+                  <div className="space-y-1 text-left pt-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Password Akun (Min. 8 Karakter) *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowSignUpPassword(!showSignUpPassword)}
+                        className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1 cursor-pointer"
+                      >
+                        {showSignUpPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        <span>{showSignUpPassword ? 'Sembunyikan' : 'Lihat'}</span>
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type={showSignUpPassword ? 'text' : 'password'}
+                        required
+                        minLength={8}
+                        autoFocus
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Minimal 8 karakter"
+                        className="w-full pl-10 pr-4 py-2.5 bg-emerald-50/30 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="pt-2 space-y-2">
                   <button
                     type="submit"
-                    disabled={loading || otpCode.trim().length < 6}
+                    disabled={loading || (!otpVerifiedNeedsPassword && otpCode.trim().length < 6)}
                     className="w-full btn-primary text-sm !py-3 flex items-center justify-center gap-2 cursor-pointer shadow-sm shadow-emerald-600/15"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>{loading ? 'Memverifikasi...' : 'Verifikasi Kode & Selesaikan'}</span>
+                    <span>
+                      {loading
+                        ? (otpVerifiedNeedsPassword ? 'Menyimpan Password...' : 'Memverifikasi...')
+                        : (otpVerifiedNeedsPassword ? 'Simpan Password & Masuk' : 'Verifikasi Kode & Selesaikan')}
+                    </span>
                   </button>
 
                   <div className="flex items-center justify-between text-xs pt-1">
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
+                        if (otpVerifiedNeedsPassword) {
+                          try { await supabase.auth.signOut() } catch (e) {}
+                          setOtpVerifiedNeedsPassword(false)
+                        }
                         sessionStorage.removeItem('eventloop_pending_signup_otp')
                         setSignUpStep('form')
                         setOtpCode('')
@@ -1161,18 +1292,20 @@ export default function LoginPage() {
                       ← Ubah Data Pendaftaran
                     </button>
 
-                    <button
-                      type="button"
-                      disabled={resendTimer > 0 || loading}
-                      onClick={handleSignUpResendOtp}
-                      className={`font-semibold cursor-pointer ${
-                        resendTimer > 0 
-                          ? 'text-slate-400 cursor-not-allowed' 
-                          : 'text-emerald-700 hover:underline'
-                      }`}
-                    >
-                      {resendTimer > 0 ? `Kirim ulang (${resendTimer}s)` : 'Kirim Ulang Kode'}
-                    </button>
+                    {!otpVerifiedNeedsPassword && (
+                      <button
+                        type="button"
+                        disabled={resendTimer > 0 || loading}
+                        onClick={handleSignUpResendOtp}
+                        className={`font-semibold cursor-pointer ${
+                          resendTimer > 0 
+                            ? 'text-slate-400 cursor-not-allowed' 
+                            : 'text-emerald-700 hover:underline'
+                        }`}
+                      >
+                        {resendTimer > 0 ? `Kirim ulang (${resendTimer}s)` : 'Kirim Ulang Kode'}
+                      </button>
+                    )}
                   </div>
                 </div>
               </form>

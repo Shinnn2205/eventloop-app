@@ -16,6 +16,18 @@ import AdminPanel from './pages/AdminPanel'
 import Layout from './components/Layout'
 import { AppProvider, useApp } from './context/AppContext'
 
+function hasPendingOtpSession() {
+  if (typeof window === 'undefined') return false
+  try {
+    return Boolean(
+      sessionStorage.getItem('eventloop_pending_signup_otp') ||
+      sessionStorage.getItem('eventloop_pending_forgot_otp')
+    )
+  } catch (e) {
+    return false
+  }
+}
+
 // Komponen penangkap sesi untuk otomatis melempar ke dashboard jika user SUDAH login saat membuka halaman /login atau klik link email
 function AuthHandler() {
   const { sessionUser, currentUserRole, isProfileComplete } = useApp()
@@ -24,15 +36,12 @@ function AuthHandler() {
 
   useEffect(() => {
     // Jangan otomatis redirect jika pengguna sedang dalam proses verifikasi kode OTP (pendaftaran atau reset password)
-    const isPendingOtp = Boolean(typeof window !== 'undefined' && (
-      sessionStorage.getItem('eventloop_pending_signup_otp') ||
-      sessionStorage.getItem('eventloop_pending_forgot_otp')
-    ))
-    if (isPendingOtp) return
+    if (hasPendingOtpSession()) return
 
     // Jika link email magic link diklik (membawa access_token di URL hash)
     if (location.hash && location.hash.includes('access_token')) {
       setTimeout(() => {
+        if (hasPendingOtpSession()) return
         if (currentUserRole === 'admin') {
           navigate('/admin', { replace: true })
         } else if (!isProfileComplete) {
@@ -72,8 +81,8 @@ function ProtectedRoute({ children, adminOnly = false }) {
     )
   }
 
-  // Jika belum login, lempar ke halaman login
-  if (!sessionUser) {
+  // Jika belum login atau masih berada di tahap verifikasi OTP, wajib selesaikan di halaman /login
+  if (!sessionUser || hasPendingOtpSession()) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
