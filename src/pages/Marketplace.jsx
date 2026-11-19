@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useApp } from '../context/AppContext'
+import { useApp, normalizeStorageLocation } from '../context/AppContext'
 import Spinner from '../components/Spinner'
 import { 
   Search, 
@@ -200,7 +200,7 @@ export default function Marketplace() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {filteredItems.map((item) => {
           const reserved = isInCart(item.id)
-          const itemLocation = item.lastLocation || item.initialLocation || 'Warehouse Kampus Gedung C'
+          const itemLocation = normalizeStorageLocation(item.lastLocation || item.initialLocation)
           return (
             <Link 
               to={`/equipment/${item.id}`}

@@ -668,7 +668,7 @@ export default function LoginPage() {
             </div>
             <div className="flex items-center gap-2.5 bg-white/80 p-2.5 rounded-xl border border-emerald-100/70 shadow-2xs">
               <Building2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-              <span>Inventarisasi Terpadu Ormawa & Gudang Kampus</span>
+              <span>Inventarisasi Terpadu Ormawa & Auditorium Lantai M PMBS</span>
             </div>
           </div>
         </div>

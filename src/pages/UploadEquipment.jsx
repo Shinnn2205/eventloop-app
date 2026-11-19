@@ -219,13 +219,13 @@ export default function UploadEquipment() {
 
               <div className="space-y-3 pt-2 border-t border-slate-100">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Lokasi Rak / Gudang Asal</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Lokasi Penyimpanan Asal</label>
                   <input 
                     type="text" 
                     required 
                     value={initialLocation} 
                     onChange={(e) => setInitialLocation(e.target.value)} 
-                    placeholder="cth. Warehouse Kampus Gedung C (Rak A-01)"
+                    placeholder="cth. Auditorium Lantai M PMBS"
                     className="cozy-input" 
                   />
                 </div>

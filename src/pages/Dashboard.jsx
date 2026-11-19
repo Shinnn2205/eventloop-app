@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useApp, parseFlexibleDate } from '../context/AppContext'
+import { useApp, parseFlexibleDate, normalizeStorageLocation, DEFAULT_STORAGE_LOCATION } from '../context/AppContext'
 import { 
   Recycle, 
   Calendar, 
@@ -155,7 +155,7 @@ export default function Dashboard() {
               <strong className="block text-sm font-bold text-emerald-950">
                 🌿 Pengembalian Event "{completedEventNotice.eventName}" Selesai & Disetujui Admin!
               </strong>
-              Seluruh perlengkapan telah dikembalikan ke gudang kampus dan peminjaman Anda otomatis dinyatakan selesai. Anda bisa langsung membuat event baru kapan saja.
+              Seluruh perlengkapan telah dikembalikan ke {DEFAULT_STORAGE_LOCATION} dan peminjaman Anda otomatis dinyatakan selesai. Anda bisa langsung membuat event baru kapan saja.
             </div>
           </div>
           <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
@@ -208,7 +208,7 @@ export default function Dashboard() {
                 <strong className="block text-sm font-bold text-rose-950">
                   ⚠️ Peringatan Keterlambatan Pengembalian ({Math.abs(daysLeft)} Hari Melewati Batas)
                 </strong>
-                Peminjaman untuk event <strong>"{activeReservation.eventName}"</strong> telah melewati tanggal {activeReservation.endDateLabel || activeReservation.endDate}. Denda keterlambatan Rp25.000 / hari sedang berjalan. Mohon segera pulangkan ke gudang kampus.
+                Peminjaman untuk event <strong>"{activeReservation.eventName}"</strong> telah melewati tanggal {activeReservation.endDateLabel || activeReservation.endDate}. Denda keterlambatan Rp25.000 / hari sedang berjalan. Mohon segera pulangkan ke {DEFAULT_STORAGE_LOCATION}.
               </div>
             </div>
             <Link
@@ -226,7 +226,7 @@ export default function Dashboard() {
                 <strong className="block text-sm font-bold text-amber-950">
                   ⏰ Batas Akhir Pengembalian Adalah Hari Ini!
                 </strong>
-                Hari ini adalah batas waktu peminjaman perlengkapan event <strong>"{activeReservation.eventName}"</strong>. Silakan kembalikan ke gudang kampus untuk menghindari denda keterlambatan.
+                Hari ini adalah batas waktu peminjaman perlengkapan event <strong>"{activeReservation.eventName}"</strong>. Silakan kembalikan ke {DEFAULT_STORAGE_LOCATION} untuk menghindari denda keterlambatan.
               </div>
             </div>
             <Link
@@ -244,7 +244,7 @@ export default function Dashboard() {
                 <strong className="block text-sm font-bold text-emerald-900">
                   📅 Pengingat Pengembalian (H-1 Besok Berakhir)
                 </strong>
-                Peminjaman perlengkapan untuk event <strong>"{activeReservation.eventName}"</strong> berakhir besok ({activeReservation.endDateLabel || activeReservation.endDate}). Pastikan perlengkapan siap diantarkan kembali ke gudang asal.
+                Peminjaman perlengkapan untuk event <strong>"{activeReservation.eventName}"</strong> berakhir besok ({activeReservation.endDateLabel || activeReservation.endDate}). Pastikan perlengkapan siap diantarkan kembali ke lokasi penyimpanan asal ({DEFAULT_STORAGE_LOCATION}).
               </div>
             </div>
             <Link
@@ -476,7 +476,7 @@ export default function Dashboard() {
                             <div className="min-w-0">
                               <div className="font-semibold text-slate-800 truncate">{item.name}</div>
                               <div className="text-[11px] text-slate-500 truncate">
-                                Lokasi asal: {item.lastLocation || item.initialLocation || 'Warehouse Kampus'}
+                                Lokasi asal: {normalizeStorageLocation(item.lastLocation || item.initialLocation)}
                               </div>
                             </div>
                           </div>
@@ -778,7 +778,7 @@ export default function Dashboard() {
             </p>
             {!trackingSearch.trim() && (
               <p className="text-[11px] text-slate-500 max-w-md mx-auto">
-                Seluruh perlengkapan kampus tersedia di gudang penyimpanan dan siap dipinjam 100% untuk kegiatan organisasi Anda.
+                Seluruh perlengkapan kampus tersedia di {DEFAULT_STORAGE_LOCATION} dan siap dipinjam 100% untuk kegiatan organisasi Anda.
               </p>
             )}
           </div>

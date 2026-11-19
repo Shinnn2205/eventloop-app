@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useApp, parseFlexibleDate } from '../context/AppContext'
+import { useApp, parseFlexibleDate, normalizeStorageLocation, DEFAULT_STORAGE_LOCATION } from '../context/AppContext'
 import { compressImageFile } from '../utils/imageCompression'
 import { 
   RotateCcw, 
@@ -59,7 +59,7 @@ const generateSampleReturnPhoto = (title, subtitle, info) => {
 
   ctx.fillStyle = '#f1f5f9'
   ctx.font = '12px monospace'
-  ctx.fillText(`Lokasi Simpan : ${info.location || 'Warehouse Kampus'}`, 42, 172)
+  ctx.fillText(`Lokasi Simpan : ${normalizeStorageLocation(info.location)}`, 42, 172)
   ctx.fillText(`Kondisi Fisik : Baik, Bersih, Komponen Lengkap`, 42, 198)
   ctx.fillText(`Peminjam      : ${info.borrower || 'Prasmulyan'}`, 42, 224)
   ctx.fillText(`Unit Serial   : ${info.itemCode || 'ITEM-RETURN'}`, 42, 250)
@@ -106,7 +106,7 @@ export default function ReturnPage() {
   }, [rentedItems, selectedItemId])
 
   const currentItem = rentedItems.find(i => i.id === selectedItemId) || rentedItems[0]
-  const currentOriginLocation = currentItem?.lastLocation || currentItem?.initialLocation || 'Warehouse Kampus Gedung C (Rak B-04)'
+  const currentOriginLocation = normalizeStorageLocation(currentItem?.lastLocation || currentItem?.initialLocation)
 
   const calculateOverdueDays = () => {
     const endStr = activeReservation?.endDateLabel || activeReservation?.endDate
@@ -268,14 +268,14 @@ export default function ReturnPage() {
 
           <a
             href={`https://wa.me/?text=${encodeURIComponent(
-              `Halo Admin Gudang EventLoop, saya PIC event "${activeReservation?.eventName}". Ingin konfirmasi jadwal serah terima pengembalian perlengkapan ke rak gudang.`
+              `Halo Admin EventLoop, saya PIC event "${activeReservation?.eventName}". Ingin konfirmasi jadwal serah terima pengembalian perlengkapan ke lokasi penyimpanan (${currentOriginLocation || DEFAULT_STORAGE_LOCATION}).`
             )}`}
             target="_blank"
             rel="noreferrer"
             className="btn-secondary !py-2 !px-3 text-[11px] flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
           >
             <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Kontak Admin Gudang (WhatsApp)</span>
+            <span>Kontak Admin Inventaris (WhatsApp)</span>
           </a>
         </div>
       )}
@@ -307,7 +307,7 @@ export default function ReturnPage() {
           </h3>
           <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
             {completedEventNotice?.eventName
-              ? `Terima kasih! Seluruh perlengkapan sewa untuk event "${completedEventNotice.eventName}" telah kembali ke gudang kampus dan diverifikasi admin. Peminjaman Anda telah otomatis selesai sehingga Anda dapat langsung membuat event baru.`
+              ? `Terima kasih! Seluruh perlengkapan sewa untuk event "${completedEventNotice.eventName}" telah kembali ke ${DEFAULT_STORAGE_LOCATION} dan diverifikasi admin. Peminjaman Anda telah otomatis selesai sehingga Anda dapat langsung membuat event baru.`
               : 'Terima kasih! Seluruh perlengkapan sewa Anda telah dikembalikan dan diverifikasi Admin. Anda dapat langsung membuat event baru.'}
           </p>
           <div className="pt-2 flex flex-wrap justify-center gap-2.5">
@@ -396,7 +396,7 @@ export default function ReturnPage() {
                       <div className="min-w-0">
                         <div className="font-semibold text-slate-900 text-xs truncate">{item.name}</div>
                         <div className="text-[11px] text-slate-500 truncate mt-0.5">
-                          {item.qty} unit · {item.lastLocation || item.initialLocation || 'Warehouse Kampus'}
+                          {item.qty} unit · {normalizeStorageLocation(item.lastLocation || item.initialLocation)}
                         </div>
                       </div>
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
@@ -568,7 +568,7 @@ export default function ReturnPage() {
                             <div className="py-6 flex flex-col items-center">
                               <MapPin className="w-5 h-5 text-emerald-600 mb-1.5" />
                               <span className="text-xs font-semibold text-slate-700">Pilih Foto Lokasi Simpan</span>
-                              <span className="text-[10px] text-slate-400 mt-0.5">Perlihatkan posisi rak/gudang</span>
+                              <span className="text-[10px] text-slate-400 mt-0.5">Perlihatkan posisi barang di lokasi penyimpanan</span>
                             </div>
                           )}
                         </div>
@@ -578,7 +578,7 @@ export default function ReturnPage() {
                             type="button"
                             onClick={() => {
                               const photo = generateSampleReturnPhoto(
-                                `Lokasi Gudang: ${currentOriginLocation}`,
+                                `Lokasi Simpan: ${currentOriginLocation}`,
                                 `Perlengkapan telah ditempatkan kembali pada rak asal (${currentItem?.name})`,
                                 {
                                   location: currentOriginLocation,

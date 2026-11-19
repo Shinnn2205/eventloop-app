@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useApp } from '../context/AppContext'
+import { useApp, normalizeStorageLocation } from '../context/AppContext'
 import { 
   ArrowLeft,
   Clock,
@@ -171,14 +171,14 @@ export default function MyEquipment() {
                         </div>
                         <div className="flex items-center gap-1 text-[11px] text-emerald-700 mt-1 truncate">
                           <MapPin className="w-3 h-3 text-emerald-600 flex-shrink-0" />
-                          <span className="truncate" title={item.lastLocation}>Lokasi Asal: {item.lastLocation || 'Warehouse Kampus'}</span>
+                          <span className="truncate" title={normalizeStorageLocation(item.lastLocation)}>Lokasi Asal: {normalizeStorageLocation(item.lastLocation)}</span>
                         </div>
                       </div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-2.5 text-xs">
                       <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                        <span className="text-[10px] text-slate-400 block">Tersedia di Gudang</span>
+                        <span className="text-[10px] text-slate-400 block">Tersedia di Lokasi</span>
                         <strong className="text-slate-800">{item.available} unit</strong>
                       </div>
                       <div className={`p-2.5 rounded-xl border ${
@@ -223,7 +223,7 @@ export default function MyEquipment() {
 
                             <a
                               href={`https://wa.me/?text=${encodeURIComponent(
-                                `Halo ${b.borrowerName} (${b.org}), saya pemilik inventaris "${item.name}" di EventLoop. Ingin koordinasi terkait pengembalian perlengkapan event "${b.eventName}" pada tanggal ${b.endDate} ke ${item.lastLocation || 'Warehouse Kampus'}.`
+                                `Halo ${b.borrowerName} (${b.org}), saya pemilik inventaris "${item.name}" di EventLoop. Ingin koordinasi terkait pengembalian perlengkapan event "${b.eventName}" pada tanggal ${b.endDate} ke ${normalizeStorageLocation(item.lastLocation)}.`
                               )}`}
                               target="_blank"
                               rel="noreferrer"

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useApp } from '../context/AppContext'
+import { useApp, normalizeStorageLocation } from '../context/AppContext'
 import { compressImageFile } from '../utils/imageCompression'
 import { 
   ClipboardCheck, 
@@ -235,7 +235,7 @@ export default function Reservation() {
                   const unitPrice = item.listingType === 'sale' ? (item.salePrice || item.price * 5) : item.price
                   const dayMultiplier = item.listingType === 'sale' ? 1 : durationDays
                   const subtotal = unitPrice * item.qty * dayMultiplier
-                  const originLocation = item.lastLocation || item.initialLocation || 'Warehouse Kampus Gedung C'
+                  const originLocation = normalizeStorageLocation(item.lastLocation || item.initialLocation)
 
                   return (
                     <div key={item.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

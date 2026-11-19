@@ -349,7 +349,7 @@ export default function LandingPage() {
               </div>
               <h4 className="text-lg font-bold text-slate-900 mb-2">2. Campus Inventory Tracking</h4>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-4">
-                Live tracking status peminjaman, siapa yang meminjam, batas tanggal pengembalian, serta lokasi gudang penyimpanan asal barang secara real-time.
+                Live tracking status peminjaman, siapa yang meminjam, batas tanggal pengembalian, serta lokasi penyimpanan asal barang (utama: Auditorium Lantai M PMBS) secara real-time.
               </p>
               <div className="text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-100 py-1 px-2.5 rounded-lg inline-block">
                 Live Location & Borrowing Status
@@ -479,7 +479,7 @@ export default function LandingPage() {
               { step: '02', title: 'Buat Event', desc: 'Tentukan nama acara, tanggal, kuota, & durasi.', icon: '📅' },
               { step: '03', title: 'Pilih Barang', desc: 'Pilih perlengkapan dari katalog berdasarkan Circular Score.', icon: '🛒' },
               { step: '04', title: 'Reservasi & QRIS', desc: 'Upload bukti transfer pembayaran untuk escrow admin.', icon: '📝' },
-              { step: '05', title: 'Ambil di Lokasi', desc: 'Ambil di gudang kampus sesuai lokasi asal barang.', icon: '📦' },
+              { step: '05', title: 'Ambil di Lokasi', desc: 'Ambil di Auditorium Lantai M PMBS sesuai lokasi asal barang.', icon: '📦' },
               { step: '06', title: 'Gunakan di Event', desc: 'Perlengkapan aktif digunakan selama kegiatan berlangsung.', icon: '🎪' },
               { step: '07', title: 'Pulangkan Barang', desc: 'Kembalikan barang ke tempat asal & upload bukti foto.', icon: '🔄' },
               { step: '08', title: 'Dampak Tercatat', desc: 'Metrik limbah & circular score otomatis bertambah!', icon: '🌱' },

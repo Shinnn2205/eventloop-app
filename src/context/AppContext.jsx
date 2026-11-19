@@ -27,6 +27,17 @@ function clearUserLocalStorage() {
 
 const AppContext = createContext()
 
+export const DEFAULT_STORAGE_LOCATION = 'Auditorium Lantai M PMBS'
+
+export const normalizeStorageLocation = (loc) => {
+  const raw = String(loc || '').trim()
+  if (!raw) return DEFAULT_STORAGE_LOCATION
+  if (/^warehouse\s+kampus/i.test(raw) || /sarpras/i.test(raw)) {
+    return DEFAULT_STORAGE_LOCATION
+  }
+  return raw
+}
+
 export const ADMIN_DISPLAY_NAMES = {
   'ac523634@gmail.com': 'Atmin Choirul',
   'sherren1999@gmail.com': 'Xyliarenn',
@@ -545,6 +556,15 @@ export function AppProvider({ children }) {
             }
 
             if (parsedRes) {
+              if (Array.isArray(parsedRes.items)) {
+                parsedRes = {
+                  ...parsedRes,
+                  items: parsedRes.items.map(i => ({
+                    ...i,
+                    lastLocation: normalizeStorageLocation(i.lastLocation || i.initialLocation)
+                  }))
+                }
+              }
               hasCloudReservation = true
               const normalizedStatus = userRes.status || parsedRes.paymentStatus || 'idle'
               const remainingRented = (parsedRes.items || []).filter(i => i.listingType !== 'sale')
@@ -710,7 +730,7 @@ export function AppProvider({ children }) {
             owner: (item.owner || 'Ormawa Kampus').replace(/sarpras/gi, 'Pengelola Kampus'),
             ownerBank: item.ownerBank || 'BCA 8012345678',
             description: item.description || '',
-            lastLocation: (item.lastLocation || 'Warehouse Kampus Gedung C').replace(/sarpras/gi, 'Kampus'),
+            lastLocation: normalizeStorageLocation(item.lastLocation),
             lastStoragePhoto: item.lastStoragePhoto || null,
             uploader: item.uploader || 'Admin'
           }
@@ -722,6 +742,7 @@ export function AppProvider({ children }) {
       equipmentData.forEach(item => {
         catalogMap.set(String(item.id), {
           ...item,
+          lastLocation: normalizeStorageLocation(item.lastLocation),
           reuseCount: item.reusedCount || 0,
           reusedCount: item.reusedCount || 0
         })
@@ -770,7 +791,7 @@ export function AppProvider({ children }) {
                 owner: parsed.owner || parsed.ownerOrg || t.buyer_org || 'Ormawa Kampus',
                 ownerBank: parsed.ownerBank || parsed.bankInfo || 'BCA 8012345678',
                 description: parsed.description || '',
-                lastLocation: parsed.lastLocation || parsed.initialLocation || 'Warehouse Kampus Gedung C',
+                lastLocation: normalizeStorageLocation(parsed.lastLocation || parsed.initialLocation),
                 lastStoragePhoto: parsed.lastStoragePhoto || parsed.initialStoragePhoto || null,
                 uploader: parsed.uploader || t.buyer_org || 'Mahasiswa'
               }
@@ -979,7 +1000,7 @@ export function AppProvider({ children }) {
                 itemCode: parsed.itemCode || `ITEM-${parsedEqId}`,
                 returnedQty: parsedQty,
                 borrower: parsed.borrower || t.buyer_org || 'Prasmulyan',
-                returnLocation: parsed.returnLocation || 'Warehouse Kampus Gedung C',
+                returnLocation: normalizeStorageLocation(parsed.returnLocation),
                 conditionPhoto: parsed.conditionPhoto || null,
                 storagePhoto: parsed.storagePhoto || null,
                 status: 'Pending Admin Verification',
@@ -1016,7 +1037,7 @@ export function AppProvider({ children }) {
                   storagePhoto: r.storage_photo,
                   returnedQty: r.returned_qty || 1,
                   borrower: r.borrower || 'Prasmulyan',
-                  returnLocation: r.return_location || 'Warehouse Kampus Gedung C',
+                  returnLocation: normalizeStorageLocation(r.return_location),
                   status: r.status || 'Pending Admin Verification',
                   timestamp: r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : 'Baru saja'
                 })
@@ -1293,7 +1314,7 @@ export function AppProvider({ children }) {
       owner: `${itemToApprove.ownerOrg || currentUserName || 'Organisasi Mahasiswa'}`,
       ownerBank: itemToApprove.bankInfo || itemToApprove.bankAccount || 'BCA 8012345678 a.n Owner',
       description: itemToApprove.description || 'Perlengkapan organisasi kampus siap pakai.',
-      lastLocation: itemToApprove.initialLocation || 'Warehouse Kampus Gedung C',
+      lastLocation: normalizeStorageLocation(itemToApprove.initialLocation),
       lastStoragePhoto: itemToApprove.initialStoragePhoto || null,
       uploader: itemToApprove.uploader || currentUserName
     }
@@ -1431,7 +1452,7 @@ export function AppProvider({ children }) {
       image: item.image || '📦',
       owner: item.owner,
       uploader: item.uploader,
-      originLocation: item.lastLocation || item.initialLocation || 'Warehouse Kampus Gedung C'
+      originLocation: normalizeStorageLocation(item.lastLocation || item.initialLocation)
     }))
 
     const cloudMetaPayload = {
@@ -1509,7 +1530,7 @@ export function AppProvider({ children }) {
       location: activeReservation?.location || 'Auditorium Kampus BSD',
       items: cartItems.map(item => ({
         ...item,
-        lastLocation: item.lastLocation || item.initialLocation || 'Warehouse Kampus Gedung C'
+        lastLocation: normalizeStorageLocation(item.lastLocation || item.initialLocation)
       })), 
       txnId: createdTxnId,
       totalAmount,
@@ -1867,7 +1888,7 @@ export function AppProvider({ children }) {
   const approveReturnByAdmin = async (returnId, equipmentId, returnedQty) => {
     const returnData = pendingReturns.find(r => r.id === returnId || r.returnId === returnId)
     const targetEq = equipments.find(e => String(e.id) === String(equipmentId))
-    const finalLocation = returnData?.returnLocation || targetEq?.lastLocation || targetEq?.initialLocation || 'Warehouse Kampus Gedung C'
+    const finalLocation = normalizeStorageLocation(returnData?.returnLocation || targetEq?.lastLocation || targetEq?.initialLocation)
     const qtyToAdd = Number(returnedQty) || 1
     const cappedNextAvail = targetEq
       ? Math.min(Number(targetEq.total) || 99, (Number(targetEq.available) || 0) + qtyToAdd)
@@ -2095,7 +2116,7 @@ export function AppProvider({ children }) {
             name: i.name,
             qty: i.qty || 1,
             image: i.image || '📦',
-            originLocation: i.lastLocation || i.initialLocation || 'Warehouse Kampus Gedung C'
+            originLocation: normalizeStorageLocation(i.lastLocation || i.initialLocation)
           }))
         })
       }
@@ -2115,7 +2136,7 @@ export function AppProvider({ children }) {
               name: cleanName,
               qty: matchQty ? parseInt(matchQty[1], 10) : 1,
               image: '📦',
-              originLocation: 'Warehouse Kampus Gedung C'
+              originLocation: DEFAULT_STORAGE_LOCATION
             }
           })
 

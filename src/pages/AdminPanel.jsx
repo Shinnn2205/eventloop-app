@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useApp } from '../context/AppContext'
+import { useApp, normalizeStorageLocation } from '../context/AppContext'
 import { compressImageFile } from '../utils/imageCompression'
 import { 
   ShieldCheck, 
@@ -368,7 +368,7 @@ export default function AdminPanel() {
                         onClick={() => setViewingProof({
                           title: `Foto Lokasi Penyimpanan: ${item.name}`,
                           photo: item.initialStoragePhoto,
-                          details: `Lokasi: ${item.initialLocation || 'Warehouse Kampus'}`
+                          details: `Lokasi: ${normalizeStorageLocation(item.initialLocation)}`
                         })}
                         className="h-32 w-full rounded-xl overflow-hidden border border-emerald-100 bg-white relative group cursor-pointer"
                       >
@@ -411,7 +411,7 @@ export default function AdminPanel() {
                       <span className="text-slate-400 text-[10px] block">Lokasi Pengambilan & Pengembalian</span>
                       <span className="font-semibold text-emerald-800 flex items-center gap-1 mt-0.5">
                         <MapPin className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                        {item.initialLocation || 'Warehouse Kampus Gedung C'}
+                        {normalizeStorageLocation(item.initialLocation)}
                       </span>
                     </div>
                   </div>
@@ -474,7 +474,7 @@ export default function AdminPanel() {
                     <MapPin className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                     <div>
                       <span className="text-[10px] text-slate-400 block">Lokasi Pengembalian Asal:</span>
-                      <strong className="text-slate-900">{ret.returnLocation || 'Warehouse Kampus Gedung C'}</strong>
+                      <strong className="text-slate-900">{normalizeStorageLocation(ret.returnLocation)}</strong>
                     </div>
                   </div>
 
@@ -503,7 +503,7 @@ export default function AdminPanel() {
                         onClick={() => setViewingProof({
                           title: `Lokasi Simpan: ${ret.itemName}`,
                           photo: ret.storagePhoto,
-                          details: `Lokasi Asal: ${ret.returnLocation || 'Gudang Asal'}`
+                          details: `Lokasi Asal: ${normalizeStorageLocation(ret.returnLocation)}`
                         })}
                         className="border border-emerald-100 rounded-xl overflow-hidden relative group cursor-pointer bg-white"
                       >

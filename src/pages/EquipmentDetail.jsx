@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useApp, parseFlexibleDate, formatIdDate } from '../context/AppContext'
+import { useApp, parseFlexibleDate, formatIdDate, normalizeStorageLocation } from '../context/AppContext'
 import { 
   ArrowLeft, 
   MapPin, 
@@ -124,7 +124,7 @@ export default function EquipmentDetail() {
   }
 
   const ownerWaText = encodeURIComponent(
-    `Halo PIC ${item.owner || 'Inventaris Kampus'}, saya tertarik untuk meminjam perlengkapan "${item.name}" melalui platform EventLoop Universitas Prasetiya Mulya. Apakah unit siap diambil di lokasi ${item.lastLocation || 'Warehouse Kampus'}?`
+    `Halo PIC ${item.owner || 'Inventaris Kampus'}, saya tertarik untuk meminjam perlengkapan "${item.name}" melalui platform EventLoop Universitas Prasetiya Mulya. Apakah unit siap diambil di lokasi ${normalizeStorageLocation(item.lastLocation)}?`
   )
 
   return (
@@ -160,8 +160,8 @@ export default function EquipmentDetail() {
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
                 <span className="text-[10px] text-slate-400 block">Lokasi Simpan</span>
-                <span className="text-xs font-bold text-emerald-900 block truncate mt-0.5" title={item.lastLocation}>
-                  {item.lastLocation || 'Warehouse Kampus Gedung C'}
+                <span className="text-xs font-bold text-emerald-900 block truncate mt-0.5" title={normalizeStorageLocation(item.lastLocation)}>
+                  {normalizeStorageLocation(item.lastLocation)}
                 </span>
               </div>
               <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
@@ -173,7 +173,7 @@ export default function EquipmentDetail() {
             </div>
 
             <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed">
-              Barang ini diambil dan wajib dikembalikan ke <strong className="text-emerald-800">{item.lastLocation || 'Warehouse Kampus Gedung C'}</strong> setelah kegiatan selesai.
+              Barang ini diambil dan wajib dikembalikan ke <strong className="text-emerald-800">{normalizeStorageLocation(item.lastLocation)}</strong> setelah kegiatan selesai.
             </p>
 
             <div>

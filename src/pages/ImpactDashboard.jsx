@@ -378,7 +378,7 @@ export default function ImpactDashboard() {
                   Dengan ini diterangkan bahwa peminjaman perlengkapan kegiatan telah memenuhi standar sistem <strong>Circular Score (Indeks: {campusImpact?.circularScore || 87}/100)</strong>, dengan mengedepankan prinsip pakai ulang (*reuse*), modularitas komponen (*repairable*), dan peniadaan limbah padat sekali pakai (*zero-waste*).
                 </p>
                 <p className="text-[11px] text-slate-500">
-                  Data ini tervalidasi secara komputasional melalui pelacakan transaksi dan foto serah terima gudang pada platform EventLoop Universitas Prasetiya Mulya.
+                  Data ini tervalidasi secara komputasional melalui pelacakan transaksi dan foto serah terima penyimpanan di Auditorium Lantai M PMBS pada platform EventLoop Universitas Prasetiya Mulya.
                 </p>
               </div>
 
@@ -395,7 +395,7 @@ export default function ImpactDashboard() {
                 </div>
 
                 <div className="space-y-12">
-                  <div className="text-[11px] text-slate-500">Pengelola Green Tech & Sarpras:</div>
+                  <div className="text-[11px] text-slate-500">Pengelola Green Tech &amp; Inventaris Kampus:</div>
                   <div>
                     <strong className="block text-emerald-900 border-t border-slate-300 pt-1 w-3/4 mx-auto">
                       Atmin Choirul & Tim EventLoop
